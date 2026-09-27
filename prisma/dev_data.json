@@ -102,6 +102,29 @@
   ],
   "assets": [
     {
+      "id": "asset_1790541056866_prigdr",
+      "projectId": "proj_1790533298685_cyyhic",
+      "cloudinaryPublicId": "impact-platform/proj_1790533298685_cyyhic/25ef6e82-4fa6-44e3-bb05-802e4360ace4/fqqegqflsigxrhyfdbqx",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790541056/impact-platform/proj_1790533298685_cyyhic/25ef6e82-4fa6-44e3-bb05-802e4360ace4/fqqegqflsigxrhyfdbqx.jpg",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 30382,
+      "width": 960,
+      "height": 720,
+      "manualCategory": "Environmental",
+      "manualLocation": "Moshi Rural, Kilimanjaro Region, Tanzania",
+      "manualNotes": null,
+      "capturedAt": "2026-09-27T00:00:00.000Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": null,
+      "exifLng": null,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-27T20:30:56.866Z",
+      "updatedAt": "2026-09-27T20:31:31.445Z"
+    },
+    {
       "id": "asset_1790540952206_txugv3",
       "projectId": "proj_1790540951015_88s45b",
       "cloudinaryPublicId": "impact-platform/proj_1790540951015_88s45b/community_farmers_council_meeting.jpg",
@@ -820,6 +843,38 @@
       "confidence": 0.86,
       "source": "external_vision",
       "createdAt": "2026-09-27T20:29:13.905Z"
+    },
+    {
+      "id": "tag_1790541091143_ty1ou",
+      "mediaAssetId": "asset_1790541056866_prigdr",
+      "label": "Natural Landscape",
+      "confidence": 0.94,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:31:31.143Z"
+    },
+    {
+      "id": "tag_1790541091215_0eiv4",
+      "mediaAssetId": "asset_1790541056866_prigdr",
+      "label": "Environmental Terrain",
+      "confidence": 0.91,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:31:31.215Z"
+    },
+    {
+      "id": "tag_1790541091259_qg7mc",
+      "mediaAssetId": "asset_1790541056866_prigdr",
+      "label": "Vegetation Cover",
+      "confidence": 0.87,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:31:31.259Z"
+    },
+    {
+      "id": "tag_1790541091320_rh9u5",
+      "mediaAssetId": "asset_1790541056866_prigdr",
+      "label": "Field Monitoring Site",
+      "confidence": 0.84,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:31:31.320Z"
     }
   ],
   "categories": [
@@ -884,6 +939,11 @@
       "id": "mac_1790540953970_w5okq",
       "mediaAssetId": "asset_1790540951045_rk5u21",
       "categoryId": "cat_disaster"
+    },
+    {
+      "id": "mac_1790541091386_9x1zd",
+      "mediaAssetId": "asset_1790541056866_prigdr",
+      "categoryId": "cat_env"
     }
   ]
 }

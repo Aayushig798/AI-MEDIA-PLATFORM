@@ -13,7 +13,10 @@ import {
   ShieldCheck, 
   FileSpreadsheet, 
   Info,
-  ExternalLink
+  ExternalLink,
+  Trash2,
+  AlertTriangle,
+  X
 } from "lucide-react";
 import { GalleryFilterBar } from "@/components/GalleryFilterBar";
 import { GalleryGrid, MediaAssetItem } from "@/components/GalleryGrid";
@@ -51,6 +54,11 @@ export default function ProjectGalleryPage() {
   // Modals
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<MediaAssetItem | null>(null);
+
+  // Project Deletion State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const fetchProjectInfo = useCallback(async () => {
     try {
@@ -131,6 +139,27 @@ export default function ProjectGalleryPage() {
     fetchProjectInfo();
   };
 
+  const handleDeleteProject = async () => {
+    try {
+      setDeletingProject(true);
+      setDeleteError("");
+
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete project");
+      }
+
+      router.push("/projects");
+    } catch (err: any) {
+      setDeleteError(err.message || "Failed to delete project");
+      setDeletingProject(false);
+    }
+  };
+
   if (loadingProject && !project) {
     return (
       <div className="py-24 flex flex-col items-center justify-center gap-3 text-slate-400">
@@ -170,7 +199,7 @@ export default function ProjectGalleryPage() {
           <span>Back to All Projects</span>
         </Link>
 
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="flex items-center gap-3 text-[11px]">
           <span className="font-mono text-slate-500">ID: {project.id}</span>
         </div>
       </div>
@@ -226,9 +255,22 @@ export default function ProjectGalleryPage() {
               <span>Upload Media</span>
             </button>
 
-            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400 px-3 py-1.5 rounded-xl bg-white/5 border border-white/5">
-              <Layers className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{assets.length} Assets in Gallery</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1 flex items-center justify-center gap-1.5 text-xs text-slate-400 px-3 py-2 rounded-xl bg-white/5 border border-white/5">
+                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{assets.length} Assets</span>
+              </div>
+
+              {/* Delete Project Button */}
+              <button
+                type="button"
+                id="open-delete-project-modal-btn"
+                onClick={() => setShowDeleteModal(true)}
+                title="Delete this project and all its media"
+                className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-white/5 transition"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
@@ -291,6 +333,66 @@ export default function ProjectGalleryPage() {
         onAssetUpdated={handleAssetUpdated}
         onAssetDeleted={handleAssetDeleted}
       />
+
+      {/* Delete Project Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div 
+            className="glass-dropdown w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl relative border border-red-500/20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowDeleteModal(false)}
+              className="absolute right-4 top-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-xl font-bold text-white">Delete Project?</h3>
+            <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+              Are you sure you want to permanently delete <strong className="text-white">&ldquo;{project.name}&rdquo;</strong>?
+            </p>
+            <p className="text-xs text-red-400 mt-2 bg-red-950/40 p-3 rounded-xl border border-red-500/20">
+              Warning: This will permanently erase the project record and destroy all <strong className="text-white">{assets.length}</strong> associated evidence media assets from Cloudinary CDN and the database.
+            </p>
+
+            {deleteError && (
+              <div className="mt-3 p-2.5 rounded-xl bg-red-500/20 text-red-200 text-xs">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deletingProject}
+                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="confirm-delete-project-btn"
+                onClick={handleDeleteProject}
+                disabled={deletingProject}
+                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/20 disabled:opacity-50 transition"
+              >
+                {deletingProject ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                <span>{deletingProject ? "Deleting Project..." : "Permanently Delete"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

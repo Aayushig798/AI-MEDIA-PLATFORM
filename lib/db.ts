@@ -459,6 +459,33 @@ export const db = {
       saveLocalData(current);
       return newProject;
     },
+
+    async delete({ where }: { where: { id: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.project.delete({ where });
+        } catch (e) {
+          console.error("Prisma error in project.delete:", e);
+        }
+      }
+      const current = loadLocalData();
+      const proj = current.projects.find((p) => p.id === where.id);
+      if (!proj) throw new Error("Project not found");
+
+      const assetIdsToDelete = new Set(
+        current.assets.filter((a) => a.projectId === where.id).map((a) => a.id)
+      );
+
+      current.projects = current.projects.filter((p) => p.id !== where.id);
+      current.assets = current.assets.filter((a) => a.projectId !== where.id);
+      current.aiTags = current.aiTags.filter((t) => !assetIdsToDelete.has(t.mediaAssetId));
+      current.mediaAssetCategories = current.mediaAssetCategories.filter(
+        (mac) => !assetIdsToDelete.has(mac.mediaAssetId)
+      );
+
+      saveLocalData(current);
+      return proj;
+    },
   },
 
   // CATEGORIES
