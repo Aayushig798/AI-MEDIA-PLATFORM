@@ -1,7 +1,5 @@
 # Phase 1: Foundation & Media Management (Day 1–2)
 
-> **Note:** This phase has already been implemented. This document is kept for reference and consistency with the rest of the phase docs — no changes to the existing Phase 1 codebase are implied by this reformatting.
-
 **Timeline:** Day 1–2 
 **Goal:** A team can create a project and upload photos/videos into it, organized by project/location/date, with a working gallery — fully CRUD, no AI yet.
 **Exit Criterion:** A batch of 5+ mixed image/video files uploads successfully, appears correctly in a filterable gallery served from Cloudinary, and deleting an asset removes it from both the gallery and the Cloudinary Media Library.
