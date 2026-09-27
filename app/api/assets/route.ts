@@ -24,15 +24,10 @@ export async function GET(req: NextRequest) {
     if (from || to) {
       where.capturedAt = {};
       if (from) {
-        where.capturedAt.gte = new Date(from);
+        where.capturedAt.gte = from.length === 10 ? new Date(`${from}T00:00:00.000Z`) : new Date(from);
       }
       if (to) {
-        // Set to end of the day if it's just a date string like YYYY-MM-DD
-        const toDate = new Date(to);
-        if (to.length === 10) {
-          toDate.setHours(23, 59, 59, 999);
-        }
-        where.capturedAt.lte = toDate;
+        where.capturedAt.lte = to.length === 10 ? new Date(`${to}T23:59:59.999Z`) : new Date(to);
       }
     }
 
