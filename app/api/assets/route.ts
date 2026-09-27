@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { extractCloudinaryAiTags, extractCloudinaryExif } from "@/lib/ai/cloudinaryTagging";
+import { runVisionFallback } from "@/lib/ai/visionFallback";
+import { mapLabelToCategory } from "@/lib/ai/categoryMapping";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId") || undefined;
     const category = searchParams.get("category") || undefined;
+    const aiCategory = searchParams.get("aiCategory") || undefined;
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
 
@@ -19,6 +23,10 @@ export async function GET(req: NextRequest) {
 
     if (category && category !== "ALL") {
       where.manualCategory = category;
+    }
+
+    if (aiCategory && aiCategory !== "ALL") {
+      where.aiCategory = aiCategory;
     }
 
     if (from || to) {
@@ -63,6 +71,10 @@ export async function POST(req: NextRequest) {
       manualNotes,
       capturedAt,
       uploadedBy,
+      exifLat,
+      exifLng,
+      info, // Cloudinary upload info response if passed
+      filename,
     } = body;
 
     if (!projectId || !cloudinaryPublicId || !secureUrl) {
@@ -92,6 +104,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Extract EXIF from Cloudinary image_metadata if present
+    let finalExifLat = exifLat ?? null;
+    let finalExifLng = exifLng ?? null;
+    let finalCapturedAt = capturedAt ? new Date(capturedAt) : null;
+
+    if (info?.image_metadata) {
+      const extracted = extractCloudinaryExif(info.image_metadata);
+      if (extracted.exifLat !== null) finalExifLat = extracted.exifLat;
+      if (extracted.exifLng !== null) finalExifLng = extracted.exifLng;
+      if (extracted.capturedAt && !finalCapturedAt) {
+        finalCapturedAt = new Date(extracted.capturedAt);
+      }
+    }
+
+    // Fallback capturedAt to now if not set
+    if (!finalCapturedAt) {
+      finalCapturedAt = new Date();
+    }
+
+    // Check for inline Cloudinary AI tags
+    const inlineAiTags = extractCloudinaryAiTags(info);
+    const hasInlineTags = inlineAiTags.length > 0;
+
+    // Create the media asset in DB
     const asset = await db.mediaAsset.create({
       data: {
         projectId,
@@ -105,10 +141,50 @@ export async function POST(req: NextRequest) {
         manualCategory: manualCategory?.trim() || null,
         manualLocation: manualLocation?.trim() || null,
         manualNotes: manualNotes?.trim() || null,
-        capturedAt: capturedAt ? new Date(capturedAt) : new Date(),
+        capturedAt: finalCapturedAt,
         uploadedBy: finalUploadedBy,
+        exifLat: finalExifLat,
+        exifLng: finalExifLng,
+        aiProcessingStatus: hasInlineTags ? "done" : "pending",
       },
     });
+
+    // If inline tags were available from Cloudinary, write them immediately
+    if (hasInlineTags) {
+      const mappedCats = new Set<string>();
+      for (const t of inlineAiTags) {
+        await db.aiTag.create({
+          data: {
+            mediaAssetId: asset.id,
+            label: t.label,
+            confidence: t.confidence,
+            source: t.source,
+          },
+        });
+        const catName = mapLabelToCategory(t.label);
+        if (catName !== "Uncategorized") mappedCats.add(catName);
+      }
+
+      for (const catName of Array.from(mappedCats)) {
+        const cat = await db.category.upsert({
+          where: { name: catName },
+          update: {},
+          create: { name: catName },
+        });
+        await db.mediaAssetCategory.create({
+          data: { mediaAssetId: asset.id, categoryId: cat.id },
+        });
+      }
+    } else {
+      // NFR-05: Non-blocking asynchronous AI vision processing
+      runVisionFallback(asset.id, asset.secureUrl, {
+        filename: filename || cloudinaryPublicId,
+        manualNotes: asset.manualNotes || undefined,
+        manualLocation: asset.manualLocation || undefined,
+      }).catch((err) => {
+        console.error("Async runVisionFallback background error:", err);
+      });
+    }
 
     return NextResponse.json({ success: true, asset }, { status: 201 });
   } catch (error: any) {

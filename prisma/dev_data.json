@@ -10,6 +10,51 @@
   ],
   "projects": [
     {
+      "id": "proj_1790540951015_88s45b",
+      "name": "Bengal Coastal Delta & Mangrove Protection",
+      "description": "AI-assisted ecological survey of coastal mangrove reforestation and community flood defenses.",
+      "location": "Sundarbans Biosphere, West Bengal",
+      "startDate": "2024-05-01T00:00:00.000Z",
+      "createdBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:29:11.017Z"
+    },
+    {
+      "id": "proj_1790539650265_41ky1q",
+      "name": "Kilimanjaro Glacial Melt & Watershed Restoration",
+      "description": "High-resolution field monitoring of glacial melt runoff channels and agroforestry buffers.",
+      "location": "Moshi Rural, Kilimanjaro Region, Tanzania",
+      "startDate": "2024-04-10T00:00:00.000Z",
+      "createdBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:07:30.265Z"
+    },
+    {
+      "id": "proj_1790539533976_g4manz",
+      "name": "Kilimanjaro Glacial Melt & Watershed Restoration",
+      "description": "High-resolution field monitoring of glacial melt runoff channels and agroforestry buffers.",
+      "location": "Moshi Rural, Kilimanjaro Region, Tanzania",
+      "startDate": "2024-04-10T00:00:00.000Z",
+      "createdBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:05:33.976Z"
+    },
+    {
+      "id": "proj_1790539256525_utvcp4",
+      "name": "Kilimanjaro Glacial Melt & Watershed Restoration",
+      "description": "High-resolution field monitoring of glacial melt runoff channels and agroforestry buffers.",
+      "location": "Moshi Rural, Kilimanjaro Region, Tanzania",
+      "startDate": "2024-04-10T00:00:00.000Z",
+      "createdBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:00:56.525Z"
+    },
+    {
+      "id": "proj_1790538013202_xm15y8",
+      "name": "TEST PROJECT 1",
+      "description": "Testing phase 1",
+      "location": "DELHI",
+      "startDate": "2026-09-27T00:00:00.000Z",
+      "createdBy": "usr_demo123",
+      "createdAt": "2026-09-27T19:40:13.207Z"
+    },
+    {
       "id": "proj_1790533298685_cyyhic",
       "name": "Kilimanjaro Glacial Melt & Watershed Restoration",
       "description": "High-resolution field monitoring of glacial melt runoff channels and agroforestry buffers.",
@@ -57,22 +102,294 @@
   ],
   "assets": [
     {
-      "id": "asset_1790533298744_yskrwo",
-      "projectId": "proj_1790533298685_cyyhic",
-      "cloudinaryPublicId": "impact-platform/proj_1790533298685_cyyhic/a14fe9d1-a1e1-4c86-a4f6-1e72a184c86c/asset_community_meeting_video",
-      "secureUrl": "https://res.cloudinary.com/demo/video/upload/sample_workshop.mp4",
+      "id": "asset_1790540952206_txugv3",
+      "projectId": "proj_1790540951015_88s45b",
+      "cloudinaryPublicId": "impact-platform/proj_1790540951015_88s45b/community_farmers_council_meeting.jpg",
+      "secureUrl": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=1200&q=80",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 1250000,
+      "width": null,
+      "height": null,
+      "manualCategory": "Community",
+      "manualLocation": "Satjelia Panchayat Bhavan",
+      "manualNotes": "Local village council training and participatory workshop.",
+      "capturedAt": "2026-09-27T20:29:12.205Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": 22.0911,
+      "exifLng": 88.8344,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-27T20:29:12.206Z",
+      "updatedAt": "2026-09-27T20:29:12.402Z"
+    },
+    {
+      "id": "asset_1790540951798_p0izok",
+      "projectId": "proj_1790540951015_88s45b",
+      "cloudinaryPublicId": "impact-platform/proj_1790540951015_88s45b/solar_powered_water_filtration.jpg",
+      "secureUrl": "https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=1200&q=80",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 1250000,
+      "width": null,
+      "height": null,
+      "manualCategory": "Infrastructure",
+      "manualLocation": "Basanti Desalination Plant",
+      "manualNotes": "Solar panel array powering community water desalination well.",
+      "capturedAt": "2026-09-27T20:29:11.797Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": 22.1982,
+      "exifLng": 88.7121,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-27T20:29:11.798Z",
+      "updatedAt": "2026-09-27T20:29:12.182Z"
+    },
+    {
+      "id": "asset_1790540951526_0hfqip",
+      "projectId": "proj_1790540951015_88s45b",
+      "cloudinaryPublicId": "impact-platform/proj_1790540951015_88s45b/mangrove_canopy_drone_survey.jpg",
+      "secureUrl": "https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?auto=format&fit=crop&w=1200&q=80",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 1250000,
+      "width": null,
+      "height": null,
+      "manualCategory": "Environmental",
+      "manualLocation": "Gosaba Island Buffer Zone",
+      "manualNotes": "Canopy density and estuarine vegetation regrowth.",
+      "capturedAt": "2026-09-27T20:29:11.525Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": 22.1643,
+      "exifLng": 88.8077,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-27T20:29:11.526Z",
+      "updatedAt": "2026-09-27T20:29:11.776Z"
+    },
+    {
+      "id": "asset_1790540951045_rk5u21",
+      "projectId": "proj_1790540951015_88s45b",
+      "cloudinaryPublicId": "impact-platform/proj_1790540951015_88s45b/flooded_coastal_village.jpg",
+      "secureUrl": "https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=1200&q=80",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 1250000,
+      "width": null,
+      "height": null,
+      "manualCategory": "Disaster Response",
+      "manualLocation": "South 24 Parganas Delta",
+      "manualNotes": "Monsoon flood inundation with debris along river bank.",
+      "capturedAt": "2026-09-27T20:29:11.044Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": 21.8492,
+      "exifLng": 88.8953,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-27T20:29:11.045Z",
+      "updatedAt": "2026-09-27T20:29:13.992Z"
+    },
+    {
+      "id": "asset_1790539658614_zn6xg6",
+      "projectId": "proj_1790539650265_41ky1q",
+      "cloudinaryPublicId": "impact-platform/proj_1790539650265_41ky1q/c4cbd160-ffc2-43b7-9df1-6c1e267b7766/s124ur3mp0hvlsyhognm",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/video/upload/v1790539658/impact-platform/proj_1790539650265_41ky1q/c4cbd160-ffc2-43b7-9df1-6c1e267b7766/s124ur3mp0hvlsyhognm.mp4",
       "resourceType": "video",
       "format": "mp4",
-      "bytes": 18500000,
-      "width": 1920,
-      "height": 1080,
+      "bytes": 788493,
+      "width": 320,
+      "height": 176,
       "manualCategory": "Community",
-      "manualLocation": "Moshi Community Council Hall",
-      "manualNotes": "Participatory watershed mapping session with village elders.",
-      "capturedAt": "2024-04-22T00:00:00.000Z",
+      "manualLocation": "Village Center",
+      "manualNotes": "Elder community council briefing.",
+      "capturedAt": "2026-09-27T20:07:38.585Z",
       "uploadedBy": "usr_demo123",
-      "createdAt": "2026-09-27T18:21:38.744Z",
-      "updatedAt": "2026-09-27T18:21:38.744Z"
+      "createdAt": "2026-09-27T20:07:38.614Z",
+      "updatedAt": "2026-09-27T20:07:38.614Z"
+    },
+    {
+      "id": "asset_1790539657104_2pzz88",
+      "projectId": "proj_1790539650265_41ky1q",
+      "cloudinaryPublicId": "impact-platform/proj_1790539650265_41ky1q/d17cf402-d2bd-4889-b85a-fc2a0d1d1d9a/oatccodczwdgevgrby8u",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/video/upload/v1790539656/impact-platform/proj_1790539650265_41ky1q/d17cf402-d2bd-4889-b85a-fc2a0d1d1d9a/oatccodczwdgevgrby8u.mp4",
+      "resourceType": "video",
+      "format": "mp4",
+      "bytes": 788493,
+      "width": 320,
+      "height": 176,
+      "manualCategory": "Environmental",
+      "manualLocation": "Runoff Channel B",
+      "manualNotes": "Runoff velocity video log.",
+      "capturedAt": "2026-09-27T20:07:37.072Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:07:37.104Z",
+      "updatedAt": "2026-09-27T20:07:37.104Z"
+    },
+    {
+      "id": "asset_1790539654390_7uqvg2",
+      "projectId": "proj_1790539650265_41ky1q",
+      "cloudinaryPublicId": "impact-platform/proj_1790539650265_41ky1q/d165b0b0-93d3-4260-a14f-16e69197f18e/dz6sfnl9edmqia9v1mt6",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790539653/impact-platform/proj_1790539650265_41ky1q/d165b0b0-93d3-4260-a14f-16e69197f18e/dz6sfnl9edmqia9v1mt6.png",
+      "resourceType": "image",
+      "format": "png",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "manualCategory": "Infrastructure",
+      "manualLocation": "Moshi Central",
+      "manualNotes": "Solar borehole well installation.",
+      "capturedAt": "2026-09-27T20:07:34.365Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:07:34.390Z",
+      "updatedAt": "2026-09-27T20:07:34.390Z"
+    },
+    {
+      "id": "asset_1790539652980_ripxvr",
+      "projectId": "proj_1790539650265_41ky1q",
+      "cloudinaryPublicId": "impact-platform/proj_1790539650265_41ky1q/a58bcf58-dd75-4a5d-a374-94f962a19b5e/w7z1yklbfqwwqs8dmryg",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790539652/impact-platform/proj_1790539650265_41ky1q/a58bcf58-dd75-4a5d-a374-94f962a19b5e/w7z1yklbfqwwqs8dmryg.png",
+      "resourceType": "image",
+      "format": "png",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "manualCategory": "Environmental",
+      "manualLocation": "Plot Alpha 2",
+      "manualNotes": "Glacial stream seedling growth.",
+      "capturedAt": "2026-09-27T20:07:32.950Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:07:32.980Z",
+      "updatedAt": "2026-09-27T20:07:32.980Z"
+    },
+    {
+      "id": "asset_1790539546591_i2vdir",
+      "projectId": "proj_1790539533976_g4manz",
+      "cloudinaryPublicId": "impact-platform/proj_1790539533976_g4manz/2e4ad3fc-bc2d-45e0-a75c-109f55a22cf3/ywkgwzb9plq7v6zbfuyt",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/video/upload/v1790539544/impact-platform/proj_1790539533976_g4manz/2e4ad3fc-bc2d-45e0-a75c-109f55a22cf3/ywkgwzb9plq7v6zbfuyt.mp4",
+      "resourceType": "video",
+      "format": "mp4",
+      "bytes": 788493,
+      "width": 320,
+      "height": 176,
+      "manualCategory": "Community",
+      "manualLocation": "Village Center",
+      "manualNotes": "Elder community council briefing.",
+      "capturedAt": "2026-09-27T20:05:46.561Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:05:46.591Z",
+      "updatedAt": "2026-09-27T20:05:46.591Z"
+    },
+    {
+      "id": "asset_1790539543446_qaqm2r",
+      "projectId": "proj_1790539533976_g4manz",
+      "cloudinaryPublicId": "impact-platform/proj_1790539533976_g4manz/bebca125-ea3b-4abc-bd75-5a7fce98c475/syuf8mieptlwqfnyd5jc",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/video/upload/v1790539539/impact-platform/proj_1790539533976_g4manz/bebca125-ea3b-4abc-bd75-5a7fce98c475/syuf8mieptlwqfnyd5jc.mp4",
+      "resourceType": "video",
+      "format": "mp4",
+      "bytes": 788493,
+      "width": 320,
+      "height": 176,
+      "manualCategory": "Environmental",
+      "manualLocation": "Runoff Channel B",
+      "manualNotes": "Runoff velocity video log.",
+      "capturedAt": "2026-09-27T20:05:43.415Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:05:43.446Z",
+      "updatedAt": "2026-09-27T20:05:43.446Z"
+    },
+    {
+      "id": "asset_1790539537694_nc0a8a",
+      "projectId": "proj_1790539533976_g4manz",
+      "cloudinaryPublicId": "impact-platform/proj_1790539533976_g4manz/53163b06-3f64-429b-aaf5-8ad68b0e619b/inidck6oqt4kehyzef2s",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790539537/impact-platform/proj_1790539533976_g4manz/53163b06-3f64-429b-aaf5-8ad68b0e619b/inidck6oqt4kehyzef2s.png",
+      "resourceType": "image",
+      "format": "png",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "manualCategory": "Infrastructure",
+      "manualLocation": "Moshi Central",
+      "manualNotes": "Solar borehole well installation.",
+      "capturedAt": "2026-09-27T20:05:37.661Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:05:37.694Z",
+      "updatedAt": "2026-09-27T20:05:37.694Z"
+    },
+    {
+      "id": "asset_1790539536603_4d78sc",
+      "projectId": "proj_1790539533976_g4manz",
+      "cloudinaryPublicId": "impact-platform/proj_1790539533976_g4manz/3c7fe1bd-b18b-4450-9184-cfa83748052d/syxqsxsqgvdtlusutbgu",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790539536/impact-platform/proj_1790539533976_g4manz/3c7fe1bd-b18b-4450-9184-cfa83748052d/syxqsxsqgvdtlusutbgu.png",
+      "resourceType": "image",
+      "format": "png",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "manualCategory": "Environmental",
+      "manualLocation": "Plot Alpha 2",
+      "manualNotes": "Glacial stream seedling growth.",
+      "capturedAt": "2026-09-27T20:05:36.572Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:05:36.603Z",
+      "updatedAt": "2026-09-27T20:05:36.603Z"
+    },
+    {
+      "id": "asset_1790539260078_kialqp",
+      "projectId": "proj_1790539256525_utvcp4",
+      "cloudinaryPublicId": "impact-platform/proj_1790539256525_utvcp4/9238cf36-3c89-40f1-8518-5688b8f049e8/gmwc6cmbq8njjv15i9no",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790539259/impact-platform/proj_1790539256525_utvcp4/9238cf36-3c89-40f1-8518-5688b8f049e8/gmwc6cmbq8njjv15i9no.png",
+      "resourceType": "image",
+      "format": "png",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "manualCategory": "Infrastructure",
+      "manualLocation": "Moshi Central",
+      "manualNotes": "Solar borehole well installation.",
+      "capturedAt": "2026-09-27T20:01:00.043Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:01:00.078Z",
+      "updatedAt": "2026-09-27T20:01:00.078Z"
+    },
+    {
+      "id": "asset_1790539259368_5vtsjk",
+      "projectId": "proj_1790539256525_utvcp4",
+      "cloudinaryPublicId": "impact-platform/proj_1790539256525_utvcp4/ab0eb8c9-eb1c-4a08-bdb9-2fdc5fdb0bc9/qbnkawgrvzpb6slsr96e",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790539259/impact-platform/proj_1790539256525_utvcp4/ab0eb8c9-eb1c-4a08-bdb9-2fdc5fdb0bc9/qbnkawgrvzpb6slsr96e.png",
+      "resourceType": "image",
+      "format": "png",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "manualCategory": "Environmental",
+      "manualLocation": "Plot Alpha 2",
+      "manualNotes": "Glacial stream seedling growth.",
+      "capturedAt": "2026-09-27T20:00:59.338Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:00:59.368Z",
+      "updatedAt": "2026-09-27T20:00:59.368Z"
+    },
+    {
+      "id": "asset_1790539258549_hupu6z",
+      "projectId": "proj_1790539256525_utvcp4",
+      "cloudinaryPublicId": "impact-platform/proj_1790539256525_utvcp4/2bd922cc-b9d8-4974-a394-f1e5e094964e/klqesadlzqjc3mclhbti",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790539258/impact-platform/proj_1790539256525_utvcp4/2bd922cc-b9d8-4974-a394-f1e5e094964e/klqesadlzqjc3mclhbti.png",
+      "resourceType": "image",
+      "format": "png",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "manualCategory": "Environmental",
+      "manualLocation": "Plot Alpha 1",
+      "manualNotes": "High altitude drone survey.",
+      "capturedAt": "2026-09-27T20:00:58.508Z",
+      "uploadedBy": "usr_demo123",
+      "createdAt": "2026-09-27T20:00:58.549Z",
+      "updatedAt": "2026-09-27T20:00:58.549Z"
     },
     {
       "id": "asset_1790533298733_3c1igq",
@@ -253,6 +570,320 @@
       "uploadedBy": "usr_demo123",
       "createdAt": "2024-04-13T00:00:00.000Z",
       "updatedAt": "2024-04-13T00:00:00.000Z"
+    }
+  ],
+  "aiTags": [
+    {
+      "id": "tag_1790540951608_9y8lt",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Forest Canopy",
+      "confidence": 0.98,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.608Z"
+    },
+    {
+      "id": "tag_1790540951628_5ordl",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Rainforest Ecosystem",
+      "confidence": 0.95,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.628Z"
+    },
+    {
+      "id": "tag_1790540951645_mohng",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Vegetation Cover",
+      "confidence": 0.92,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.645Z"
+    },
+    {
+      "id": "tag_1790540951669_9stwi",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Tree Biomass",
+      "confidence": 0.88,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.669Z"
+    },
+    {
+      "id": "tag_1790540951682_58c1u",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Mangrove Sapling",
+      "confidence": 0.96,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.682Z"
+    },
+    {
+      "id": "tag_1790540951695_t03hx",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Estuarine Habitat",
+      "confidence": 0.94,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.695Z"
+    },
+    {
+      "id": "tag_1790540951715_pd02f",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Tree Nursery",
+      "confidence": 0.91,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.715Z"
+    },
+    {
+      "id": "tag_1790540951737_jtllh",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "label": "Coastal Wetland",
+      "confidence": 0.87,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.737Z"
+    },
+    {
+      "id": "tag_1790540951877_480dv",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Solar Panel Array",
+      "confidence": 0.97,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.877Z"
+    },
+    {
+      "id": "tag_1790540951896_uqsmq",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Renewable Energy Installation",
+      "confidence": 0.94,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.896Z"
+    },
+    {
+      "id": "tag_1790540951916_wmwae",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Photovoltaic Cells",
+      "confidence": 0.91,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.916Z"
+    },
+    {
+      "id": "tag_1790540951940_n8aoc",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Clean Power Infrastructure",
+      "confidence": 0.89,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.940Z"
+    },
+    {
+      "id": "tag_1790540951959_dtixo",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Water Resource",
+      "confidence": 0.95,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.959Z"
+    },
+    {
+      "id": "tag_1790540951977_r0ga9",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "River Stream Flow",
+      "confidence": 0.93,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.977Z"
+    },
+    {
+      "id": "tag_1790540951996_nl1jh",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Hydrological Channel",
+      "confidence": 0.9,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:11.996Z"
+    },
+    {
+      "id": "tag_1790540952017_re0t8",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Borehole Pump Facility",
+      "confidence": 0.88,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.017Z"
+    },
+    {
+      "id": "tag_1790540952030_21p5e",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Community Council Gathering",
+      "confidence": 0.95,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.030Z"
+    },
+    {
+      "id": "tag_1790540952053_4qs0t",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Participatory Workshop",
+      "confidence": 0.92,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.053Z"
+    },
+    {
+      "id": "tag_1790540952074_hxf3h",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Local Stakeholders",
+      "confidence": 0.89,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.074Z"
+    },
+    {
+      "id": "tag_1790540952094_jalcv",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "label": "Indigenous Leadership",
+      "confidence": 0.86,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.094Z"
+    },
+    {
+      "id": "tag_1790540952287_cpl87",
+      "mediaAssetId": "asset_1790540952206_txugv3",
+      "label": "Community Council Gathering",
+      "confidence": 0.95,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.287Z"
+    },
+    {
+      "id": "tag_1790540952309_zz7di",
+      "mediaAssetId": "asset_1790540952206_txugv3",
+      "label": "Participatory Workshop",
+      "confidence": 0.92,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.309Z"
+    },
+    {
+      "id": "tag_1790540952329_lzuaa",
+      "mediaAssetId": "asset_1790540952206_txugv3",
+      "label": "Local Stakeholders",
+      "confidence": 0.89,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.329Z"
+    },
+    {
+      "id": "tag_1790540952352_o52rb",
+      "mediaAssetId": "asset_1790540952206_txugv3",
+      "label": "Indigenous Leadership",
+      "confidence": 0.86,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:12.352Z"
+    },
+    {
+      "id": "tag_1790540953725_d5vxj",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "label": "Water Resource",
+      "confidence": 0.95,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:13.725Z"
+    },
+    {
+      "id": "tag_1790540953751_ydrlr",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "label": "River Stream Flow",
+      "confidence": 0.93,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:13.751Z"
+    },
+    {
+      "id": "tag_1790540953780_ynvkb",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "label": "Hydrological Channel",
+      "confidence": 0.9,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:13.780Z"
+    },
+    {
+      "id": "tag_1790540953809_2rhjf",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "label": "Borehole Pump Facility",
+      "confidence": 0.88,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:13.809Z"
+    },
+    {
+      "id": "tag_1790540953856_s6fz5",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "label": "Erosion Gully",
+      "confidence": 0.93,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:13.856Z"
+    },
+    {
+      "id": "tag_1790540953877_7fmbb",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "label": "Debris Obstruction",
+      "confidence": 0.9,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:13.877Z"
+    },
+    {
+      "id": "tag_1790540953905_o53mu",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "label": "Storm Surge Impact",
+      "confidence": 0.86,
+      "source": "external_vision",
+      "createdAt": "2026-09-27T20:29:13.905Z"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat_env",
+      "name": "Environmental"
+    },
+    {
+      "id": "cat_infra",
+      "name": "Infrastructure"
+    },
+    {
+      "id": "cat_comm",
+      "name": "Community"
+    },
+    {
+      "id": "cat_disaster",
+      "name": "Disaster Response"
+    },
+    {
+      "id": "cat_uncat",
+      "name": "Uncategorized"
+    }
+  ],
+  "mediaAssetCategories": [
+    {
+      "id": "mac_1790540951760_z9ovp",
+      "mediaAssetId": "asset_1790540951526_0hfqip",
+      "categoryId": "cat_env"
+    },
+    {
+      "id": "mac_1790540952118_z5o4o",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "categoryId": "cat_env"
+    },
+    {
+      "id": "mac_1790540952141_dhjvd",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "categoryId": "cat_infra"
+    },
+    {
+      "id": "mac_1790540952163_74uer",
+      "mediaAssetId": "asset_1790540951798_p0izok",
+      "categoryId": "cat_comm"
+    },
+    {
+      "id": "mac_1790540952376_roift",
+      "mediaAssetId": "asset_1790540952206_txugv3",
+      "categoryId": "cat_comm"
+    },
+    {
+      "id": "mac_1790540953926_3mi5o",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "categoryId": "cat_env"
+    },
+    {
+      "id": "mac_1790540953949_dc090",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "categoryId": "cat_infra"
+    },
+    {
+      "id": "mac_1790540953970_w5okq",
+      "mediaAssetId": "asset_1790540951045_rk5u21",
+      "categoryId": "cat_disaster"
     }
   ]
 }

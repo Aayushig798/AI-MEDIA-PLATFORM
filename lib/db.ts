@@ -37,6 +37,27 @@ export interface StoredProject {
   _count?: { assets: number };
 }
 
+export interface StoredAiTag {
+  id: string;
+  mediaAssetId: string;
+  label: string;
+  confidence: number;
+  source: string; // "cloudinary_google" | "cloudinary_rekognition" | "external_vision"
+  createdAt: string;
+}
+
+export interface StoredCategory {
+  id: string;
+  name: string;
+}
+
+export interface StoredMediaAssetCategory {
+  id: string;
+  mediaAssetId: string;
+  categoryId: string;
+  category?: StoredCategory;
+}
+
 export interface StoredMediaAsset {
   id: string;
   projectId: string;
@@ -52,6 +73,11 @@ export interface StoredMediaAsset {
   manualNotes: string | null;
   capturedAt: string | null;
   uploadedBy: string;
+  exifLat?: number | null;
+  exifLng?: number | null;
+  aiProcessingStatus: string; // "pending" | "processing" | "done" | "failed"
+  aiTags?: StoredAiTag[];
+  categories?: StoredMediaAssetCategory[];
   createdAt: string;
   updatedAt: string;
   project?: StoredProject;
@@ -61,19 +87,34 @@ interface LocalDBData {
   users: StoredUser[];
   projects: StoredProject[];
   assets: StoredMediaAsset[];
+  aiTags: StoredAiTag[];
+  categories: StoredCategory[];
+  mediaAssetCategories: StoredMediaAssetCategory[];
 }
 
 function loadLocalData(): LocalDBData {
+  const defaultCategories: StoredCategory[] = [
+    { id: "cat_env", name: "Environmental" },
+    { id: "cat_infra", name: "Infrastructure" },
+    { id: "cat_comm", name: "Community" },
+    { id: "cat_disaster", name: "Disaster Response" },
+    { id: "cat_uncat", name: "Uncategorized" },
+  ];
+
   try {
     if (fs.existsSync(DATA_FILE)) {
       const raw = fs.readFileSync(DATA_FILE, "utf-8");
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      if (!parsed.aiTags) parsed.aiTags = [];
+      if (!parsed.categories || parsed.categories.length === 0) parsed.categories = defaultCategories;
+      if (!parsed.mediaAssetCategories) parsed.mediaAssetCategories = [];
+      return parsed;
     }
   } catch (e) {
     console.error("Failed to load local dev_data.json:", e);
   }
 
-  // Seed default demo data
+  // Seed default demo data with Phase 2 fields
   const defaultData: LocalDBData = {
     users: [
       {
@@ -81,6 +122,70 @@ function loadLocalData(): LocalDBData {
         email: "demo@impactmedia.org",
         name: "Field Officer Elena",
         password: "demo123_plain_or_hash",
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    categories: defaultCategories,
+    mediaAssetCategories: [
+      { id: "mac_1", mediaAssetId: "asset_seed_1", categoryId: "cat_env" },
+      { id: "mac_2", mediaAssetId: "asset_seed_2", categoryId: "cat_comm" },
+      { id: "mac_3", mediaAssetId: "asset_seed_3", categoryId: "cat_infra" },
+    ],
+    aiTags: [
+      {
+        id: "tag_seed_1",
+        mediaAssetId: "asset_seed_1",
+        label: "Canopy",
+        confidence: 0.98,
+        source: "external_vision",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "tag_seed_2",
+        mediaAssetId: "asset_seed_1",
+        label: "Rainforest",
+        confidence: 0.95,
+        source: "external_vision",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "tag_seed_3",
+        mediaAssetId: "asset_seed_1",
+        label: "Vegetation",
+        confidence: 0.92,
+        source: "external_vision",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "tag_seed_4",
+        mediaAssetId: "asset_seed_2",
+        label: "Community meeting",
+        confidence: 0.94,
+        source: "external_vision",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "tag_seed_5",
+        mediaAssetId: "asset_seed_2",
+        label: "Tree nursery sapling",
+        confidence: 0.91,
+        source: "external_vision",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "tag_seed_6",
+        mediaAssetId: "asset_seed_3",
+        label: "Solar panel array",
+        confidence: 0.97,
+        source: "external_vision",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "tag_seed_7",
+        mediaAssetId: "asset_seed_3",
+        label: "Water pump infrastructure",
+        confidence: 0.93,
+        source: "external_vision",
         createdAt: new Date().toISOString(),
       },
     ],
@@ -103,15 +208,6 @@ function loadLocalData(): LocalDBData {
         createdBy: "usr_demo123",
         createdAt: new Date("2024-03-10").toISOString(),
       },
-      {
-        id: "proj_mangrove_restoration",
-        name: "Sundarbans Coastal Mangrove Barrier",
-        description: "Restoring cyclone storm-surge buffers and estuarine habitats through community mangrove sapling planting.",
-        location: "Khulna Division, Bangladesh",
-        startDate: new Date("2024-02-01").toISOString(),
-        createdBy: "usr_demo123",
-        createdAt: new Date("2024-02-01").toISOString(),
-      },
     ],
     assets: [
       {
@@ -129,6 +225,9 @@ function loadLocalData(): LocalDBData {
         manualNotes: "Drone survey of nursery sapling canopy expansion after first rainy season.",
         capturedAt: new Date("2024-05-18").toISOString(),
         uploadedBy: "usr_demo123",
+        exifLat: -12.5933,
+        exifLng: -69.1891,
+        aiProcessingStatus: "done",
         createdAt: new Date("2024-05-19").toISOString(),
         updatedAt: new Date("2024-05-19").toISOString(),
       },
@@ -147,6 +246,9 @@ function loadLocalData(): LocalDBData {
         manualNotes: "Local indigenous youth collective preparing 2,000 mahogany and cedar seedlings.",
         capturedAt: new Date("2024-06-02").toISOString(),
         uploadedBy: "usr_demo123",
+        exifLat: -12.6500,
+        exifLng: -69.2100,
+        aiProcessingStatus: "done",
         createdAt: new Date("2024-06-03").toISOString(),
         updatedAt: new Date("2024-06-03").toISOString(),
       },
@@ -165,6 +267,9 @@ function loadLocalData(): LocalDBData {
         manualNotes: "Commissioning of the 12kW photovoltaic array powering submersible borehole pump.",
         capturedAt: new Date("2024-04-12").toISOString(),
         uploadedBy: "usr_demo123",
+        exifLat: 3.1199,
+        exifLng: 35.5973,
+        aiProcessingStatus: "done",
         createdAt: new Date("2024-04-13").toISOString(),
         updatedAt: new Date("2024-04-13").toISOString(),
       },
@@ -192,25 +297,18 @@ let isPrismaAvailable: boolean | null = null;
 async function checkPrismaConnection(): Promise<boolean> {
   if (isPrismaAvailable !== null) return isPrismaAvailable;
   try {
-    // Quick test query with 1s timeout
     await Promise.race([
       prisma.$queryRaw`SELECT 1`,
       new Promise((_, reject) => setTimeout(() => reject(new Error("DB timeout")), 1500)),
     ]);
     isPrismaAvailable = true;
-    console.log("Connected to PostgreSQL via Prisma successfully.");
     return true;
   } catch (err) {
     isPrismaAvailable = false;
-    console.warn("PostgreSQL not accessible directly; utilizing high-fidelity dev store in prisma/dev_data.json.");
     return false;
   }
 }
 
-/**
- * Unified Database Access Object
- * Automatically uses Prisma if PostgreSQL is available, or seamless local persistence if not.
- */
 export const db = {
   async isPrismaConnected(): Promise<boolean> {
     return checkPrismaConnection();
@@ -298,6 +396,10 @@ export const db = {
             include: include || {
               assets: {
                 orderBy: { createdAt: "desc" },
+                include: {
+                  aiTags: true,
+                  categories: { include: { category: true } },
+                },
               },
               _count: { select: { assets: true } },
             },
@@ -312,6 +414,20 @@ export const db = {
 
       const projectAssets = data.assets
         .filter((a) => a.projectId === where.id)
+        .map((a) => {
+          const tags = data.aiTags.filter((t) => t.mediaAssetId === a.id);
+          const cats = data.mediaAssetCategories
+            .filter((mac) => mac.mediaAssetId === a.id)
+            .map((mac) => ({
+              ...mac,
+              category: data.categories.find((c) => c.id === mac.categoryId),
+            }));
+          return {
+            ...a,
+            aiTags: tags,
+            categories: cats,
+          };
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       return {
@@ -345,25 +461,260 @@ export const db = {
     },
   },
 
+  // CATEGORIES
+  category: {
+    async upsert({
+      where,
+      update,
+      create,
+    }: {
+      where: { name: string };
+      update: any;
+      create: { name: string };
+    }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.category.upsert({ where, update, create });
+        } catch (e) {
+          console.error("Prisma error in category.upsert:", e);
+        }
+      }
+      const current = loadLocalData();
+      let cat = current.categories.find(
+        (c) => c.name.toLowerCase() === where.name.toLowerCase()
+      );
+      if (!cat) {
+        cat = {
+          id: `cat_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          name: create.name,
+        };
+        current.categories.push(cat);
+        saveLocalData(current);
+      }
+      return cat;
+    },
+
+    async findMany() {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.category.findMany();
+        } catch (e) {
+          console.error("Prisma error in category.findMany:", e);
+        }
+      }
+      const data = loadLocalData();
+      return data.categories;
+    },
+
+    async findUnique({ where }: { where: { id?: string; name?: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.category.findUnique({ where: where as any });
+        } catch (e) {
+          console.error("Prisma error in category.findUnique:", e);
+        }
+      }
+      const data = loadLocalData();
+      return (
+        data.categories.find(
+          (c) =>
+            (where.id && c.id === where.id) ||
+            (where.name && c.name.toLowerCase() === where.name.toLowerCase())
+        ) || null
+      );
+    },
+  },
+
+  // MEDIA ASSET CATEGORIES
+  mediaAssetCategory: {
+    async create({ data }: { data: { mediaAssetId: string; categoryId: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.mediaAssetCategory.create({ data });
+        } catch (e) {
+          console.error("Prisma error in mediaAssetCategory.create:", e);
+        }
+      }
+      const current = loadLocalData();
+      const existing = current.mediaAssetCategories.find(
+        (m) => m.mediaAssetId === data.mediaAssetId && m.categoryId === data.categoryId
+      );
+      if (existing) return existing;
+
+      const newMac: StoredMediaAssetCategory = {
+        id: `mac_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        mediaAssetId: data.mediaAssetId,
+        categoryId: data.categoryId,
+      };
+      current.mediaAssetCategories.push(newMac);
+      saveLocalData(current);
+      return newMac;
+    },
+
+    async deleteMany({ where }: { where: { mediaAssetId: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.mediaAssetCategory.deleteMany({ where });
+        } catch (e) {
+          console.error("Prisma error in mediaAssetCategory.deleteMany:", e);
+        }
+      }
+      const current = loadLocalData();
+      current.mediaAssetCategories = current.mediaAssetCategories.filter(
+        (m) => m.mediaAssetId !== where.mediaAssetId
+      );
+      saveLocalData(current);
+      return { count: 1 };
+    },
+
+    async findMany({ where }: { where: { mediaAssetId: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.mediaAssetCategory.findMany({
+            where,
+            include: { category: true },
+          });
+        } catch (e) {
+          console.error("Prisma error in mediaAssetCategory.findMany:", e);
+        }
+      }
+      const current = loadLocalData();
+      return current.mediaAssetCategories
+        .filter((m) => m.mediaAssetId === where.mediaAssetId)
+        .map((m) => ({
+          ...m,
+          category: current.categories.find((c) => c.id === m.categoryId),
+        }));
+    },
+  },
+
+  // AI TAGS
+  aiTag: {
+    async create({
+      data,
+    }: {
+      data: {
+        mediaAssetId: string;
+        label: string;
+        confidence: number;
+        source: string;
+      };
+    }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.aiTag.create({ data });
+        } catch (e) {
+          console.error("Prisma error in aiTag.create:", e);
+        }
+      }
+      const current = loadLocalData();
+      const newTag: StoredAiTag = {
+        id: `tag_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        mediaAssetId: data.mediaAssetId,
+        label: data.label,
+        confidence: Number(data.confidence) || 0.9,
+        source: data.source,
+        createdAt: new Date().toISOString(),
+      };
+      current.aiTags.push(newTag);
+      saveLocalData(current);
+      return newTag;
+    },
+
+    async findMany({ where }: { where: { mediaAssetId: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.aiTag.findMany({
+            where,
+            orderBy: { confidence: "desc" },
+          });
+        } catch (e) {
+          console.error("Prisma error in aiTag.findMany:", e);
+        }
+      }
+      const current = loadLocalData();
+      return current.aiTags
+        .filter((t) => t.mediaAssetId === where.mediaAssetId)
+        .sort((a, b) => b.confidence - a.confidence);
+    },
+
+    async delete({ where }: { where: { id: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.aiTag.delete({ where });
+        } catch (e) {
+          console.error("Prisma error in aiTag.delete:", e);
+        }
+      }
+      const current = loadLocalData();
+      const tag = current.aiTags.find((t) => t.id === where.id);
+      if (!tag) throw new Error("Tag not found");
+      current.aiTags = current.aiTags.filter((t) => t.id !== where.id);
+      saveLocalData(current);
+      return tag;
+    },
+
+    async deleteMany({ where }: { where: { mediaAssetId: string } }) {
+      if (await checkPrismaConnection()) {
+        try {
+          return await prisma.aiTag.deleteMany({ where });
+        } catch (e) {
+          console.error("Prisma error in aiTag.deleteMany:", e);
+        }
+      }
+      const current = loadLocalData();
+      current.aiTags = current.aiTags.filter((t) => t.mediaAssetId !== where.mediaAssetId);
+      saveLocalData(current);
+      return { count: 1 };
+    },
+  },
+
   // MEDIA ASSETS
   mediaAsset: {
     async findMany({
       where = {},
       orderBy = { createdAt: "desc" },
+      include = { aiTags: true, categories: { include: { category: true } } },
     }: {
       where?: {
         projectId?: string;
         manualCategory?: string;
+        aiCategory?: string;
         capturedAt?: { gte?: Date | string; lte?: Date | string };
         createdAt?: { gte?: Date | string; lte?: Date | string };
       };
       orderBy?: { createdAt?: "asc" | "desc" };
+      include?: any;
     } = {}) {
       if (await checkPrismaConnection()) {
         try {
+          const prismaWhere: any = {};
+          if (where.projectId) prismaWhere.projectId = where.projectId;
+          if (where.manualCategory && where.manualCategory !== "ALL") {
+            prismaWhere.manualCategory = where.manualCategory;
+          }
+          if (where.aiCategory && where.aiCategory !== "ALL") {
+            prismaWhere.categories = {
+              some: {
+                category: {
+                  name: {
+                    equals: where.aiCategory,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            };
+          }
+          if (where.capturedAt) prismaWhere.capturedAt = where.capturedAt;
+          if (where.createdAt) prismaWhere.createdAt = where.createdAt;
+
           return await prisma.mediaAsset.findMany({
-            where: where as any,
+            where: prismaWhere,
             orderBy: orderBy as any,
+            include: include || {
+              aiTags: true,
+              categories: { include: { category: true } },
+            },
           });
         } catch (e) {
           console.error("Prisma error in mediaAsset.findMany:", e);
@@ -381,6 +732,21 @@ export const db = {
         results = results.filter(
           (a) => a.manualCategory && a.manualCategory.toLowerCase() === where.manualCategory?.toLowerCase()
         );
+      }
+
+      if (where.aiCategory && where.aiCategory !== "ALL") {
+        const catName = where.aiCategory.toLowerCase();
+        const matchingCat = data.categories.find((c) => c.name.toLowerCase() === catName);
+        if (matchingCat) {
+          const assetIdsWithCat = new Set(
+            data.mediaAssetCategories
+              .filter((mac) => mac.categoryId === matchingCat.id)
+              .map((mac) => mac.mediaAssetId)
+          );
+          results = results.filter((a) => assetIdsWithCat.has(a.id));
+        } else {
+          results = [];
+        }
       }
 
       if (where.capturedAt || where.createdAt) {
@@ -406,31 +772,79 @@ export const db = {
         return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * order;
       });
 
-      return results;
+      // Hydrate aiTags and categories
+      return results.map((a) => {
+        const tags = data.aiTags.filter((t) => t.mediaAssetId === a.id);
+        const cats = data.mediaAssetCategories
+          .filter((mac) => mac.mediaAssetId === a.id)
+          .map((mac) => ({
+            ...mac,
+            category: data.categories.find((c) => c.id === mac.categoryId),
+          }));
+        return {
+          ...a,
+          aiTags: tags,
+          categories: cats,
+        };
+      });
     },
 
-    async findUnique({ where }: { where: { id?: string; cloudinaryPublicId?: string } }) {
+    async findUnique({
+      where,
+      include,
+    }: {
+      where: { id?: string; cloudinaryPublicId?: string };
+      include?: any;
+    }) {
       if (await checkPrismaConnection()) {
         try {
-          return await (prisma.mediaAsset.findUnique as any)({ where });
+          return await (prisma.mediaAsset.findUnique as any)({
+            where,
+            include: include || {
+              aiTags: { orderBy: { confidence: "desc" } },
+              categories: { include: { category: true } },
+            },
+          });
         } catch (e) {
           console.error("Prisma error in mediaAsset.findUnique:", e);
         }
       }
       const data = loadLocalData();
-      return (
-        data.assets.find(
-          (a) =>
-            (where.id && a.id === where.id) ||
-            (where.cloudinaryPublicId && a.cloudinaryPublicId === where.cloudinaryPublicId)
-        ) || null
+      const asset = data.assets.find(
+        (a) =>
+          (where.id && a.id === where.id) ||
+          (where.cloudinaryPublicId && a.cloudinaryPublicId === where.cloudinaryPublicId)
       );
+      if (!asset) return null;
+
+      const tags = data.aiTags
+        .filter((t) => t.mediaAssetId === asset.id)
+        .sort((a, b) => b.confidence - a.confidence);
+
+      const cats = data.mediaAssetCategories
+        .filter((mac) => mac.mediaAssetId === asset.id)
+        .map((mac) => ({
+          ...mac,
+          category: data.categories.find((c) => c.id === mac.categoryId),
+        }));
+
+      return {
+        ...asset,
+        aiTags: tags,
+        categories: cats,
+      };
     },
 
     async create({ data }: { data: any }) {
       if (await checkPrismaConnection()) {
         try {
-          return await prisma.mediaAsset.create({ data });
+          return await prisma.mediaAsset.create({
+            data,
+            include: {
+              aiTags: true,
+              categories: { include: { category: true } },
+            },
+          });
         } catch (e) {
           console.error("Prisma error in mediaAsset.create:", e);
         }
@@ -451,6 +865,11 @@ export const db = {
         manualNotes: data.manualNotes || null,
         capturedAt: data.capturedAt ? new Date(data.capturedAt).toISOString() : null,
         uploadedBy: data.uploadedBy || "usr_demo123",
+        exifLat: data.exifLat !== undefined ? data.exifLat : null,
+        exifLng: data.exifLng !== undefined ? data.exifLng : null,
+        aiProcessingStatus: data.aiProcessingStatus || "pending",
+        aiTags: [],
+        categories: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -462,7 +881,14 @@ export const db = {
     async update({ where, data }: { where: { id: string }; data: any }) {
       if (await checkPrismaConnection()) {
         try {
-          return await prisma.mediaAsset.update({ where, data });
+          return await prisma.mediaAsset.update({
+            where,
+            data,
+            include: {
+              aiTags: true,
+              categories: { include: { category: true } },
+            },
+          });
         } catch (e) {
           console.error("Prisma error in mediaAsset.update:", e);
         }
@@ -483,11 +909,30 @@ export const db = {
               ? new Date(data.capturedAt).toISOString()
               : null
             : existing.capturedAt,
+        exifLat: data.exifLat !== undefined ? data.exifLat : existing.exifLat,
+        exifLng: data.exifLng !== undefined ? data.exifLng : existing.exifLng,
+        aiProcessingStatus:
+          data.aiProcessingStatus !== undefined
+            ? data.aiProcessingStatus
+            : existing.aiProcessingStatus,
         updatedAt: new Date().toISOString(),
       };
       current.assets[index] = updated;
       saveLocalData(current);
-      return updated;
+
+      const tags = current.aiTags.filter((t) => t.mediaAssetId === updated.id);
+      const cats = current.mediaAssetCategories
+        .filter((mac) => mac.mediaAssetId === updated.id)
+        .map((mac) => ({
+          ...mac,
+          category: current.categories.find((c) => c.id === mac.categoryId),
+        }));
+
+      return {
+        ...updated,
+        aiTags: tags,
+        categories: cats,
+      };
     },
 
     async delete({ where }: { where: { id: string } }) {
@@ -503,6 +948,10 @@ export const db = {
       if (!asset) throw new Error("Asset not found");
 
       current.assets = current.assets.filter((a) => a.id !== where.id);
+      current.aiTags = current.aiTags.filter((t) => t.mediaAssetId !== where.id);
+      current.mediaAssetCategories = current.mediaAssetCategories.filter(
+        (m) => m.mediaAssetId !== where.id
+      );
       saveLocalData(current);
       return asset;
     },

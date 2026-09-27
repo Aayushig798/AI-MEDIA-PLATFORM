@@ -17,10 +17,12 @@ import {
   Loader2,
   FileText,
   Layers,
-  Sparkles
+  Sparkles,
+  Navigation
 } from "lucide-react";
 import { MediaAssetItem } from "./GalleryGrid";
 import { CATEGORIES } from "./GalleryFilterBar";
+import { AiTagChips, AiTagItem } from "./AiTagChips";
 
 interface AssetDetailModalProps {
   asset: MediaAssetItem | null;
@@ -65,6 +67,9 @@ export function AssetDetailModal({
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
 
+  const [aiTags, setAiTags] = useState<AiTagItem[]>(asset.aiTags || []);
+  const [aiStatus, setAiStatus] = useState<string>(asset.aiProcessingStatus || "done");
+
   const handleCopy = (text: string, type: "url" | "id") => {
     navigator.clipboard.writeText(text);
     if (type === "url") {
@@ -100,7 +105,7 @@ export function AssetDetailModal({
       }
 
       setSaveSuccess(true);
-      onAssetUpdated(data.asset);
+      onAssetUpdated({ ...data.asset, aiTags, aiProcessingStatus: aiStatus });
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
       setSaveError(err.message || "Failed to save changes");
@@ -132,7 +137,23 @@ export function AssetDetailModal({
     }
   };
 
+  const handleTagDeleted = (deletedTagId: string) => {
+    const updated = aiTags.filter((t) => t.id !== deletedTagId);
+    setAiTags(updated);
+    onAssetUpdated({ ...asset, aiTags: updated, aiProcessingStatus: aiStatus });
+  };
+
+  const handleReanalyzed = (updatedTags: AiTagItem[], newStatus: string) => {
+    setAiTags(updatedTags);
+    setAiStatus(newStatus);
+    onAssetUpdated({ ...asset, aiTags: updatedTags, aiProcessingStatus: newStatus });
+  };
+
   const isVideo = asset.resourceType === "video";
+  const primaryAiCategory =
+    asset.categories?.[0]?.category?.name ||
+    asset.categories?.[0]?.name ||
+    "Environmental";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in overflow-y-auto">
@@ -157,7 +178,7 @@ export function AssetDetailModal({
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Full-resolution CDN preview and verified evidence metadata
+                Full-resolution CDN preview, automated AI tagging, and verified metadata
               </p>
             </div>
           </div>
@@ -171,7 +192,7 @@ export function AssetDetailModal({
           </button>
         </div>
 
-        {/* Content Body: Left Preview, Right Metadata & Edit Form */}
+        {/* Content Body: Left Preview, Right Metadata & AI Panel */}
         <div className="flex-1 overflow-y-auto py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 pr-1">
           {/* Left Column: Full Preview (7 cols) */}
           <div className="lg:col-span-7 flex flex-col items-center justify-center bg-black/60 rounded-2xl p-3 border border-white/10 relative overflow-hidden">
@@ -179,7 +200,7 @@ export function AssetDetailModal({
               <video
                 controls
                 playsInline
-                className="max-h-[60vh] w-full rounded-xl object-contain bg-black shadow-2xl"
+                className="max-h-[58vh] w-full rounded-xl object-contain bg-black shadow-2xl"
                 src={asset.secureUrl}
               >
                 Your browser does not support HTML5 video preview.
@@ -189,7 +210,7 @@ export function AssetDetailModal({
                 <img
                   src={asset.secureUrl}
                   alt={asset.manualNotes || asset.cloudinaryPublicId}
-                  className="max-h-[60vh] w-auto max-w-full rounded-xl object-contain shadow-2xl"
+                  className="max-h-[58vh] w-auto max-w-full rounded-xl object-contain shadow-2xl"
                 />
               </div>
             )}
@@ -221,11 +242,74 @@ export function AssetDetailModal({
             </div>
           </div>
 
-          {/* Right Column: Metadata & Edit Form (5 cols) */}
-          <div className="lg:col-span-5 flex flex-col justify-between space-y-6">
+          {/* Right Column: AI Analysis, Metadata & Edit Form (5 cols) */}
+          <div className="lg:col-span-5 flex flex-col justify-between space-y-5">
+            {/* Phase 2: AI Understanding & Classification Panel */}
+            <div className="glass-panel rounded-2xl p-4 space-y-3 border border-emerald-500/20 bg-emerald-950/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300 uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>AI Understanding & Category</span>
+                </div>
+                <span
+                  id="ai-processing-status-badge"
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    aiStatus === "done"
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                      : aiStatus === "failed"
+                      ? "bg-red-500/20 text-red-300 border-red-500/40"
+                      : "bg-amber-500/20 text-amber-300 border-amber-500/40 animate-pulse"
+                  }`}
+                >
+                  {aiStatus.toUpperCase()}
+                </span>
+              </div>
+
+              {/* Dominant Category Badge */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-400">Assigned Domain:</span>
+                <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20">
+                  {primaryAiCategory}
+                </span>
+              </div>
+
+              {/* EXIF GPS Display if present */}
+              {asset.exifLat && asset.exifLng && (
+                <div className="p-2.5 rounded-xl bg-slate-900/80 border border-white/5 flex items-center justify-between text-xs text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <Navigation className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                    <div>
+                      <span className="block text-[10px] text-slate-500 uppercase font-bold">EXIF GPS Location</span>
+                      <span className="font-mono text-emerald-300">
+                        {asset.exifLat.toFixed(4)}°, {asset.exifLng.toFixed(4)}°
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={`https://maps.google.com/?q=${asset.exifLat},${asset.exifLng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-teal-400 hover:underline flex items-center gap-0.5 font-medium"
+                  >
+                    <span>Map</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+              )}
+
+              {/* AI Tag Chips with Rejection & Re-analyze Controls */}
+              <AiTagChips
+                assetId={asset.id}
+                tags={aiTags}
+                processingStatus={aiStatus}
+                onTagDeleted={handleTagDeleted}
+                onReanalyzed={handleReanalyzed}
+              />
+            </div>
+
             {/* Technical Metadata Box */}
-            <div className="glass-panel rounded-2xl p-4 space-y-2.5 text-xs border border-white/5">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
+            <div className="glass-panel rounded-2xl p-4 space-y-2 text-xs border border-white/5">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-1.5">
                 <Layers className="w-3.5 h-3.5 text-emerald-400" />
                 Cloudinary Asset Metadata
               </h3>
@@ -251,7 +335,7 @@ export function AssetDetailModal({
             </div>
 
             {/* Editable Manual Tags Form */}
-            <form onSubmit={handleSaveChanges} className="space-y-4">
+            <form onSubmit={handleSaveChanges} className="space-y-3.5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-emerald-400" />
                 Manual Tags & Metadata
@@ -266,30 +350,45 @@ export function AssetDetailModal({
               {saveSuccess && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-1.5">
                   <Check className="w-4 h-4" />
-                  <span>Metadata changes persisted to database successfully!</span>
+                  <span>Metadata changes persisted successfully!</span>
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Domain Category
-                </label>
-                <select
-                  id="asset-detail-category-select"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
-                >
-                  {CATEGORIES.filter((c) => c !== "ALL").map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    Manual Category
+                  </label>
+                  <select
+                    id="asset-detail-category-select"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+                  >
+                    {CATEGORIES.filter((c) => c !== "ALL").map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                    Date Captured
+                  </label>
+                  <input
+                    id="asset-detail-date-input"
+                    type="date"
+                    value={capturedAt}
+                    onChange={(e) => setCapturedAt(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
                   Location Text / GPS Point
                 </label>
                 <input
@@ -298,34 +397,21 @@ export function AssetDetailModal({
                   placeholder="e.g. Madre de Dios, Plot B"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Date Captured
-                </label>
-                <input
-                  id="asset-detail-date-input"
-                  type="date"
-                  value={capturedAt}
-                  onChange={(e) => setCapturedAt(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
                   Field Observation Notes
                 </label>
                 <textarea
                   id="asset-detail-notes-input"
-                  rows={3}
+                  rows={2}
                   placeholder="Detailed notes on visible environmental indicators, project progress, or field activity..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
@@ -333,17 +419,17 @@ export function AssetDetailModal({
                 type="submit"
                 id="save-asset-metadata-btn"
                 disabled={saving}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 disabled:opacity-50 transition"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 disabled:opacity-50 transition"
               >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 <span>{saving ? "Saving Changes..." : "Save Metadata"}</span>
               </button>
             </form>
 
             {/* Deletion Section */}
-            <div className="pt-4 border-t border-white/10">
+            <div className="pt-3 border-t border-white/10">
               {deleteError && (
-                <div className="mb-3 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
+                <div className="mb-2.5 p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
                   {deleteError}
                 </div>
               )}
@@ -353,9 +439,9 @@ export function AssetDetailModal({
                   type="button"
                   id="trigger-delete-asset-btn"
                   onClick={() => setConfirmDelete(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-red-500/20 transition"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete Asset from Cloudinary & Database</span>
                 </button>
               ) : (
@@ -365,14 +451,14 @@ export function AssetDetailModal({
                     <span>Confirm Permanent Deletion?</span>
                   </div>
                   <p className="text-[11px] text-red-300/80">
-                    This will call Cloudinary&apos;s destroy API to erase the asset from CDN storage and remove the database record. This cannot be undone.
+                    This calls Cloudinary&apos;s destroy API to permanently erase the asset from CDN storage and remove the database record.
                   </p>
                   <div className="flex items-center justify-end gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => setConfirmDelete(false)}
                       disabled={deleting}
-                      className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white"
+                      className="px-3 py-1 rounded-lg text-xs text-slate-400 hover:text-white"
                     >
                       Cancel
                     </button>

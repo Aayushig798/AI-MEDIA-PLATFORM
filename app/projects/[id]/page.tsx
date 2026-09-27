@@ -44,6 +44,7 @@ export default function ProjectGalleryPage() {
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState("ALL");
+  const [selectedAiCategory, setSelectedAiCategory] = useState("ALL");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -75,6 +76,9 @@ export default function ProjectGalleryPage() {
       if (selectedCategory && selectedCategory !== "ALL") {
         queryParams.append("category", selectedCategory);
       }
+      if (selectedAiCategory && selectedAiCategory !== "ALL") {
+        queryParams.append("aiCategory", selectedAiCategory);
+      }
       if (fromDate) {
         queryParams.append("from", fromDate);
       }
@@ -92,7 +96,7 @@ export default function ProjectGalleryPage() {
     } finally {
       setLoadingAssets(false);
     }
-  }, [projectId, selectedCategory, fromDate, toDate]);
+  }, [projectId, selectedCategory, selectedAiCategory, fromDate, toDate]);
 
   useEffect(() => {
     fetchProjectInfo();
@@ -104,6 +108,7 @@ export default function ProjectGalleryPage() {
 
   const handleResetFilters = () => {
     setSelectedCategory("ALL");
+    setSelectedAiCategory("ALL");
     setFromDate("");
     setToDate("");
   };
@@ -233,6 +238,8 @@ export default function ProjectGalleryPage() {
       <GalleryFilterBar
         selectedCategory={selectedCategory}
         onSelectCategory={setSelectedCategory}
+        selectedAiCategory={selectedAiCategory}
+        onSelectAiCategory={setSelectedAiCategory}
         fromDate={fromDate}
         onSelectFromDate={setFromDate}
         toDate={toDate}

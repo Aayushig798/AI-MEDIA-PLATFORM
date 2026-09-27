@@ -32,12 +32,12 @@ model Project {
 }
 
 model MediaAsset {
-  id                  String   @id @default(cuid())
+  id                  String               @id @default(cuid())
   projectId           String
-  project             Project  @relation(fields: [projectId], references: [id])
-  cloudinaryPublicId  String   @unique
+  project             Project              @relation(fields: [projectId], references: [id])
+  cloudinaryPublicId  String               @unique
   secureUrl           String
-  resourceType        String   // "image" | "video"
+  resourceType        String               // "image" | "video"
   format              String
   bytes               Int
   width               Int?
@@ -47,6 +47,37 @@ model MediaAsset {
   manualNotes         String?
   capturedAt          DateTime?
   uploadedBy          String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  exifLat             Float?
+  exifLng             Float?
+  aiProcessingStatus  String               @default("pending") // "pending" | "processing" | "done" | "failed"
+  aiTags              AiTag[]
+  categories          MediaAssetCategory[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model AiTag {
+  id           String     @id @default(cuid())
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  label        String
+  confidence   Float
+  source       String     // "cloudinary_google" | "cloudinary_rekognition" | "external_vision"
+  createdAt    DateTime   @default(now())
+}
+
+model Category {
+  id     String               @id @default(cuid())
+  name   String               @unique
+  assets MediaAssetCategory[]
+}
+
+model MediaAssetCategory {
+  id           String     @id @default(cuid())
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  categoryId   String
+  category     Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaAssetId, categoryId])
 }

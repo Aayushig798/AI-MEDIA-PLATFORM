@@ -1,7 +1,8 @@
 "use client";
 
-import { Video, Image as ImageIcon, MapPin, Calendar, HardDrive, Play } from "lucide-react";
+import { Video, Image as ImageIcon, MapPin, Calendar, Play, Sparkles, Navigation, Loader2 } from "lucide-react";
 import { getThumbnailUrl } from "@/lib/cloudinary-url";
+import { AiTagItem } from "./AiTagChips";
 
 export interface MediaAssetItem {
   id: string;
@@ -18,6 +19,11 @@ export interface MediaAssetItem {
   manualNotes: string | null;
   capturedAt: string | null;
   uploadedBy: string;
+  exifLat?: number | null;
+  exifLng?: number | null;
+  aiProcessingStatus?: string; // "pending" | "processing" | "done" | "failed"
+  aiTags?: AiTagItem[];
+  categories?: { category?: { id: string; name: string }; name?: string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -78,6 +84,13 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
       {assets.map((asset) => {
         const thumbUrl = getThumbnailUrl(asset.secureUrl, asset.resourceType);
         const isVideo = asset.resourceType === "video";
+        const isAiPending =
+          asset.aiProcessingStatus === "pending" ||
+          asset.aiProcessingStatus === "processing";
+        const primaryAiCategory =
+          asset.categories?.[0]?.category?.name ||
+          asset.categories?.[0]?.name ||
+          null;
 
         return (
           <div
@@ -102,11 +115,40 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                   {isVideo ? <Video className="w-3 h-3 text-cyan-400" /> : <ImageIcon className="w-3 h-3 text-emerald-400" />}
                   {asset.format || (isVideo ? "MP4" : "JPG")}
                 </span>
+
+                {/* GPS EXIF indicator */}
+                {asset.exifLat && asset.exifLng && (
+                  <span
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 backdrop-blur-md"
+                    title={`GPS: ${asset.exifLat.toFixed(4)}, ${asset.exifLng.toFixed(4)}`}
+                  >
+                    <Navigation className="w-2.5 h-2.5" />
+                    GPS
+                  </span>
+                )}
               </div>
 
-              {/* Category Badge */}
-              {asset.manualCategory && (
-                <div className="absolute top-2.5 right-2.5">
+              {/* AI Processing Status & Domain Badge on top right */}
+              <div className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1">
+                {isAiPending ? (
+                  <span
+                    id={`ai-badge-${asset.id}`}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 backdrop-blur-md animate-pulse"
+                  >
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                    Analyzing...
+                  </span>
+                ) : primaryAiCategory ? (
+                  <span
+                    id={`ai-badge-${asset.id}`}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border backdrop-blur-md ${getCategoryColor(
+                      primaryAiCategory
+                    )}`}
+                  >
+                    <Sparkles className="w-2.5 h-2.5" />
+                    AI: {primaryAiCategory}
+                  </span>
+                ) : asset.manualCategory ? (
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border backdrop-blur-md ${getCategoryColor(
                       asset.manualCategory
@@ -114,8 +156,8 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                   >
                     {asset.manualCategory}
                   </span>
-                </div>
-              )}
+                ) : null}
+              </div>
 
               {/* Video Play Overlay */}
               {isVideo && (
@@ -154,6 +196,25 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                 <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
                   {asset.manualNotes || "No notes recorded."}
                 </p>
+
+                {/* AI Tags Preview Pill Stream */}
+                {asset.aiTags && asset.aiTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2.5">
+                    {asset.aiTags.slice(0, 3).map((t) => (
+                      <span
+                        key={t.id}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-slate-300 font-mono"
+                      >
+                        #{t.label}
+                      </span>
+                    ))}
+                    {asset.aiTags.length > 3 && (
+                      <span className="text-[10px] px-1 py-0.5 text-slate-500 font-mono">
+                        +{asset.aiTags.length - 3}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Date Footer */}

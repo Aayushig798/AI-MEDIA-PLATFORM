@@ -173,6 +173,8 @@ export function UploadModal({
         // ignore
       }
 
+      let rawCloudinaryInfo: any = null;
+
       // Step 2: Attempt direct upload to Cloudinary
       let uploadedToCloudinary = false;
 
@@ -196,6 +198,7 @@ export function UploadModal({
 
           if (cldRes.ok) {
             const cldData = await cldRes.json();
+            rawCloudinaryInfo = cldData;
             publicId = cldData.public_id;
             secureUrl = cldData.secure_url;
             resourceType = cldData.resource_type || resourceType;
@@ -242,6 +245,8 @@ export function UploadModal({
         manualLocation: staged.manualLocation || null,
         manualNotes: staged.manualNotes || null,
         capturedAt: staged.capturedAt ? new Date(staged.capturedAt).toISOString() : new Date().toISOString(),
+        info: rawCloudinaryInfo,
+        filename: staged.file.name,
       };
 
       const dbRes = await fetch("/api/assets", {
