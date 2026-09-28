@@ -18,7 +18,10 @@ import {
   AlertTriangle,
   X,
   SlidersHorizontal,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Search,
+  FileText,
+  BarChart3
 } from "lucide-react";
 import { GalleryFilterBar } from "@/components/GalleryFilterBar";
 import { GalleryGrid, MediaAssetItem } from "@/components/GalleryGrid";
@@ -306,11 +309,38 @@ export default function ProjectGalleryPage() {
           }`}
         >
           <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
-          <span>Before / After Change Comparisons</span>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-            Phase 3
-          </span>
+          <span>Before / After Comparisons</span>
         </button>
+
+        <Link
+          href={`/search?projectId=${project.id}`}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition"
+        >
+          <Search className="w-4 h-4 text-cyan-400" />
+          <span>Semantic Search</span>
+        </Link>
+
+        <Link
+          href={`/projects/${project.id}/report`}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition"
+        >
+          <FileText className="w-4 h-4 text-rose-400" />
+          <span>Impact Report Studio</span>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/20">
+            Phase 4
+          </span>
+        </Link>
+
+        <Link
+          href={`/projects/${project.id}/dashboard`}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition"
+        >
+          <BarChart3 className="w-4 h-4 text-amber-400" />
+          <span>Impact Dashboard</span>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
+            Phase 4
+          </span>
+        </Link>
       </div>
 
       {activeTab === "gallery" ? (

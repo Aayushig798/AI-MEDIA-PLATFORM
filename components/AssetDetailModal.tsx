@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { MediaAssetItem } from "./GalleryGrid";
 import { AiTagChips, AiTagItem } from "./AiTagChips";
+import { TraceabilityTimeline } from "./TraceabilityTimeline";
 
 const CATEGORY_OPTIONS = [
   "Environmental",
@@ -320,6 +321,11 @@ export function AssetDetailModal({
                   <span>Open</span>
                 </a>
               </div>
+            </div>
+
+            {/* Phase 4: Full Lifecycle Traceability Timeline */}
+            <div className="w-full mt-4 pt-4 border-t border-white/10">
+              <TraceabilityTimeline assetId={asset.id} />
             </div>
           </div>
 

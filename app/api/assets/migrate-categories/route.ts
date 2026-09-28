@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Compute primary category
-      let primaryCategory = determinePrimaryCategory((asset.aiTags || []) as any);
+      let primaryCategory = determinePrimaryCategory(((asset as any).aiTags || []) as any);
       if (primaryCategory === "Uncategorized" && (asset as any).categories?.length > 0) {
         const catName = (asset as any).categories[0]?.category?.name || (asset as any).categories[0]?.name;
         if (catName) primaryCategory = catName;

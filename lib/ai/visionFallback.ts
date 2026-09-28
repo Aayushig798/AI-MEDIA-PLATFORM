@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { determinePrimaryCategory, DomainCategory } from "./categoryMapping";
 import { generateEmbeddingForAsset } from "./embeddings";
+import { logEvent } from "@/lib/audit/logEvent";
 
 export interface VisionLabelResult {
   label: string;
@@ -158,6 +159,18 @@ export async function runVisionFallback(
       where: { id: assetId },
       data: updateData,
     });
+
+    await logEvent(
+      assetId,
+      "ai_tagged",
+      {
+        tags: detectedLabels.map((t) => t.label),
+        confidences: detectedLabels.map((t) => t.confidence),
+        source: "external_vision",
+        primaryCategory,
+      },
+      "system-ai"
+    );
 
     // Automatically generate text embedding for pgvector search (Task 3.2)
     generateEmbeddingForAsset(assetId).catch((err) => {

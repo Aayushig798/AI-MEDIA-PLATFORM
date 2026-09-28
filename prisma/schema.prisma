@@ -30,6 +30,7 @@ model Project {
   createdAt   DateTime     @default(now())
   assets      MediaAsset[]
   comparisons Comparison[]
+  reports     Report[]
 }
 
 model MediaAsset {
@@ -55,6 +56,7 @@ model MediaAsset {
   aiTags              AiTag[]
   categories          MediaAssetCategory[]
   embedding           MediaEmbedding?
+  auditLogs           AssetAuditLog[]
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -123,5 +125,31 @@ model PairVerification {
   @@index([beforeAssetId])
   @@index([afterAssetId])
 }
+
+model Report {
+  id               String   @id @default(cuid())
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title            String?
+  generatedSummary String   @db.Text
+  selectedAssetIds String[]
+  createdBy        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model AssetAuditLog {
+  id           String     @id @default(cuid())
+  mediaAssetId String
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  eventType    String     // "uploaded" | "ai_tagged" | "embedded" | "used_in_comparison" | "used_in_report"
+  eventDetail  Json
+  actor        String
+  createdAt    DateTime   @default(now())
+
+  @@index([mediaAssetId])
+  @@index([eventType])
+}
+
 
 

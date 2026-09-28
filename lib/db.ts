@@ -777,48 +777,31 @@ export const db = {
     async findMany({
       where = {},
       orderBy = { createdAt: "desc" },
-      include = { aiTags: true, categories: { include: { category: true } } },
+      include,
+      select,
+      take,
     }: {
-      where?: {
-        projectId?: string;
-        manualCategory?: string;
-        aiCategory?: string;
-        capturedAt?: { gte?: Date | string; lte?: Date | string };
-        createdAt?: { gte?: Date | string; lte?: Date | string };
-      };
-      orderBy?: { createdAt?: "asc" | "desc" };
+      where?: any;
+      orderBy?: any;
       include?: any;
+      select?: any;
+      take?: number;
     } = {}) {
       if (hasDatabaseUrl()) {
         try {
-          const prismaWhere: any = {};
-          if (where.projectId) prismaWhere.projectId = where.projectId;
-          if (where.manualCategory && where.manualCategory !== "ALL") {
-            prismaWhere.manualCategory = where.manualCategory;
-          }
-          if (where.aiCategory && where.aiCategory !== "ALL") {
-            prismaWhere.categories = {
-              some: {
-                category: {
-                  name: {
-                    equals: where.aiCategory,
-                    mode: "insensitive",
-                  },
-                },
-              },
-            };
-          }
-          if (where.capturedAt) prismaWhere.capturedAt = where.capturedAt;
-          if (where.createdAt) prismaWhere.createdAt = where.createdAt;
-
-          return await prisma.mediaAsset.findMany({
-            where: prismaWhere,
+          const queryArgs: any = {
+            where,
             orderBy: orderBy as any,
-            include: include || {
-              aiTags: true,
-              categories: { include: { category: true } },
-            },
-          });
+          };
+          if (select) {
+            queryArgs.select = select;
+          } else if (include) {
+            queryArgs.include = include;
+          }
+          if (typeof take === "number") {
+            queryArgs.take = take;
+          }
+          return await prisma.mediaAsset.findMany(queryArgs);
         } catch (e) {
           console.error("[DB Error] prisma.mediaAsset.findMany failed:", e);
           throw e;
@@ -896,19 +879,26 @@ export const db = {
     async findUnique({
       where,
       include,
+      select,
     }: {
       where: { id?: string; cloudinaryPublicId?: string };
       include?: any;
+      select?: any;
     }) {
       if (hasDatabaseUrl()) {
         try {
-          return await (prisma.mediaAsset.findUnique as any)({
-            where,
-            include: include || {
+          const args: any = { where };
+          if (select) {
+            args.select = select;
+          } else if (include) {
+            args.include = include;
+          } else {
+            args.include = {
               aiTags: { orderBy: { confidence: "desc" } },
               categories: { include: { category: true } },
-            },
-          });
+            };
+          }
+          return await (prisma.mediaAsset.findUnique as any)(args);
         } catch (e) {
           console.error("[DB Error] prisma.mediaAsset.findUnique failed:", e);
           throw e;
@@ -1347,6 +1337,185 @@ export const db = {
       list.push(newRec);
       saveLocalData(current);
       return newRec;
+    },
+  },
+
+  // REPORT
+  report: {
+    async findMany({ where, orderBy, include }: { where?: any; orderBy?: any; include?: any } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).report.findMany({ where, orderBy, include });
+        } catch (e) {
+          console.error("[DB Error] prisma.report.findMany failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      let list = (current as any).reports || [];
+      if (where?.projectId) {
+        list = list.filter((r: any) => r.projectId === where.projectId);
+      }
+      return list;
+    },
+
+    async findUnique({ where, include }: { where: { id: string }; include?: any }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).report.findUnique({ where, include });
+        } catch (e) {
+          console.error("[DB Error] prisma.report.findUnique failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).reports || [];
+      return list.find((r: any) => r.id === where.id) || null;
+    },
+
+    async findFirst({ where, include }: { where?: any; include?: any } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).report.findFirst({ where, include });
+        } catch (e) {
+          console.error("[DB Error] prisma.report.findFirst failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).reports || [];
+      if (where?.projectId) {
+        return list.find((r: any) => r.projectId === where.projectId) || null;
+      }
+      return list[0] || null;
+    },
+
+    async create({ data }: { data: any }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).report.create({ data });
+        } catch (e) {
+          console.error("[DB Error] prisma.report.create failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!(current as any).reports) (current as any).reports = [];
+      const newRec = {
+        id: `rep_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        ...data,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      (current as any).reports.push(newRec);
+      saveLocalData(current);
+      return newRec;
+    },
+
+    async update({ where, data }: { where: { id: string }; data: any }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).report.update({ where, data });
+        } catch (e) {
+          console.error("[DB Error] prisma.report.update failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).reports || [];
+      const idx = list.findIndex((r: any) => r.id === where.id);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...data, updatedAt: new Date().toISOString() };
+        saveLocalData(current);
+        return list[idx];
+      }
+      throw new Error(`Report not found: ${where.id}`);
+    },
+
+    async delete({ where }: { where: { id: string } }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).report.delete({ where });
+        } catch (e) {
+          console.error("[DB Error] prisma.report.delete failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).reports || [];
+      const idx = list.findIndex((r: any) => r.id === where.id);
+      if (idx !== -1) {
+        const deleted = list.splice(idx, 1)[0];
+        saveLocalData(current);
+        return deleted;
+      }
+      throw new Error(`Report not found: ${where.id}`);
+    },
+  },
+
+  // ASSET AUDIT LOG
+  assetAuditLog: {
+    async findMany({ where, orderBy }: { where?: any; orderBy?: any } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).assetAuditLog.findMany({ where, orderBy });
+        } catch (e) {
+          console.error("[DB Error] prisma.assetAuditLog.findMany failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      let list = (current as any).assetAuditLogs || [];
+      if (where?.mediaAssetId) {
+        list = list.filter((l: any) => l.mediaAssetId === where.mediaAssetId);
+      }
+      if (where?.eventType) {
+        list = list.filter((l: any) => l.eventType === where.eventType);
+      }
+      return list;
+    },
+
+    async create({ data }: { data: any }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).assetAuditLog.create({ data });
+        } catch (e) {
+          console.error("[DB Error] prisma.assetAuditLog.create failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!(current as any).assetAuditLogs) (current as any).assetAuditLogs = [];
+      const newRec = {
+        id: `aud_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        ...data,
+        createdAt: new Date().toISOString(),
+      };
+      (current as any).assetAuditLogs.push(newRec);
+      saveLocalData(current);
+      return newRec;
+    },
+
+    async createMany({ data }: { data: any[] }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).assetAuditLog.createMany({ data });
+        } catch (e) {
+          console.error("[DB Error] prisma.assetAuditLog.createMany failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!(current as any).assetAuditLogs) (current as any).assetAuditLogs = [];
+      const now = new Date().toISOString();
+      const created = data.map((d: any) => ({
+        id: `aud_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        ...d,
+        createdAt: now,
+      }));
+      (current as any).assetAuditLogs.push(...created);
+      saveLocalData(current);
+      return { count: created.length };
     },
   },
 };

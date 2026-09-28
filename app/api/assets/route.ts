@@ -6,6 +6,7 @@ import { extractCloudinaryAiTags, extractCloudinaryExif } from "@/lib/ai/cloudin
 import { runVisionFallback } from "@/lib/ai/visionFallback";
 import { mapLabelToCategory, determinePrimaryCategory } from "@/lib/ai/categoryMapping";
 import { generateEmbeddingForAsset } from "@/lib/ai/embeddings";
+import { logEvent } from "@/lib/audit/logEvent";
 
 export async function GET(req: NextRequest) {
   try {
@@ -160,6 +161,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Log upload event for asset traceability
+    await logEvent(
+      asset.id,
+      "uploaded",
+      { format: asset.format, bytes: asset.bytes, resourceType: asset.resourceType },
+      asset.uploadedBy
+    );
+
     // If inline tags were available from Cloudinary, write them immediately
     if (hasInlineTags) {
       console.log(
@@ -205,6 +214,18 @@ export async function POST(req: NextRequest) {
           data: { manualCategory: primaryCategory },
         });
       }
+
+      await logEvent(
+        asset.id,
+        "ai_tagged",
+        {
+          tags: inlineAiTags.map((t) => t.label),
+          confidences: inlineAiTags.map((t) => t.confidence),
+          source: inlineAiTags[0]?.source || "cloudinary_google",
+          primaryCategory,
+        },
+        "system-ai"
+      );
 
       // Automatically generate text embedding for pgvector search (Task 3.2)
       generateEmbeddingForAsset(asset.id).catch((err) => {

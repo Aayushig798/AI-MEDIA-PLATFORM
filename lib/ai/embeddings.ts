@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { db } from "@/lib/db";
+import { logEvent } from "@/lib/audit/logEvent";
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -170,6 +171,14 @@ export async function generateEmbeddingForAsset(assetId: string): Promise<number
     );
 
     console.log(`[Embeddings] Successfully generated & saved embedding for asset ${assetId} (${modelVersion})`);
+
+    await logEvent(
+      assetId,
+      "embedded",
+      { model: modelVersion, dimensions: 1536 },
+      "system-ai"
+    );
+
     return vector;
   } catch (error: any) {
     console.error(`[Embeddings Error] Failed to generate embedding for asset ${assetId}:`, error);

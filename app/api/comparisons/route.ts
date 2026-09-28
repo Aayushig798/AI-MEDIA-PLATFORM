@@ -7,6 +7,7 @@ import {
   checkContentSimilarity,
   verifyPairWithVision,
 } from "@/lib/comparison/verify";
+import { logEvent } from "@/lib/audit/logEvent";
 
 export async function GET(req: NextRequest) {
   try {
@@ -279,6 +280,22 @@ export async function POST(req: NextRequest) {
         createdBy: createdBy || "usr_demo123",
       },
     });
+
+    // Retrofit audit log: used_in_comparison for both assets
+    await Promise.all([
+      logEvent(
+        beforeAsset.id,
+        "used_in_comparison",
+        { comparisonId: comparison.id, counterpartId: afterAsset.id, role: "before", verified: isVerified },
+        comparison.createdBy
+      ),
+      logEvent(
+        afterAsset.id,
+        "used_in_comparison",
+        { comparisonId: comparison.id, counterpartId: beforeAsset.id, role: "after", verified: isVerified },
+        comparison.createdBy
+      ),
+    ]);
 
     return NextResponse.json(
       {
