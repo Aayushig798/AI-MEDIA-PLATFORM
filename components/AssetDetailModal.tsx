@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   X, 
   ExternalLink, 
@@ -69,6 +69,33 @@ export function AssetDetailModal({
 
   const [aiTags, setAiTags] = useState<AiTagItem[]>(asset.aiTags || []);
   const [aiStatus, setAiStatus] = useState<string>(asset.aiProcessingStatus || "done");
+
+  const currentAsset = asset;
+
+  // Load fresh tags directly from the AiTag table via /api/assets/[id]/ai-tags
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchFreshAiTags() {
+      try {
+        const res = await fetch(`/api/assets/${currentAsset.id}/ai-tags`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.success && Array.isArray(data.aiTags)) {
+            setAiTags(data.aiTags);
+            if (data.aiProcessingStatus) {
+              setAiStatus(data.aiProcessingStatus);
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to load fresh AI tags for asset ${currentAsset.id}:`, err);
+      }
+    }
+    fetchFreshAiTags();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentAsset.id]);
 
   const handleCopy = (text: string, type: "url" | "id") => {
     navigator.clipboard.writeText(text);

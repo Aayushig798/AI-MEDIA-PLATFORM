@@ -292,36 +292,32 @@ function saveLocalData(data: LocalDBData) {
   }
 }
 
-let isPrismaAvailable: boolean | null = null;
+function hasDatabaseUrl(): boolean {
+  const url = process.env.DATABASE_URL;
+  return Boolean(
+    url &&
+    (url.startsWith("postgresql://") || url.startsWith("postgres://"))
+  );
+}
 
 async function checkPrismaConnection(): Promise<boolean> {
-  if (isPrismaAvailable !== null) return isPrismaAvailable;
-  try {
-    await Promise.race([
-      prisma.$queryRaw`SELECT 1`,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("DB timeout")), 1500)),
-    ]);
-    isPrismaAvailable = true;
-    return true;
-  } catch (err) {
-    isPrismaAvailable = false;
-    return false;
-  }
+  return hasDatabaseUrl();
 }
 
 export const db = {
   async isPrismaConnected(): Promise<boolean> {
-    return checkPrismaConnection();
+    return hasDatabaseUrl();
   },
 
   // USERS
   user: {
     async findUnique({ where }: { where: { email?: string; id?: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await (prisma.user.findUnique as any)({ where });
         } catch (e) {
-          console.error("Prisma error in user.findUnique:", e);
+          console.error("[DB Error] prisma.user.findUnique failed:", e);
+          throw e;
         }
       }
       const data = loadLocalData();
@@ -333,11 +329,12 @@ export const db = {
     },
 
     async create({ data }: { data: any }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.user.create({ data });
         } catch (e) {
-          console.error("Prisma error in user.create:", e);
+          console.error("[DB Error] prisma.user.create failed:", e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -357,7 +354,7 @@ export const db = {
   // PROJECTS
   project: {
     async findMany({ orderBy }: { orderBy?: { createdAt?: "asc" | "desc" } } = {}) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.project.findMany({
             include: {
@@ -368,7 +365,8 @@ export const db = {
             orderBy: orderBy || { createdAt: "desc" },
           });
         } catch (e) {
-          console.error("Prisma error in project.findMany:", e);
+          console.error("[DB Error] prisma.project.findMany failed:", e);
+          throw e;
         }
       }
       const data = loadLocalData();
@@ -389,7 +387,7 @@ export const db = {
     },
 
     async findUnique({ where, include }: { where: { id: string }; include?: any }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.project.findUnique({
             where,
@@ -405,7 +403,8 @@ export const db = {
             },
           });
         } catch (e) {
-          console.error("Prisma error in project.findUnique:", e);
+          console.error("[DB Error] prisma.project.findUnique failed:", e);
+          throw e;
         }
       }
       const data = loadLocalData();
@@ -438,11 +437,12 @@ export const db = {
     },
 
     async create({ data }: { data: any }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.project.create({ data });
         } catch (e) {
-          console.error("Prisma error in project.create:", e);
+          console.error("[DB Error] prisma.project.create failed:", e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -461,11 +461,12 @@ export const db = {
     },
 
     async delete({ where }: { where: { id: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.project.delete({ where });
         } catch (e) {
-          console.error("Prisma error in project.delete:", e);
+          console.error("[DB Error] prisma.project.delete failed:", e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -499,11 +500,12 @@ export const db = {
       update: any;
       create: { name: string };
     }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.category.upsert({ where, update, create });
         } catch (e) {
-          console.error("Prisma error in category.upsert:", e);
+          console.error(`[DB Error] prisma.category.upsert failed for "${where.name}":`, e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -522,11 +524,12 @@ export const db = {
     },
 
     async findMany() {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.category.findMany();
         } catch (e) {
-          console.error("Prisma error in category.findMany:", e);
+          console.error("[DB Error] prisma.category.findMany failed:", e);
+          throw e;
         }
       }
       const data = loadLocalData();
@@ -534,11 +537,12 @@ export const db = {
     },
 
     async findUnique({ where }: { where: { id?: string; name?: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.category.findUnique({ where: where as any });
         } catch (e) {
-          console.error("Prisma error in category.findUnique:", e);
+          console.error("[DB Error] prisma.category.findUnique failed:", e);
+          throw e;
         }
       }
       const data = loadLocalData();
@@ -555,11 +559,12 @@ export const db = {
   // MEDIA ASSET CATEGORIES
   mediaAssetCategory: {
     async create({ data }: { data: { mediaAssetId: string; categoryId: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.mediaAssetCategory.create({ data });
         } catch (e) {
-          console.error("Prisma error in mediaAssetCategory.create:", e);
+          console.error(`[DB Error] prisma.mediaAssetCategory.create failed for asset ${data.mediaAssetId}:`, e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -579,11 +584,12 @@ export const db = {
     },
 
     async deleteMany({ where }: { where: { mediaAssetId: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.mediaAssetCategory.deleteMany({ where });
         } catch (e) {
-          console.error("Prisma error in mediaAssetCategory.deleteMany:", e);
+          console.error(`[DB Error] prisma.mediaAssetCategory.deleteMany failed for asset ${where.mediaAssetId}:`, e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -594,15 +600,22 @@ export const db = {
       return { count: 1 };
     },
 
-    async findMany({ where }: { where: { mediaAssetId: string } }) {
-      if (await checkPrismaConnection()) {
+    async findMany({
+      where,
+      include,
+    }: {
+      where: { mediaAssetId: string };
+      include?: any;
+    }) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.mediaAssetCategory.findMany({
             where,
-            include: { category: true },
+            include: include || { category: true },
           });
         } catch (e) {
-          console.error("Prisma error in mediaAssetCategory.findMany:", e);
+          console.error("[DB Error] prisma.mediaAssetCategory.findMany failed:", e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -627,11 +640,19 @@ export const db = {
         source: string;
       };
     }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
-          return await prisma.aiTag.create({ data });
+          return await prisma.aiTag.create({
+            data: {
+              mediaAssetId: data.mediaAssetId,
+              label: data.label,
+              confidence: Number(data.confidence),
+              source: data.source,
+            },
+          });
         } catch (e) {
-          console.error("Prisma error in aiTag.create:", e);
+          console.error(`[DB Error] prisma.aiTag.create failed for label "${data.label}" on asset ${data.mediaAssetId}:`, e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -648,29 +669,80 @@ export const db = {
       return newTag;
     },
 
-    async findMany({ where }: { where: { mediaAssetId: string } }) {
-      if (await checkPrismaConnection()) {
+    async createMany({
+      data,
+    }: {
+      data: Array<{
+        mediaAssetId: string;
+        label: string;
+        confidence: number;
+        source: string;
+      }>;
+    }) {
+      if (!data || data.length === 0) return { count: 0 };
+      if (hasDatabaseUrl()) {
         try {
-          return await prisma.aiTag.findMany({
-            where,
-            orderBy: { confidence: "desc" },
+          return await prisma.aiTag.createMany({
+            data: data.map((d) => ({
+              mediaAssetId: d.mediaAssetId,
+              label: d.label,
+              confidence: Number(d.confidence),
+              source: d.source,
+            })),
           });
         } catch (e) {
-          console.error("Prisma error in aiTag.findMany:", e);
+          console.error(`[DB Error] prisma.aiTag.createMany failed for ${data.length} tags:`, e);
+          throw e;
         }
       }
       const current = loadLocalData();
-      return current.aiTags
-        .filter((t) => t.mediaAssetId === where.mediaAssetId)
-        .sort((a, b) => b.confidence - a.confidence);
+      for (const d of data) {
+        current.aiTags.push({
+          id: `tag_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          mediaAssetId: d.mediaAssetId,
+          label: d.label,
+          confidence: Number(d.confidence) || 0.9,
+          source: d.source,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      saveLocalData(current);
+      return { count: data.length };
+    },
+
+    async findMany({
+      where,
+      orderBy = { confidence: "desc" },
+    }: {
+      where?: { mediaAssetId?: string; id?: string };
+      orderBy?: any;
+    } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await prisma.aiTag.findMany({
+            where,
+            orderBy: orderBy as any,
+          });
+        } catch (e) {
+          console.error("[DB Error] prisma.aiTag.findMany failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      let results = [...current.aiTags];
+      if (where?.mediaAssetId) {
+        results = results.filter((t) => t.mediaAssetId === where.mediaAssetId);
+      }
+      return results.sort((a, b) => b.confidence - a.confidence);
     },
 
     async delete({ where }: { where: { id: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.aiTag.delete({ where });
         } catch (e) {
-          console.error("Prisma error in aiTag.delete:", e);
+          console.error(`[DB Error] prisma.aiTag.delete failed for tag ${where.id}:`, e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -682,11 +754,12 @@ export const db = {
     },
 
     async deleteMany({ where }: { where: { mediaAssetId: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.aiTag.deleteMany({ where });
         } catch (e) {
-          console.error("Prisma error in aiTag.deleteMany:", e);
+          console.error(`[DB Error] prisma.aiTag.deleteMany failed for asset ${where.mediaAssetId}:`, e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -713,7 +786,7 @@ export const db = {
       orderBy?: { createdAt?: "asc" | "desc" };
       include?: any;
     } = {}) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           const prismaWhere: any = {};
           if (where.projectId) prismaWhere.projectId = where.projectId;
@@ -744,7 +817,8 @@ export const db = {
             },
           });
         } catch (e) {
-          console.error("Prisma error in mediaAsset.findMany:", e);
+          console.error("[DB Error] prisma.mediaAsset.findMany failed:", e);
+          throw e;
         }
       }
 
@@ -823,7 +897,7 @@ export const db = {
       where: { id?: string; cloudinaryPublicId?: string };
       include?: any;
     }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await (prisma.mediaAsset.findUnique as any)({
             where,
@@ -833,7 +907,8 @@ export const db = {
             },
           });
         } catch (e) {
-          console.error("Prisma error in mediaAsset.findUnique:", e);
+          console.error("[DB Error] prisma.mediaAsset.findUnique failed:", e);
+          throw e;
         }
       }
       const data = loadLocalData();
@@ -863,7 +938,7 @@ export const db = {
     },
 
     async create({ data }: { data: any }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.mediaAsset.create({
             data,
@@ -873,7 +948,8 @@ export const db = {
             },
           });
         } catch (e) {
-          console.error("Prisma error in mediaAsset.create:", e);
+          console.error("[DB Error] prisma.mediaAsset.create failed:", e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -906,7 +982,7 @@ export const db = {
     },
 
     async update({ where, data }: { where: { id: string }; data: any }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.mediaAsset.update({
             where,
@@ -917,7 +993,8 @@ export const db = {
             },
           });
         } catch (e) {
-          console.error("Prisma error in mediaAsset.update:", e);
+          console.error("[DB Error] prisma.mediaAsset.update failed:", e);
+          throw e;
         }
       }
       const current = loadLocalData();
@@ -963,11 +1040,12 @@ export const db = {
     },
 
     async delete({ where }: { where: { id: string } }) {
-      if (await checkPrismaConnection()) {
+      if (hasDatabaseUrl()) {
         try {
           return await prisma.mediaAsset.delete({ where });
         } catch (e) {
-          console.error("Prisma error in mediaAsset.delete:", e);
+          console.error("[DB Error] prisma.mediaAsset.delete failed:", e);
+          throw e;
         }
       }
       const current = loadLocalData();

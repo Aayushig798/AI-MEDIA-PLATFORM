@@ -197,7 +197,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, asset }, { status: 201 });
+    // Refresh asset to include aiTags and categories if created inline
+    const finalAsset = hasInlineTags 
+      ? (await db.mediaAsset.findUnique({ where: { id: asset.id } })) || asset
+      : asset;
+
+    return NextResponse.json({ success: true, asset: finalAsset }, { status: 201 });
   } catch (error: any) {
     console.error("POST /api/assets error:", error);
     return NextResponse.json(
