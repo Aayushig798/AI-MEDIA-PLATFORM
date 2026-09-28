@@ -209,17 +209,18 @@ curl http://localhost:3000/api/assets/<asset_id>/audit-log
 
 ## Build Roadmap
 
-This project is built in four sequential phases, each a complete, demoable increment:
+This project is built in four sequential phases, each documented in the [`docs/`](./docs) directory:
 
-- [x] **Phase 1 — Foundation & Media Management:** projects, signed Cloudinary uploads, gallery, manual tags. *(Implemented)*
-- [ ] **Phase 2 — AI Understanding & Auto-Organization:** automatic tagging + domain categorization.
-- [ ] **Phase 3 — Intelligent Search & Evidence Comparison:** semantic search + before/after slider.
-- [ ] **Phase 4 — Impact Intelligence & Reporting:** grounded LLM reports, PDF export, full traceability, dashboard.
+- [x] [**Phase 1 — Foundation & Media Management**](./docs/PHASE1_FOUNDATION_AND_MEDIA_MANAGEMENT.md): projects, signed Cloudinary uploads, gallery, manual tags. *(Implemented & Active)*
+- [ ] [**Phase 2 — AI Understanding & Auto-Organization**](./docs/PHASE2_AI_UNDERSTANDING_AND_AUTO_ORGANIZATION.md): automatic tagging + domain categorization.
+- [ ] [**Phase 3 — Intelligent Search & Evidence Comparison**](./docs/PHASE3_INTELLIGENT_SEARCH_AND_EVIDENCE_COMPARISON.md): semantic search + before/after slider.
+- [ ] [**Phase 4 — Impact Intelligence & Reporting**](./docs/PHASE4_IMPACT_REPORTING.md): grounded LLM reports, PDF export, full traceability, dashboard.
 
 ## Project Structure
 
 ```
 ai-media-platform/
+├── docs/                       # Detailed specifications for Phases 1–4
 ├── prisma/
 │   ├── schema.prisma           # User, Project, MediaAsset, AiTag, Category,
 │   │                           #   MediaEmbedding, Comparison, Report, AssetAuditLog
