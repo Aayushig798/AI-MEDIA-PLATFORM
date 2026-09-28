@@ -26,6 +26,11 @@ export async function POST(req: NextRequest) {
       cloud_name: signedParams.cloudName,
       cloudName: signedParams.cloudName,
       folder: signedParams.folder,
+      categorization: signedParams.categorization,
+      auto_tagging: signedParams.autoTagging,
+      autoTagging: signedParams.autoTagging,
+      image_metadata: signedParams.imageMetadata,
+      imageMetadata: signedParams.imageMetadata,
     });
   } catch (error: any) {
     console.error("POST /api/cloudinary/sign error:", error);

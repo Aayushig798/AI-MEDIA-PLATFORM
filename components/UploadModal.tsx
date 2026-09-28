@@ -187,6 +187,9 @@ export function UploadModal({
           uploadFormData.append("timestamp", timestamp.toString());
           uploadFormData.append("signature", signature);
           uploadFormData.append("folder", folder);
+          uploadFormData.append("categorization", signData.categorization || "google_tagging");
+          uploadFormData.append("auto_tagging", (signData.auto_tagging ?? signData.autoTagging ?? 0.6).toString());
+          uploadFormData.append("image_metadata", (signData.image_metadata ?? signData.imageMetadata ?? true).toString());
 
           updateStagedField(staged.id, "progress", 50);
 

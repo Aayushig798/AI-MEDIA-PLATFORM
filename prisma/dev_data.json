@@ -73,15 +73,6 @@
       "createdAt": "2026-09-27T18:20:30.551Z"
     },
     {
-      "id": "proj_amazon_reforest",
-      "name": "Amazon Basin Reforestation & Canopy Recovery",
-      "description": "Monitoring canopy regrowth, soil moisture, and native biodiversity restoration in the Madre de Dios region.",
-      "location": "Madre de Dios, Peru",
-      "startDate": "2024-01-15T00:00:00.000Z",
-      "createdBy": "usr_demo123",
-      "createdAt": "2024-01-15T00:00:00.000Z"
-    },
-    {
       "id": "proj_clean_water_kenya",
       "name": "Turkana Solar-Powered Aquifer Wells",
       "description": "Community solar pumping infrastructure providing clean drinking water to over 15,000 pastoralists.",
@@ -101,6 +92,75 @@
     }
   ],
   "assets": [
+    {
+      "id": "asset_1790570174927_i6u83w",
+      "projectId": "proj_1790538013202_xm15y8",
+      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/576df0ad-4da3-4be9-b656-ff4e35c48389/rzckbc5w7fwjei2iqueg",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790570174/impact-platform/proj_1790538013202_xm15y8/576df0ad-4da3-4be9-b656-ff4e35c48389/rzckbc5w7fwjei2iqueg.jpg",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 2899115,
+      "width": 5472,
+      "height": 3648,
+      "manualCategory": "Infrastructure",
+      "manualLocation": "DELHI",
+      "manualNotes": null,
+      "capturedAt": "2026-09-28T00:00:00.000Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": null,
+      "exifLng": null,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-28T04:36:14.927Z",
+      "updatedAt": "2026-09-28T04:36:15.593Z"
+    },
+    {
+      "id": "asset_1790569799725_9ymsy6",
+      "projectId": "proj_1790538013202_xm15y8",
+      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/da32647c-8526-48eb-96b4-16eadcb26e3e/bmhyojabrr51jwguviwu",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790569798/impact-platform/proj_1790538013202_xm15y8/da32647c-8526-48eb-96b4-16eadcb26e3e/bmhyojabrr51jwguviwu.jpg",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 1871619,
+      "width": 2560,
+      "height": 3840,
+      "manualCategory": "Environmental",
+      "manualLocation": "DELHI",
+      "manualNotes": null,
+      "capturedAt": "2026-09-28T00:00:00.000Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": null,
+      "exifLng": null,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-28T04:29:59.725Z",
+      "updatedAt": "2026-09-28T04:30:29.546Z"
+    },
+    {
+      "id": "asset_1790569604330_s0et4x",
+      "projectId": "proj_1790538013202_xm15y8",
+      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/5d918e99-5b5f-4f07-b99b-d63a28e0abde/aeiwad3odkzrfj0xbmwp",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790569603/impact-platform/proj_1790538013202_xm15y8/5d918e99-5b5f-4f07-b99b-d63a28e0abde/aeiwad3odkzrfj0xbmwp.jpg",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 1847858,
+      "width": 5747,
+      "height": 3832,
+      "manualCategory": "Environmental",
+      "manualLocation": "DELHI",
+      "manualNotes": null,
+      "capturedAt": "2026-09-28T00:00:00.000Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": null,
+      "exifLng": null,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-28T04:26:44.332Z",
+      "updatedAt": "2026-09-28T04:26:45.350Z"
+    },
     {
       "id": "asset_1790541056866_prigdr",
       "projectId": "proj_1790533298685_cyyhic",
@@ -541,42 +601,6 @@
       "updatedAt": "2026-09-27T18:20:30.611Z"
     },
     {
-      "id": "asset_seed_1",
-      "projectId": "proj_amazon_reforest",
-      "cloudinaryPublicId": "impact-platform/proj_amazon_reforest/seed_canopy_drone",
-      "secureUrl": "https://images.unsplash.com/photo-1516026672322-bc52d61a55d5?auto=format&fit=crop&w=1200&q=80",
-      "resourceType": "image",
-      "format": "jpg",
-      "bytes": 1420500,
-      "width": 1920,
-      "height": 1080,
-      "manualCategory": "Environmental",
-      "manualLocation": "Plot A-12, Rio Tambopata",
-      "manualNotes": "Drone survey of nursery sapling canopy expansion after first rainy season.",
-      "capturedAt": "2024-05-18T00:00:00.000Z",
-      "uploadedBy": "usr_demo123",
-      "createdAt": "2024-05-19T00:00:00.000Z",
-      "updatedAt": "2024-05-19T00:00:00.000Z"
-    },
-    {
-      "id": "asset_seed_2",
-      "projectId": "proj_amazon_reforest",
-      "cloudinaryPublicId": "impact-platform/proj_amazon_reforest/seed_community_planting",
-      "secureUrl": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=1200&q=80",
-      "resourceType": "image",
-      "format": "jpg",
-      "bytes": 980200,
-      "width": 1600,
-      "height": 1066,
-      "manualCategory": "Community",
-      "manualLocation": "Inambari Nursery, Peru",
-      "manualNotes": "Local indigenous youth collective preparing 2,000 mahogany and cedar seedlings.",
-      "capturedAt": "2024-06-02T00:00:00.000Z",
-      "uploadedBy": "usr_demo123",
-      "createdAt": "2024-06-03T00:00:00.000Z",
-      "updatedAt": "2024-06-03T00:00:00.000Z"
-    },
-    {
       "id": "asset_seed_3",
       "projectId": "proj_clean_water_kenya",
       "cloudinaryPublicId": "impact-platform/proj_clean_water_kenya/seed_solar_pump",
@@ -611,14 +635,6 @@
       "confidence": 0.95,
       "source": "external_vision",
       "createdAt": "2026-09-27T20:29:11.628Z"
-    },
-    {
-      "id": "tag_1790540951645_mohng",
-      "mediaAssetId": "asset_1790540951526_0hfqip",
-      "label": "Vegetation Cover",
-      "confidence": 0.92,
-      "source": "external_vision",
-      "createdAt": "2026-09-27T20:29:11.645Z"
     },
     {
       "id": "tag_1790540951669_9stwi",
@@ -843,38 +859,6 @@
       "confidence": 0.86,
       "source": "external_vision",
       "createdAt": "2026-09-27T20:29:13.905Z"
-    },
-    {
-      "id": "tag_1790541091143_ty1ou",
-      "mediaAssetId": "asset_1790541056866_prigdr",
-      "label": "Natural Landscape",
-      "confidence": 0.94,
-      "source": "external_vision",
-      "createdAt": "2026-09-27T20:31:31.143Z"
-    },
-    {
-      "id": "tag_1790541091215_0eiv4",
-      "mediaAssetId": "asset_1790541056866_prigdr",
-      "label": "Environmental Terrain",
-      "confidence": 0.91,
-      "source": "external_vision",
-      "createdAt": "2026-09-27T20:31:31.215Z"
-    },
-    {
-      "id": "tag_1790541091259_qg7mc",
-      "mediaAssetId": "asset_1790541056866_prigdr",
-      "label": "Vegetation Cover",
-      "confidence": 0.87,
-      "source": "external_vision",
-      "createdAt": "2026-09-27T20:31:31.259Z"
-    },
-    {
-      "id": "tag_1790541091320_rh9u5",
-      "mediaAssetId": "asset_1790541056866_prigdr",
-      "label": "Field Monitoring Site",
-      "confidence": 0.84,
-      "source": "external_vision",
-      "createdAt": "2026-09-27T20:31:31.320Z"
     }
   ],
   "categories": [
@@ -943,6 +927,21 @@
     {
       "id": "mac_1790541091386_9x1zd",
       "mediaAssetId": "asset_1790541056866_prigdr",
+      "categoryId": "cat_env"
+    },
+    {
+      "id": "mac_1790569605232_q0mxt",
+      "mediaAssetId": "asset_1790569604330_s0et4x",
+      "categoryId": "cat_env"
+    },
+    {
+      "id": "mac_1790569829490_evjj9",
+      "mediaAssetId": "asset_1790569799725_9ymsy6",
+      "categoryId": "cat_env"
+    },
+    {
+      "id": "mac_1790570175547_6pk4n",
+      "mediaAssetId": "asset_1790570174927_i6u83w",
       "categoryId": "cat_env"
     }
   ]

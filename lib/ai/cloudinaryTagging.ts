@@ -55,40 +55,77 @@ export function extractCloudinaryAiTags(info: any): ExtractedAiTag[] {
   if (!info) return [];
 
   const tags: ExtractedAiTag[] = [];
+  const seen = new Set<string>();
 
-  // Google Auto Tagging add-on
-  if (info.categorization?.google_tagging?.data) {
-    for (const item of info.categorization.google_tagging.data) {
-      if (item.tag) {
+  const categorization =
+    info.categorization ||
+    info.info?.categorization ||
+    info.data?.categorization;
+
+  const autoTagging =
+    info.auto_tagging ||
+    info.info?.auto_tagging;
+
+  const tagsList =
+    info.tags ||
+    info.info?.tags;
+
+  // 1. Google Auto Tagging add-on data
+  if (categorization?.google_tagging?.data && Array.isArray(categorization.google_tagging.data)) {
+    for (const item of categorization.google_tagging.data) {
+      const label = item.tag || item.name;
+      if (label && typeof label === "string" && !seen.has(label.toLowerCase())) {
+        seen.add(label.toLowerCase());
+        const rawConf = typeof item.confidence === "number" ? item.confidence : 0.85;
         tags.push({
-          label: item.tag,
-          confidence: Math.round((item.confidence || 0.9) * 100) / 100,
+          label: label.trim(),
+          confidence: Math.round(rawConf * 1000) / 1000,
           source: "cloudinary_google",
         });
       }
     }
   }
 
-  // AWS Rekognition add-on
-  if (info.categorization?.aws_rek_tagging?.data) {
-    for (const item of info.categorization.aws_rek_tagging.data) {
-      if (item.tag) {
+  // 2. AWS Rekognition add-on data
+  if (categorization?.aws_rek_tagging?.data && Array.isArray(categorization.aws_rek_tagging.data)) {
+    for (const item of categorization.aws_rek_tagging.data) {
+      const label = item.tag || item.name;
+      if (label && typeof label === "string" && !seen.has(label.toLowerCase())) {
+        seen.add(label.toLowerCase());
+        const rawConf = typeof item.confidence === "number" ? item.confidence : 0.85;
         tags.push({
-          label: item.tag,
-          confidence: Math.round((item.confidence || 0.9) * 100) / 100,
+          label: label.trim(),
+          confidence: Math.round(rawConf * 1000) / 1000,
           source: "cloudinary_rekognition",
         });
       }
     }
   }
 
-  // Generic auto_tagging array
-  if (Array.isArray(info.auto_tagging)) {
-    for (const item of info.auto_tagging) {
-      if (item.tag) {
+  // 3. Generic auto_tagging array
+  if (autoTagging && Array.isArray(autoTagging)) {
+    for (const item of autoTagging) {
+      const label = item.tag || item.name;
+      if (label && typeof label === "string" && !seen.has(label.toLowerCase())) {
+        seen.add(label.toLowerCase());
+        const rawConf = typeof item.confidence === "number" ? item.confidence : 0.85;
         tags.push({
-          label: item.tag,
-          confidence: Math.round((item.confidence || 0.9) * 100) / 100,
+          label: label.trim(),
+          confidence: Math.round(rawConf * 1000) / 1000,
+          source: "cloudinary_google",
+        });
+      }
+    }
+  }
+
+  // 4. Tags array fallback if categorization object was stripped but tags were returned
+  if (tags.length === 0 && Array.isArray(tagsList) && tagsList.length > 0) {
+    for (const item of tagsList) {
+      if (typeof item === "string" && item.trim() && !seen.has(item.toLowerCase())) {
+        seen.add(item.toLowerCase());
+        tags.push({
+          label: item.trim(),
+          confidence: 0.85,
           source: "cloudinary_google",
         });
       }

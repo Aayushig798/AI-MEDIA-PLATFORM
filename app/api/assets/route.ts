@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { extractCloudinaryAiTags, extractCloudinaryExif } from "@/lib/ai/cloudinaryTagging";
 import { runVisionFallback } from "@/lib/ai/visionFallback";
-import { mapLabelToCategory } from "@/lib/ai/categoryMapping";
+import { mapLabelToCategory, determinePrimaryCategory } from "@/lib/ai/categoryMapping";
 
 export async function GET(req: NextRequest) {
   try {
@@ -151,7 +151,15 @@ export async function POST(req: NextRequest) {
 
     // If inline tags were available from Cloudinary, write them immediately
     if (hasInlineTags) {
-      const mappedCats = new Set<string>();
+      console.log(
+        `[AI Tagging] Asset ${asset.id} (${inlineAiTags[0]?.source || "cloudinary_google"}) raw labels:`,
+        inlineAiTags.map((t) => `${t.label} (${t.confidence})`).join(", ")
+      );
+
+      // Clean up any stale tags or categories (Requirement 7)
+      await db.aiTag.deleteMany({ where: { mediaAssetId: asset.id } });
+      await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: asset.id } });
+
       for (const t of inlineAiTags) {
         await db.aiTag.create({
           data: {
@@ -161,22 +169,25 @@ export async function POST(req: NextRequest) {
             source: t.source,
           },
         });
-        const catName = mapLabelToCategory(t.label);
-        if (catName !== "Uncategorized") mappedCats.add(catName);
       }
 
-      for (const catName of Array.from(mappedCats)) {
-        const cat = await db.category.upsert({
-          where: { name: catName },
-          update: {},
-          create: { name: catName },
-        });
-        await db.mediaAssetCategory.create({
-          data: { mediaAssetId: asset.id, categoryId: cat.id },
-        });
-      }
+      // Assign ONE primary category based on highest total confidence (Requirement 5)
+      const primaryCategory = determinePrimaryCategory(inlineAiTags);
+      console.log(
+        `[AI Tagging] Asset ${asset.id} primary category assigned: ${primaryCategory}`
+      );
+
+      const cat = await db.category.upsert({
+        where: { name: primaryCategory },
+        update: {},
+        create: { name: primaryCategory },
+      });
+
+      await db.mediaAssetCategory.create({
+        data: { mediaAssetId: asset.id, categoryId: cat.id },
+      });
     } else {
-      // NFR-05: Non-blocking asynchronous AI vision processing
+      // Asynchronous fallback: Google Vision or fail gracefully without mock tags
       runVisionFallback(asset.id, asset.secureUrl, {
         filename: filename || cloudinaryPublicId,
         manualNotes: asset.manualNotes || undefined,

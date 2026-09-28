@@ -1,15 +1,16 @@
 import { db } from "@/lib/db";
-import { mapLabelToCategory, DomainCategory } from "./categoryMapping";
+import { determinePrimaryCategory, DomainCategory } from "./categoryMapping";
 
-interface VisionLabelResult {
+export interface VisionLabelResult {
   label: string;
   confidence: number;
-  source: string;
+  source: "cloudinary_google" | "cloudinary_rekognition" | "external_vision";
 }
 
 /**
- * Intelligent Vision Fallback Engine
- * Analyzes visual evidence using Google Vision API if configured, or smart visual/context classifier.
+ * Real Vision Fallback Engine
+ * Calls Google Cloud Vision LABEL_DETECTION using GOOGLE_VISION_API_KEY when Cloudinary add-on tags are absent.
+ * If no real tags can be obtained, marks the asset as "failed" and never invents mock tags.
  */
 export async function runVisionFallback(
   assetId: string,
@@ -27,11 +28,11 @@ export async function runVisionFallback(
       data: { aiProcessingStatus: "processing" },
     });
 
-    let detectedLabels: VisionLabelResult[] = [];
-
-    // 2. Try Google Vision API if key exists
+    const detectedLabels: VisionLabelResult[] = [];
     const googleApiKey = process.env.GOOGLE_VISION_API_KEY;
-    if (googleApiKey && secureUrl.startsWith("http")) {
+
+    // 2. Call Google Cloud Vision API if key is configured
+    if (googleApiKey && secureUrl && secureUrl.startsWith("http")) {
       try {
         const visionRes = await fetch(
           `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`,
@@ -42,7 +43,7 @@ export async function runVisionFallback(
               requests: [
                 {
                   image: { source: { imageUri: secureUrl } },
-                  features: [{ type: "LABEL_DETECTION", maxResults: 10 }],
+                  features: [{ type: "LABEL_DETECTION", maxResults: 15 }],
                 },
               ],
             }),
@@ -53,83 +54,103 @@ export async function runVisionFallback(
           const visionData = await visionRes.json();
           const annotations = visionData.responses?.[0]?.labelAnnotations || [];
           for (const item of annotations) {
-            if (item.description) {
+            if (item.description && typeof item.score === "number") {
               detectedLabels.push({
-                label: item.description,
-                confidence: Math.round((item.score || 0.85) * 100) / 100,
+                label: item.description.trim(),
+                confidence: Math.round(item.score * 1000) / 1000,
                 source: "external_vision",
               });
             }
           }
+        } else {
+          const errText = await visionRes.text();
+          console.warn(`[Vision API] Google Cloud Vision returned ${visionRes.status}:`, errText);
         }
-      } catch (err) {
-        console.warn("Google Vision API call failed, falling back to smart classifier:", err);
+      } catch (err: any) {
+        console.warn("[Vision API] Google Cloud Vision request error:", err.message || err);
       }
     }
 
-    // 3. Smart Vision & Visual Cue Classifier (used if no external API key or fallback needed)
+    // 3. If no real tags were obtained, FAIL GRACEFULLY - DO NOT INVENT MOCK TAGS
     if (detectedLabels.length === 0) {
-      detectedLabels = generateContextualLabels(secureUrl, options);
+      const missingReason = !googleApiKey
+        ? "Google Auto Tagging add-on returned no data and GOOGLE_VISION_API_KEY not set"
+        : "Google Auto Tagging add-on returned no data and Google Cloud Vision API returned 0 labels";
+
+      console.error(
+        `[AI Tagging Failed] Asset ${assetId}: ${missingReason}. No mock tags will be generated.`
+      );
+
+      // Clean up any stale tags or categories
+      await db.aiTag.deleteMany({ where: { mediaAssetId: assetId } });
+      await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: assetId } });
+
+      const failedAsset = await db.mediaAsset.update({
+        where: { id: assetId },
+        data: { aiProcessingStatus: "failed" },
+      });
+
+      return {
+        success: false,
+        asset: failedAsset,
+        tagsCount: 0,
+        categories: [],
+        error: missingReason,
+      };
     }
 
-    // 4. Clear any previous AI tags for this asset
+    // 4. Log raw labels and confidences (Requirement 6)
+    console.log(
+      `[AI Tagging] Asset ${assetId} (external_vision) raw labels:`,
+      detectedLabels.map((t) => `${t.label} (${t.confidence})`).join(", ")
+    );
+
+    // 5. Clean up old tags before writing new ones (Requirement 7)
     await db.aiTag.deleteMany({ where: { mediaAssetId: assetId } });
     await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: assetId } });
 
-    // 5. Save AI tags & map domain categories
-    const assignedCategories = new Set<string>();
-
+    // 6. Save real AI tags
     for (const item of detectedLabels) {
-      // Create AiTag row
       await db.aiTag.create({
         data: {
           mediaAssetId: assetId,
           label: item.label,
           confidence: item.confidence,
-          source: item.source,
-        },
-      });
-
-      // Map to Domain Category
-      const categoryName = mapLabelToCategory(item.label);
-      if (categoryName && categoryName !== "Uncategorized") {
-        assignedCategories.add(categoryName);
-      }
-    }
-
-    // If no category matched, assign Uncategorized
-    if (assignedCategories.size === 0) {
-      assignedCategories.add("Environmental"); // Default baseline for field evidence
-    }
-
-    // Link asset to Categories in database
-    for (const catName of Array.from(assignedCategories)) {
-      const cat = await db.category.upsert({
-        where: { name: catName },
-        update: {},
-        create: { name: catName },
-      });
-      await db.mediaAssetCategory.create({
-        data: {
-          mediaAssetId: assetId,
-          categoryId: cat.id,
+          source: "external_vision",
         },
       });
     }
 
-    // 6. Update MediaAsset aiProcessingStatus to "done"
+    // 7. Assign ONE primary category based on highest total confidence (Requirement 5)
+    const primaryCategory = determinePrimaryCategory(detectedLabels);
+    console.log(
+      `[AI Tagging] Asset ${assetId} primary category assigned: ${primaryCategory}`
+    );
+
+    const cat = await db.category.upsert({
+      where: { name: primaryCategory },
+      update: {},
+      create: { name: primaryCategory },
+    });
+
+    await db.mediaAssetCategory.create({
+      data: {
+        mediaAssetId: assetId,
+        categoryId: cat.id,
+      },
+    });
+
+    // 8. Update status to done
     const updatedAsset = await db.mediaAsset.update({
       where: { id: assetId },
-      data: {
-        aiProcessingStatus: "done",
-      },
+      data: { aiProcessingStatus: "done" },
     });
 
     return {
       success: true,
       asset: updatedAsset,
       tagsCount: detectedLabels.length,
-      categories: Array.from(assignedCategories),
+      categories: [primaryCategory],
     };
   } catch (error: any) {
     console.error(`runVisionFallback error for asset ${assetId}:`, error);
@@ -139,93 +160,4 @@ export async function runVisionFallback(
     });
     throw error;
   }
-}
-
-/**
- * Contextual Label Generator
- * Generates realistic visual classification tags and confidence scores from media context.
- */
-function generateContextualLabels(
-  secureUrl: string,
-  options: {
-    filename?: string;
-    manualNotes?: string;
-    manualLocation?: string;
-  }
-): VisionLabelResult[] {
-  const combined = [
-    secureUrl,
-    options.filename || "",
-    options.manualNotes || "",
-    options.manualLocation || "",
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  const labels: VisionLabelResult[] = [];
-
-  const addTag = (label: string, confidence: number) => {
-    if (!labels.some((l) => l.label.toLowerCase() === label.toLowerCase())) {
-      labels.push({ label, confidence, source: "external_vision" });
-    }
-  };
-
-  // Check visual topic indicators
-  if (combined.includes("canopy") || combined.includes("drone") || combined.includes("forest") || combined.includes("rainforest")) {
-    addTag("Forest Canopy", 0.98);
-    addTag("Rainforest Ecosystem", 0.95);
-    addTag("Vegetation Cover", 0.92);
-    addTag("Tree Biomass", 0.88);
-  }
-
-  if (combined.includes("mangrove") || combined.includes("seedling") || combined.includes("nursery") || combined.includes("planting")) {
-    addTag("Mangrove Sapling", 0.96);
-    addTag("Estuarine Habitat", 0.94);
-    addTag("Tree Nursery", 0.91);
-    addTag("Coastal Wetland", 0.87);
-  }
-
-  if (combined.includes("solar") || combined.includes("panel") || combined.includes("photovoltaic") || combined.includes("inverter")) {
-    addTag("Solar Panel Array", 0.97);
-    addTag("Renewable Energy Installation", 0.94);
-    addTag("Photovoltaic Cells", 0.91);
-    addTag("Clean Power Infrastructure", 0.89);
-  }
-
-  if (combined.includes("water") || combined.includes("river") || combined.includes("stream") || combined.includes("well") || combined.includes("pump")) {
-    addTag("Water Resource", 0.95);
-    addTag("River Stream Flow", 0.93);
-    addTag("Hydrological Channel", 0.90);
-    addTag("Borehole Pump Facility", 0.88);
-  }
-
-  if (combined.includes("flood") || combined.includes("debris") || combined.includes("damage") || combined.includes("erosion") || combined.includes("disaster")) {
-    addTag("Floodwater Inundation", 0.96);
-    addTag("Erosion Gully", 0.93);
-    addTag("Debris Obstruction", 0.90);
-    addTag("Storm Surge Impact", 0.86);
-  }
-
-  if (combined.includes("community") || combined.includes("meeting") || combined.includes("workshop") || combined.includes("people") || combined.includes("village") || combined.includes("council")) {
-    addTag("Community Council Gathering", 0.95);
-    addTag("Participatory Workshop", 0.92);
-    addTag("Local Stakeholders", 0.89);
-    addTag("Indigenous Leadership", 0.86);
-  }
-
-  if (combined.includes("construction") || combined.includes("road") || combined.includes("bridge") || combined.includes("building") || combined.includes("scaffolding")) {
-    addTag("Construction Scaffolding", 0.96);
-    addTag("Civil Engineering Structure", 0.93);
-    addTag("Bridge Infrastructure", 0.89);
-  }
-
-  // Default baseline if no specific keywords matched
-  if (labels.length === 0) {
-    addTag("Natural Landscape", 0.94);
-    addTag("Environmental Terrain", 0.91);
-    addTag("Vegetation Cover", 0.87);
-    addTag("Field Monitoring Site", 0.84);
-  }
-
-  return labels;
 }

@@ -16,11 +16,15 @@ export interface CloudinarySignedParams {
   apiKey: string;
   cloudName: string;
   folder: string;
+  categorization: string;
+  autoTagging: number;
+  imageMetadata: boolean;
 }
 
 /**
  * Generate a signed upload signature for direct browser-to-Cloudinary upload.
  * Folder convention: impact-platform/{projectId}/{uuid}
+ * Signed params include Google Auto Tagging add-on and EXIF metadata extraction.
  */
 export function generateUploadSignature(projectId: string, folderUuid: string): CloudinarySignedParams {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "demo";
@@ -30,9 +34,12 @@ export function generateUploadSignature(projectId: string, folderUuid: string): 
   const timestamp = Math.round(new Date().getTime() / 1000);
   const folder = `impact-platform/${projectId}/${folderUuid}`;
 
-  // Parameters to sign
+  // Parameters to sign (must match form fields submitted to Cloudinary)
   const paramsToSign = {
+    auto_tagging: 0.6,
+    categorization: "google_tagging",
     folder,
+    image_metadata: true,
     timestamp,
   };
 
@@ -50,6 +57,9 @@ export function generateUploadSignature(projectId: string, folderUuid: string): 
     apiKey,
     cloudName,
     folder,
+    categorization: "google_tagging",
+    autoTagging: 0.6,
+    imageMetadata: true,
   };
 }
 

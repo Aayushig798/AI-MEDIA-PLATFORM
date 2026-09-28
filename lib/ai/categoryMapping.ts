@@ -14,43 +14,91 @@ export const DOMAIN_CATEGORIES = [
 export type DomainCategory = (typeof DOMAIN_CATEGORIES)[number];
 
 export const KEYWORD_MAP: Record<string, DomainCategory> = {
-  // Environmental
-  river: "Environmental",
-  flood: "Environmental",
-  forest: "Environmental",
+  // Environmental (Restoration, Ecology, Water, Climate, Nature)
   water: "Environmental",
+  river: "Environmental",
+  lake: "Environmental",
   tree: "Environmental",
-  solar: "Environmental",
+  forest: "Environmental",
+  plant: "Environmental",
+  grass: "Environmental",
+  sky: "Environmental",
+  cloud: "Environmental",
+  mountain: "Environmental",
+  hill: "Environmental",
+  valley: "Environmental",
+  nature: "Environmental",
+  landscape: "Environmental",
+  ocean: "Environmental",
+  sea: "Environmental",
+  stream: "Environmental",
+  creek: "Environmental",
   canopy: "Environmental",
   rainforest: "Environmental",
   mangrove: "Environmental",
   vegetation: "Environmental",
   glacier: "Environmental",
-  nature: "Environmental",
-  ocean: "Environmental",
-  lake: "Environmental",
   soil: "Environmental",
   wildlife: "Environmental",
-  plant: "Environmental",
   leaf: "Environmental",
   jungle: "Environmental",
-  creek: "Environmental",
-  landscape: "Environmental",
   woodland: "Environmental",
+  wetland: "Environmental",
+  marsh: "Environmental",
+  estuary: "Environmental",
+  flora: "Environmental",
+  fauna: "Environmental",
+  coast: "Environmental",
+  coastal: "Environmental",
+  beach: "Environmental",
+  wilderness: "Environmental",
+  savanna: "Environmental",
+  meadow: "Environmental",
+  foliage: "Environmental",
+  algae: "Environmental",
+  coral: "Environmental",
+  reef: "Environmental",
+  rock: "Environmental",
+  geology: "Environmental",
+  terrain: "Environmental",
+  watercourse: "Environmental",
+  reservoir: "Environmental",
+  reflection: "Environmental",
+  mist: "Environmental",
+  fog: "Environmental",
+  sunrise: "Environmental",
+  sunset: "Environmental",
+  dawn: "Environmental",
+  dusk: "Environmental",
+  alps: "Environmental",
+  ridge: "Environmental",
+  cliff: "Environmental",
+  massif: "Environmental",
+  sound: "Environmental",
+  fjord: "Environmental",
+  pine: "Environmental",
+  conifer: "Environmental",
+  larch: "Environmental",
+  fir: "Environmental",
+  fern: "Environmental",
+  herb: "Environmental",
+  flower: "Environmental",
 
-  // Infrastructure
-  scaffolding: "Infrastructure",
-  construction: "Infrastructure",
+  // Infrastructure (Civil Works, Renewable Energy, Utilities)
   road: "Infrastructure",
   building: "Infrastructure",
   bridge: "Infrastructure",
+  construction: "Infrastructure",
+  house: "Infrastructure",
+  "solar panel": "Infrastructure",
+  solar: "Infrastructure",
+  photovoltaic: "Infrastructure",
+  scaffolding: "Infrastructure",
   pipe: "Infrastructure",
   pipeline: "Infrastructure",
   well: "Infrastructure",
   borehole: "Infrastructure",
   pump: "Infrastructure",
-  "solar panel": "Infrastructure",
-  photovoltaic: "Infrastructure",
   dam: "Infrastructure",
   turbine: "Infrastructure",
   generator: "Infrastructure",
@@ -58,30 +106,82 @@ export const KEYWORD_MAP: Record<string, DomainCategory> = {
   antenna: "Infrastructure",
   concrete: "Infrastructure",
   highway: "Infrastructure",
+  street: "Infrastructure",
+  pavement: "Infrastructure",
+  architecture: "Infrastructure",
+  roof: "Infrastructure",
+  wall: "Infrastructure",
+  tower: "Infrastructure",
+  electric: "Infrastructure",
+  power: "Infrastructure",
+  grid: "Infrastructure",
+  waterwork: "Infrastructure",
+  sanitation: "Infrastructure",
+  sewage: "Infrastructure",
+  drainage: "Infrastructure",
+  structure: "Infrastructure",
+  tunnel: "Infrastructure",
+  canal: "Infrastructure",
+  vehicle: "Infrastructure",
+  truck: "Infrastructure",
+  car: "Infrastructure",
+  equipment: "Infrastructure",
+  machinery: "Infrastructure",
+  asphalt: "Infrastructure",
+  railway: "Infrastructure",
+  warehouse: "Infrastructure",
 
-  // Community
+  // Community (People, Education, Health, Workshops, Livelihoods)
   crowd: "Community",
-  meeting: "Community",
-  school: "Community",
   people: "Community",
   person: "Community",
   human: "Community",
   children: "Community",
+  child: "Community",
   youth: "Community",
+  meeting: "Community",
+  school: "Community",
+  classroom: "Community",
   training: "Community",
   workshop: "Community",
   farmer: "Community",
   village: "Community",
   gathering: "Community",
   clinic: "Community",
-  classroom: "Community",
+  hospital: "Community",
   council: "Community",
+  student: "Community",
+  teacher: "Community",
+  worker: "Community",
+  resident: "Community",
+  family: "Community",
+  women: "Community",
+  men: "Community",
+  elder: "Community",
+  volunteer: "Community",
+  civic: "Community",
+  public: "Community",
+  hand: "Community",
+  finger: "Community",
+  thumb: "Community",
+  wrist: "Community",
+  nail: "Community",
+  audience: "Community",
+  team: "Community",
+  collaboration: "Community",
+  education: "Community",
+  healthcare: "Community",
 
-  // Disaster Response
+  // Disaster Response (Damage, Floods, Fires, Crises, Relief)
   debris: "Disaster Response",
+  flood: "Disaster Response",
+  flooding: "Disaster Response",
+  inundation: "Disaster Response",
   rubble: "Disaster Response",
   rescue: "Disaster Response",
   fire: "Disaster Response",
+  wildfire: "Disaster Response",
+  smoke: "Disaster Response",
   damage: "Disaster Response",
   destroyed: "Disaster Response",
   erosion: "Disaster Response",
@@ -91,6 +191,15 @@ export const KEYWORD_MAP: Record<string, DomainCategory> = {
   emergency: "Disaster Response",
   cyclone: "Disaster Response",
   hurricane: "Disaster Response",
+  typhoon: "Disaster Response",
+  tsunami: "Disaster Response",
+  earthquake: "Disaster Response",
+  hazard: "Disaster Response",
+  casualty: "Disaster Response",
+  shelter: "Disaster Response",
+  ruins: "Disaster Response",
+  submerged: "Disaster Response",
+  devastation: "Disaster Response",
 };
 
 /**
@@ -106,27 +215,41 @@ export function mapLabelToCategory(label: string): DomainCategory {
 }
 
 /**
- * Determines the dominant category from multiple labels by frequency / weight.
+ * Assigns ONE primary category to the asset:
+ * The category whose matching labels have the highest total confidence.
+ * Returns "Uncategorized" only if no label matches.
+ */
+export function determinePrimaryCategory(
+  items: Array<{ label: string; confidence?: number }>
+): DomainCategory {
+  if (!items || items.length === 0) return "Uncategorized";
+
+  const scores: Partial<Record<DomainCategory, number>> = {};
+
+  for (const item of items) {
+    const cat = mapLabelToCategory(item.label);
+    if (cat !== "Uncategorized") {
+      const weight = typeof item.confidence === "number" ? item.confidence : 1.0;
+      scores[cat] = (scores[cat] || 0) + weight;
+    }
+  }
+
+  let topCategory: DomainCategory = "Uncategorized";
+  let maxScore = 0;
+
+  for (const [cat, score] of Object.entries(scores)) {
+    if (score && score > maxScore) {
+      maxScore = score;
+      topCategory = cat as DomainCategory;
+    }
+  }
+
+  return topCategory;
+}
+
+/**
+ * Backward compatibility alias for determinePrimaryCategory
  */
 export function determineDominantCategory(labels: string[]): DomainCategory {
-  if (!labels || labels.length === 0) return "Uncategorized";
-
-  const scores: Record<string, number> = {};
-  for (const label of labels) {
-    const cat = mapLabelToCategory(label);
-    if (cat !== "Uncategorized") {
-      scores[cat] = (scores[cat] || 0) + 1;
-    }
-  }
-
-  let topCat: DomainCategory = "Uncategorized";
-  let maxScore = 0;
-  for (const [cat, score] of Object.entries(scores)) {
-    if (score > maxScore) {
-      maxScore = score;
-      topCat = cat as DomainCategory;
-    }
-  }
-
-  return topCat;
+  return determinePrimaryCategory(labels.map((l) => ({ label: l, confidence: 1.0 })));
 }
