@@ -34,9 +34,9 @@ export default function RootLayout({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-semibold tracking-wide uppercase text-[10px] text-emerald-300">Phase 1 Active</span>
+            <span className="font-semibold tracking-wide uppercase text-[10px] text-emerald-300">Phase 3 Active</span>
             <span className="text-slate-400 hidden sm:inline">|</span>
-            <span className="text-slate-300 hidden sm:inline">Foundation, Direct Cloudinary Uploads & Project Media Management</span>
+            <span className="text-slate-300 hidden sm:inline">Retrieval AI, Vector Search & Evidence Comparison</span>
           </div>
           <div className="flex items-center gap-3 text-slate-400 text-[11px]">
             <span className="hidden md:inline">Field Officer Session:</span>
@@ -77,14 +77,13 @@ export default function RootLayout({
                 <FolderKanban className="w-4 h-4 text-emerald-400" />
                 Projects
               </Link>
-              <div className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed flex items-center gap-2 title='Phase 3 feature'">
-                <Sparkles className="w-4 h-4 text-slate-600" />
-                Semantic Search <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400">Phase 3</span>
-              </div>
-              <div className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed flex items-center gap-2 title='Phase 3 feature'">
-                <Layers className="w-4 h-4 text-slate-600" />
-                Compare Pairs <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400">Phase 3</span>
-              </div>
+              <Link
+                href="/search"
+                className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                Semantic Search
+              </Link>
             </nav>
 
             {/* Action CTA */}

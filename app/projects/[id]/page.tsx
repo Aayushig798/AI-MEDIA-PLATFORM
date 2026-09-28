@@ -16,12 +16,16 @@ import {
   ExternalLink,
   Trash2,
   AlertTriangle,
-  X
+  X,
+  SlidersHorizontal,
+  Image as ImageIcon
 } from "lucide-react";
 import { GalleryFilterBar } from "@/components/GalleryFilterBar";
 import { GalleryGrid, MediaAssetItem } from "@/components/GalleryGrid";
 import { UploadModal } from "@/components/UploadModal";
 import { AssetDetailModal } from "@/components/AssetDetailModal";
+import { SuggestedComparisons } from "@/components/SuggestedComparisons";
+import { SavedComparisons } from "@/components/SavedComparisons";
 
 interface ProjectDetail {
   id: string;
@@ -46,14 +50,17 @@ export default function ProjectGalleryPage() {
   const [loadingAssets, setLoadingAssets] = useState(true);
 
   // Filters
-  const [selectedCategory, setSelectedCategory] = useState("ALL");
-  const [selectedAiCategory, setSelectedAiCategory] = useState("ALL");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
   // Modals
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<MediaAssetItem | null>(null);
+
+  // Tabs (Phase 3: Media Gallery vs Before/After Comparisons)
+  const [activeTab, setActiveTab] = useState<"gallery" | "comparisons">("gallery");
+  const [comparisonsRefreshKey, setComparisonsRefreshKey] = useState(0);
 
   // Project Deletion State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -81,11 +88,8 @@ export default function ProjectGalleryPage() {
       const queryParams = new URLSearchParams();
       queryParams.append("projectId", projectId);
 
-      if (selectedCategory && selectedCategory !== "ALL") {
+      if (selectedCategory && selectedCategory.toLowerCase() !== "all") {
         queryParams.append("category", selectedCategory);
-      }
-      if (selectedAiCategory && selectedAiCategory !== "ALL") {
-        queryParams.append("aiCategory", selectedAiCategory);
       }
       if (fromDate) {
         queryParams.append("from", fromDate);
@@ -104,7 +108,7 @@ export default function ProjectGalleryPage() {
     } finally {
       setLoadingAssets(false);
     }
-  }, [projectId, selectedCategory, selectedAiCategory, fromDate, toDate]);
+  }, [projectId, selectedCategory, fromDate, toDate]);
 
   useEffect(() => {
     fetchProjectInfo();
@@ -115,8 +119,7 @@ export default function ProjectGalleryPage() {
   }, [fetchAssets]);
 
   const handleResetFilters = () => {
-    setSelectedCategory("ALL");
-    setSelectedAiCategory("ALL");
+    setSelectedCategory("All");
     setFromDate("");
     setToDate("");
   };
@@ -276,45 +279,95 @@ export default function ProjectGalleryPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <GalleryFilterBar
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        selectedAiCategory={selectedAiCategory}
-        onSelectAiCategory={setSelectedAiCategory}
-        fromDate={fromDate}
-        onSelectFromDate={setFromDate}
-        toDate={toDate}
-        onSelectToDate={setToDate}
-        onReset={handleResetFilters}
-        totalCount={project._count?.assets ?? assets.length}
-        filteredCount={assets.length}
-      />
+      {/* Tabs Switcher (Phase 3: Media Evidence vs Before/After Comparisons) */}
+      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+        <button
+          type="button"
+          id="project-tab-gallery"
+          onClick={() => setActiveTab("gallery")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "gallery"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
+              : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+          }`}
+        >
+          <ImageIcon className="w-4 h-4" />
+          <span>Media Evidence Stream ({assets.length})</span>
+        </button>
 
-      {/* Media Gallery Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span className="font-semibold text-slate-200 uppercase tracking-wider text-[11px]">
-            Field Media Stream &bull; Newest First
+        <button
+          type="button"
+          id="project-tab-comparisons"
+          onClick={() => setActiveTab("comparisons")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+            activeTab === "comparisons"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
+              : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+          }`}
+        >
+          <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
+          <span>Before / After Change Comparisons</span>
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+            Phase 3
           </span>
-          <span className="text-[11px] text-slate-400">
-            Thumbnails rendered via Cloudinary dynamic transformations
-          </span>
-        </div>
-
-        {loadingAssets ? (
-          <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
-            <Loader2 className="w-7 h-7 animate-spin text-emerald-400" />
-            <p className="text-xs">Fetching evidence assets...</p>
-          </div>
-        ) : (
-          <GalleryGrid
-            assets={assets}
-            onSelectAsset={(asset) => setSelectedAsset(asset)}
-            onOpenUpload={() => setIsUploadOpen(true)}
-          />
-        )}
+        </button>
       </div>
+
+      {activeTab === "gallery" ? (
+        <>
+          {/* Filter Bar */}
+          <GalleryFilterBar
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+            fromDate={fromDate}
+            onSelectFromDate={setFromDate}
+            toDate={toDate}
+            onSelectToDate={setToDate}
+            onReset={handleResetFilters}
+            totalCount={project._count?.assets ?? assets.length}
+            filteredCount={assets.length}
+          />
+
+          {/* Media Gallery Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-slate-400">
+              <span className="font-semibold text-slate-200 uppercase tracking-wider text-[11px]">
+                Field Media Stream &bull; Newest First
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Thumbnails rendered via Cloudinary dynamic transformations
+              </span>
+            </div>
+
+            {loadingAssets ? (
+              <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                <Loader2 className="w-7 h-7 animate-spin text-emerald-400" />
+                <p className="text-xs">Fetching evidence assets...</p>
+              </div>
+            ) : (
+              <GalleryGrid
+                assets={assets}
+                onSelectAsset={(asset) => setSelectedAsset(asset)}
+                onOpenUpload={() => setIsUploadOpen(true)}
+              />
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="space-y-10 animate-fade-in">
+          {/* Suggested Comparisons Section */}
+          <SuggestedComparisons
+            projectId={projectId}
+            onComparisonSaved={() => setComparisonsRefreshKey((k) => k + 1)}
+          />
+
+          {/* Saved Comparisons Section */}
+          <SavedComparisons
+            projectId={projectId}
+            refreshTrigger={comparisonsRefreshKey}
+          />
+        </div>
+      )}
 
       {/* Upload Modal */}
       <UploadModal

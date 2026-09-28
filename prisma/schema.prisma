@@ -20,15 +20,16 @@ model User {
 }
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   description String?
   location    String?
   startDate   DateTime?
   createdBy   String
-  user        User     @relation(fields: [createdBy], references: [id])
-  createdAt   DateTime @default(now())
+  user        User         @relation(fields: [createdBy], references: [id])
+  createdAt   DateTime     @default(now())
   assets      MediaAsset[]
+  comparisons Comparison[]
 }
 
 model MediaAsset {
@@ -43,6 +44,7 @@ model MediaAsset {
   width               Int?
   height              Int?
   manualCategory      String?
+  categorySource      String               @default("ai") // "ai" | "user"
   manualLocation       String?
   manualNotes         String?
   capturedAt          DateTime?
@@ -52,6 +54,7 @@ model MediaAsset {
   aiProcessingStatus  String               @default("pending") // "pending" | "processing" | "done" | "failed"
   aiTags              AiTag[]
   categories          MediaAssetCategory[]
+  embedding           MediaEmbedding?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
 }
@@ -81,3 +84,44 @@ model MediaAssetCategory {
 
   @@unique([mediaAssetId, categoryId])
 }
+
+model MediaEmbedding {
+  id           String     @id @default(cuid())
+  mediaAssetId String     @unique
+  mediaAsset   MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+  embedding    Unsupported("vector(1536)")
+  modelVersion String
+  createdAt    DateTime   @default(now())
+}
+
+model Comparison {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  beforeAssetId   String
+  afterAssetId    String
+  notes           String?
+  verified        Boolean  @default(false)
+  matchConfidence Float?
+  aiReason        String?
+  changeSummary   String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+}
+
+model PairVerification {
+  id            String   @id @default(cuid())
+  beforeAssetId String
+  afterAssetId  String
+  sameScene     Boolean
+  confidence    Float
+  reason        String
+  visibleChange String
+  createdAt     DateTime @default(now())
+
+  @@unique([beforeAssetId, afterAssetId])
+  @@index([beforeAssetId])
+  @@index([afterAssetId])
+}
+
+

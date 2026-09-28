@@ -1,24 +1,24 @@
 "use client";
 
-import { Filter, Calendar, RotateCcw, Sparkles, Tag } from "lucide-react";
-import { DOMAIN_CATEGORIES } from "@/lib/ai/categoryMapping";
+import { Filter, Calendar, RotateCcw } from "lucide-react";
 
-export const CATEGORIES = [
-  "ALL",
+export const CATEGORY_OPTIONS = [
+  "All",
   "Environmental",
   "Infrastructure",
   "Community",
   "Disaster Response",
-  "Other",
-];
+  "Uncategorized",
+] as const;
 
-export const AI_CATEGORIES = ["ALL", ...DOMAIN_CATEGORIES];
+export type CategoryFilter = (typeof CATEGORY_OPTIONS)[number];
+
+// Backward-compatibility export
+export const CATEGORIES = CATEGORY_OPTIONS;
 
 interface GalleryFilterBarProps {
   selectedCategory: string;
   onSelectCategory: (cat: string) => void;
-  selectedAiCategory: string;
-  onSelectAiCategory: (cat: string) => void;
   fromDate: string;
   onSelectFromDate: (date: string) => void;
   toDate: string;
@@ -31,8 +31,6 @@ interface GalleryFilterBarProps {
 export function GalleryFilterBar({
   selectedCategory,
   onSelectCategory,
-  selectedAiCategory,
-  onSelectAiCategory,
   fromDate,
   onSelectFromDate,
   toDate,
@@ -42,36 +40,36 @@ export function GalleryFilterBar({
   filteredCount,
 }: GalleryFilterBarProps) {
   const hasActiveFilters =
-    (selectedCategory && selectedCategory !== "ALL") ||
-    (selectedAiCategory && selectedAiCategory !== "ALL") ||
+    (selectedCategory && selectedCategory.toLowerCase() !== "all") ||
     fromDate ||
     toDate;
 
   return (
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-3.5 border border-white/5">
-      {/* Row 1: AI-Assisted Category Filter (Primary in Phase 2) */}
+      {/* Row 1: Single Category Filter */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 mr-1">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            AI Domain Category:
+            <Filter className="w-3.5 h-3.5 text-emerald-400" />
+            Category:
           </span>
           <div className="flex flex-wrap gap-1.5">
-            {AI_CATEGORIES.map((cat) => {
+            {CATEGORY_OPTIONS.map((cat) => {
               const isActive =
-                selectedAiCategory === cat || (!selectedAiCategory && cat === "ALL");
+                selectedCategory.toLowerCase() === cat.toLowerCase() ||
+                (!selectedCategory && cat === "All");
               return (
                 <button
                   key={cat}
-                  id={`filter-ai-category-${cat.toLowerCase().replace(/\s+/g, "-")}`}
-                  onClick={() => onSelectAiCategory(cat)}
+                  id={`filter-category-${cat.toLowerCase().replace(/\s+/g, "-")}`}
+                  onClick={() => onSelectCategory(cat)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
                     isActive
                       ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
                       : "bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800 border border-white/5"
                   }`}
                 >
-                  {cat === "ALL" ? "All AI Categories" : cat}
+                  {cat}
                 </button>
               );
             })}
@@ -83,27 +81,8 @@ export function GalleryFilterBar({
         </div>
       </div>
 
-      {/* Row 2: Manual Tags & Date Filters */}
+      {/* Row 2: Date Filters & Reset */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-slate-400 flex items-center gap-1 mr-1">
-            <Tag className="w-3 h-3 text-slate-400" />
-            Manual Category:
-          </span>
-          <select
-            id="filter-manual-category-select"
-            value={selectedCategory}
-            onChange={(e) => onSelectCategory(e.target.value)}
-            className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-          >
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat === "ALL" ? "All Manual Categories" : cat}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-900/80 border border-white/10 px-3 py-1.5 rounded-xl text-xs">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />

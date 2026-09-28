@@ -18,11 +18,19 @@ import {
   FileText,
   Layers,
   Sparkles,
-  Navigation
+  Navigation,
+  RotateCcw
 } from "lucide-react";
 import { MediaAssetItem } from "./GalleryGrid";
-import { CATEGORIES } from "./GalleryFilterBar";
 import { AiTagChips, AiTagItem } from "./AiTagChips";
+
+const CATEGORY_OPTIONS = [
+  "Environmental",
+  "Infrastructure",
+  "Community",
+  "Disaster Response",
+  "Uncategorized",
+];
 
 interface AssetDetailModalProps {
   asset: MediaAssetItem | null;
@@ -49,11 +57,13 @@ export function AssetDetailModal({
 }: AssetDetailModalProps) {
   if (!isOpen || !asset) return null;
 
-  const [category, setCategory] = useState(asset.manualCategory || "Environmental");
+  const [category, setCategory] = useState(asset.manualCategory || "Uncategorized");
+  const [categorySource, setCategorySource] = useState(asset.categorySource || "ai");
+  const [resettingAi, setResettingAi] = useState(false);
   const [location, setLocation] = useState(asset.manualLocation || "");
   const [notes, setNotes] = useState(asset.manualNotes || "");
   const [capturedAt, setCapturedAt] = useState(
-    asset.capturedAt ? asset.capturedAt.split("T")[0] : new Date().toISOString().split("T")[0]
+    asset.capturedAt ? asset.capturedAt.split("T")[0] : ""
   );
 
   const [saving, setSaving] = useState(false);
@@ -71,6 +81,21 @@ export function AssetDetailModal({
   const [aiStatus, setAiStatus] = useState<string>(asset.aiProcessingStatus || "done");
 
   const currentAsset = asset;
+
+  // Sync state when asset prop changes
+  useEffect(() => {
+    if (asset) {
+      setCategory(asset.manualCategory || "Uncategorized");
+      setCategorySource(asset.categorySource || "ai");
+      setLocation(asset.manualLocation || "");
+      setNotes(asset.manualNotes || "");
+      setCapturedAt(
+        asset.capturedAt ? asset.capturedAt.split("T")[0] : ""
+      );
+      setAiTags(asset.aiTags || []);
+      setAiStatus(asset.aiProcessingStatus || "done");
+    }
+  }, [asset]);
 
   // Load fresh tags directly from the AiTag table via /api/assets/[id]/ai-tags
   useEffect(() => {
@@ -108,6 +133,34 @@ export function AssetDetailModal({
     }
   };
 
+  const handleCategoryChange = (val: string) => {
+    setCategory(val);
+    setCategorySource("user");
+  };
+
+  const handleResetToAi = async () => {
+    try {
+      setResettingAi(true);
+      setSaveError("");
+      const res = await fetch(`/api/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetToAi: true }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to reset category");
+      }
+      setCategory(data.asset.manualCategory || "Uncategorized");
+      setCategorySource("ai");
+      onAssetUpdated({ ...data.asset, aiTags, aiProcessingStatus: aiStatus });
+    } catch (err: any) {
+      setSaveError(err.message || "Failed to reset to AI suggestion");
+    } finally {
+      setResettingAi(false);
+    }
+  };
+
   const handleSaveChanges = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -120,6 +173,7 @@ export function AssetDetailModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           manualCategory: category,
+          categorySource: categorySource,
           manualLocation: location,
           manualNotes: notes,
           capturedAt: capturedAt ? new Date(capturedAt).toISOString() : null,
@@ -293,11 +347,35 @@ export function AssetDetailModal({
               </div>
 
               {/* Dominant Category Badge */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-400">Assigned Domain:</span>
-                <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20">
-                  {primaryAiCategory}
-                </span>
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Category:</span>
+                  <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20">
+                    {category || "Uncategorized"}
+                  </span>
+                  <span
+                    id="asset-detail-ai-category-source-badge"
+                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
+                      categorySource === "user"
+                        ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                        : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                    }`}
+                  >
+                    {categorySource === "user" ? "Edited by you" : "AI"}
+                  </span>
+                </div>
+                {categorySource === "user" && (
+                  <button
+                    type="button"
+                    id="reset-to-ai-category-btn-top"
+                    onClick={handleResetToAi}
+                    disabled={resettingAi}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <RotateCcw className={`w-3 h-3 ${resettingAi ? "animate-spin" : ""}`} />
+                    <span>Reset to AI suggestion</span>
+                  </button>
+                )}
               </div>
 
               {/* EXIF GPS Display if present */}
@@ -365,7 +443,7 @@ export function AssetDetailModal({
             <form onSubmit={handleSaveChanges} className="space-y-3.5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                Manual Tags & Metadata
+                Category & Metadata
               </h3>
 
               {saveError && (
@@ -383,16 +461,43 @@ export function AssetDetailModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                    Manual Category
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[11px] font-medium text-slate-300">
+                        Category
+                      </label>
+                      <span
+                        id="asset-detail-form-source-badge"
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
+                          categorySource === "user"
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                            : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                        }`}
+                      >
+                        {categorySource === "user" ? "Edited by you" : "AI"}
+                      </span>
+                    </div>
+                    {categorySource === "user" && (
+                      <button
+                        type="button"
+                        id="asset-detail-form-reset-ai-btn"
+                        onClick={handleResetToAi}
+                        disabled={resettingAi}
+                        className="text-[10px] text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1 disabled:opacity-50"
+                        title="Reset category to AI suggestion"
+                      >
+                        <RotateCcw className={`w-2.5 h-2.5 ${resettingAi ? "animate-spin" : ""}`} />
+                        <span>Reset to AI</span>
+                      </button>
+                    )}
+                  </div>
                   <select
                     id="asset-detail-category-select"
                     value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
                     className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
                   >
-                    {CATEGORIES.filter((c) => c !== "ALL").map((c) => (
+                    {CATEGORY_OPTIONS.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -402,7 +507,7 @@ export function AssetDetailModal({
 
                 <div>
                   <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                    Date Captured
+                    Date taken
                   </label>
                   <input
                     id="asset-detail-date-input"

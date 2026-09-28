@@ -19,6 +19,7 @@ export interface MediaAssetItem {
   manualNotes: string | null;
   capturedAt: string | null;
   uploadedBy: string;
+  categorySource?: string;
   exifLat?: number | null;
   exifLng?: number | null;
   aiProcessingStatus?: string; // "pending" | "processing" | "done" | "failed"
@@ -128,7 +129,7 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                 )}
               </div>
 
-              {/* AI Processing Status & Domain Badge on top right */}
+              {/* Category Badge on top right */}
               <div className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1">
                 {isAiPending ? (
                   <span
@@ -138,25 +139,17 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                     <Loader2 className="w-2.5 h-2.5 animate-spin" />
                     Analyzing...
                   </span>
-                ) : primaryAiCategory ? (
+                ) : (
                   <span
-                    id={`ai-badge-${asset.id}`}
+                    id={`category-badge-${asset.id}`}
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border backdrop-blur-md ${getCategoryColor(
-                      primaryAiCategory
+                      asset.manualCategory || "Uncategorized"
                     )}`}
                   >
-                    <Sparkles className="w-2.5 h-2.5" />
-                    AI: {primaryAiCategory}
+                    {asset.categorySource !== "user" && <Sparkles className="w-2.5 h-2.5" />}
+                    {asset.manualCategory || "Uncategorized"}
                   </span>
-                ) : asset.manualCategory ? (
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border backdrop-blur-md ${getCategoryColor(
-                      asset.manualCategory
-                    )}`}
-                  >
-                    {asset.manualCategory}
-                  </span>
-                ) : null}
+                )}
               </div>
 
               {/* Video Play Overlay */}

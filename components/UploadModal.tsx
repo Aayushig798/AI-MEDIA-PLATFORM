@@ -16,7 +16,13 @@ import {
   Calendar,
   Layers
 } from "lucide-react";
-import { CATEGORIES } from "./GalleryFilterBar";
+const CATEGORY_OPTIONS = [
+  "Environmental",
+  "Infrastructure",
+  "Community",
+  "Disaster Response",
+  "Uncategorized",
+];
 
 interface StagedFile {
   id: string;
@@ -50,7 +56,7 @@ export function UploadModal({
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [batchUploading, setBatchUploading] = useState(false);
-  const [batchCategory, setBatchCategory] = useState("Environmental");
+  const [batchCategory, setBatchCategory] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -70,7 +76,7 @@ export function UploadModal({
         manualCategory: batchCategory,
         manualLocation: defaultLocation || "",
         manualNotes: "",
-        capturedAt: todayStr,
+        capturedAt: "",
         status: "idle",
         progress: 0,
       };
@@ -234,6 +240,8 @@ export function UploadModal({
 
       updateStagedField(staged.id, "progress", 80);
 
+      const hasPickedCategory = Boolean(staged.manualCategory && staged.manualCategory.trim() !== "");
+
       // Step 3: Register media asset in database via POST /api/assets
       const assetPayload = {
         projectId,
@@ -244,10 +252,11 @@ export function UploadModal({
         bytes,
         width,
         height,
-        manualCategory: staged.manualCategory,
+        manualCategory: hasPickedCategory ? staged.manualCategory.trim() : null,
+        categorySource: hasPickedCategory ? "user" : "ai",
         manualLocation: staged.manualLocation || null,
         manualNotes: staged.manualNotes || null,
-        capturedAt: staged.capturedAt ? new Date(staged.capturedAt).toISOString() : new Date().toISOString(),
+        capturedAt: staged.capturedAt ? new Date(staged.capturedAt).toISOString() : null,
         info: rawCloudinaryInfo,
         filename: staged.file.name,
       };
@@ -383,7 +392,8 @@ export function UploadModal({
                     onChange={(e) => applyCategoryToAll(e.target.value)}
                     className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
                   >
-                    {CATEGORIES.filter((c) => c !== "ALL").map((c) => (
+                    <option value="">Auto (AI will detect)</option>
+                    {CATEGORY_OPTIONS.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
@@ -454,7 +464,8 @@ export function UploadModal({
                             disabled={batchUploading}
                             className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
                           >
-                            {CATEGORIES.filter((c) => c !== "ALL").map((cat) => (
+                            <option value="">Auto (AI will detect)</option>
+                            {CATEGORY_OPTIONS.map((cat) => (
                               <option key={cat} value={cat}>
                                 {cat}
                               </option>
@@ -476,9 +487,9 @@ export function UploadModal({
                           />
                         </div>
 
-                        {/* Capture Date */}
+                        {/* Date taken */}
                         <div>
-                          <label className="block text-[10px] text-slate-400 mb-1 font-medium">Captured Date</label>
+                          <label className="block text-[10px] text-slate-400 mb-1 font-medium">Date taken</label>
                           <input
                             id={`staged-date-${index}`}
                             type="date"

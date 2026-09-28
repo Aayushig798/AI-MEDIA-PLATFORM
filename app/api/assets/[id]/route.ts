@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { destroyCloudinaryAsset } from "@/lib/cloudinary";
+import { determinePrimaryCategory } from "@/lib/ai/categoryMapping";
 
 export async function GET(
   req: NextRequest,
@@ -36,7 +37,7 @@ export async function PATCH(
   try {
     const { id } = params;
     const body = await req.json();
-    const { manualCategory, manualLocation, manualNotes, capturedAt } = body;
+    const { manualCategory, manualLocation, manualNotes, capturedAt, categorySource, resetToAi } = body;
 
     const existing = await db.mediaAsset.findUnique({
       where: { id },
@@ -49,13 +50,60 @@ export async function PATCH(
       );
     }
 
+    // Handle "Reset to AI suggestion"
+    if (resetToAi) {
+      const tags = await db.aiTag.findMany({
+        where: { mediaAssetId: id },
+        orderBy: { confidence: "desc" },
+      });
+      const aiPrimary = determinePrimaryCategory(tags);
+
+      // Also ensure Category and MediaAssetCategory record reflect the AI primary category
+      const cat = await db.category.upsert({
+        where: { name: aiPrimary },
+        update: {},
+        create: { name: aiPrimary },
+      });
+      await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: id } });
+      await db.mediaAssetCategory.create({
+        data: { mediaAssetId: id, categoryId: cat.id },
+      });
+
+      const updated = await db.mediaAsset.update({
+        where: { id },
+        data: {
+          manualCategory: aiPrimary,
+          categorySource: "ai",
+        },
+        include: {
+          aiTags: { orderBy: { confidence: "desc" } },
+          categories: { include: { category: true } },
+        },
+      });
+
+      return NextResponse.json({ success: true, asset: updated });
+    }
+
+    // If category changed or explicitly provided as user
+    let finalCategorySource = existing.categorySource;
+    if (categorySource) {
+      finalCategorySource = categorySource;
+    } else if (manualCategory !== undefined && manualCategory !== existing.manualCategory) {
+      finalCategorySource = "user";
+    }
+
     const updated = await db.mediaAsset.update({
       where: { id },
       data: {
         manualCategory: manualCategory !== undefined ? manualCategory : existing.manualCategory,
+        categorySource: finalCategorySource,
         manualLocation: manualLocation !== undefined ? manualLocation : existing.manualLocation,
         manualNotes: manualNotes !== undefined ? manualNotes : existing.manualNotes,
         capturedAt: capturedAt !== undefined ? (capturedAt ? new Date(capturedAt) : null) : existing.capturedAt,
+      },
+      include: {
+        aiTags: { orderBy: { confidence: "desc" } },
+        categories: { include: { category: true } },
       },
     });
 

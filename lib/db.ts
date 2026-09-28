@@ -69,6 +69,7 @@ export interface StoredMediaAsset {
   width: number | null;
   height: number | null;
   manualCategory: string | null;
+  categorySource?: string; // "ai" | "user"
   manualLocation: string | null;
   manualNotes: string | null;
   capturedAt: string | null;
@@ -90,6 +91,7 @@ interface LocalDBData {
   aiTags: StoredAiTag[];
   categories: StoredCategory[];
   mediaAssetCategories: StoredMediaAssetCategory[];
+  comparisons?: any[];
 }
 
 function loadLocalData(): LocalDBData {
@@ -108,6 +110,7 @@ function loadLocalData(): LocalDBData {
       if (!parsed.aiTags) parsed.aiTags = [];
       if (!parsed.categories || parsed.categories.length === 0) parsed.categories = defaultCategories;
       if (!parsed.mediaAssetCategories) parsed.mediaAssetCategories = [];
+      if (!parsed.comparisons) parsed.comparisons = [];
       return parsed;
     }
   } catch (e) {
@@ -964,6 +967,7 @@ export const db = {
         width: data.width ? Number(data.width) : null,
         height: data.height ? Number(data.height) : null,
         manualCategory: data.manualCategory || null,
+        categorySource: data.categorySource || "ai",
         manualLocation: data.manualLocation || null,
         manualNotes: data.manualNotes || null,
         capturedAt: data.capturedAt ? new Date(data.capturedAt).toISOString() : null,
@@ -981,13 +985,13 @@ export const db = {
       return newAsset;
     },
 
-    async update({ where, data }: { where: { id: string }; data: any }) {
+    async update({ where, data, include }: { where: { id: string }; data: any; include?: any }) {
       if (hasDatabaseUrl()) {
         try {
           return await prisma.mediaAsset.update({
             where,
             data,
-            include: {
+            include: include || {
               aiTags: true,
               categories: { include: { category: true } },
             },
@@ -1005,6 +1009,7 @@ export const db = {
       const updated: StoredMediaAsset = {
         ...existing,
         manualCategory: data.manualCategory !== undefined ? data.manualCategory : existing.manualCategory,
+        categorySource: data.categorySource !== undefined ? data.categorySource : existing.categorySource,
         manualLocation: data.manualLocation !== undefined ? data.manualLocation : existing.manualLocation,
         manualNotes: data.manualNotes !== undefined ? data.manualNotes : existing.manualNotes,
         capturedAt:
@@ -1061,4 +1066,289 @@ export const db = {
       return asset;
     },
   },
+
+  // RAW SQL EXECUTION
+  async $queryRawUnsafe<T = any>(query: string, ...values: any[]): Promise<T> {
+    if (hasDatabaseUrl()) {
+      try {
+        return await prisma.$queryRawUnsafe(query, ...values);
+      } catch (e) {
+        console.error("[DB Error] prisma.$queryRawUnsafe failed:", e);
+        throw e;
+      }
+    }
+    return [] as any;
+  },
+
+  async $executeRawUnsafe(query: string, ...values: any[]): Promise<number> {
+    if (hasDatabaseUrl()) {
+      try {
+        return await prisma.$executeRawUnsafe(query, ...values);
+      } catch (e) {
+        console.error("[DB Error] prisma.$executeRawUnsafe failed:", e);
+        throw e;
+      }
+    }
+    return 0;
+  },
+
+  // COMPARISONS
+  comparison: {
+    async create({
+      data,
+    }: {
+      data: {
+        projectId: string;
+        beforeAssetId: string;
+        afterAssetId: string;
+        notes?: string | null;
+        verified?: boolean;
+        matchConfidence?: number | null;
+        aiReason?: string | null;
+        changeSummary?: string | null;
+        createdBy?: string;
+      };
+    }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await prisma.comparison.create({
+            data: {
+              projectId: data.projectId,
+              beforeAssetId: data.beforeAssetId,
+              afterAssetId: data.afterAssetId,
+              notes: data.notes || null,
+              verified: data.verified ?? false,
+              matchConfidence: data.matchConfidence ?? null,
+              aiReason: data.aiReason ?? null,
+              changeSummary: data.changeSummary ?? null,
+              createdBy: data.createdBy || "usr_demo123",
+            },
+          });
+        } catch (e) {
+          console.error("[DB Error] prisma.comparison.create failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!current.comparisons) current.comparisons = [];
+      const newComp: any = {
+        id: `comp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        projectId: data.projectId,
+        beforeAssetId: data.beforeAssetId,
+        afterAssetId: data.afterAssetId,
+        notes: data.notes || null,
+        verified: data.verified ?? false,
+        matchConfidence: data.matchConfidence ?? null,
+        aiReason: data.aiReason ?? null,
+        changeSummary: data.changeSummary ?? null,
+        createdBy: data.createdBy || "usr_demo123",
+        createdAt: new Date().toISOString(),
+      };
+      current.comparisons.unshift(newComp);
+      saveLocalData(current);
+      return newComp;
+    },
+
+    async update({ where, data }: { where: { id: string }; data: any }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await prisma.comparison.update({ where, data });
+        } catch (e) {
+          console.error("[DB Error] prisma.comparison.update failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!current.comparisons) current.comparisons = [];
+      const idx = current.comparisons.findIndex((c: any) => c.id === where.id);
+      if (idx !== -1) {
+        current.comparisons[idx] = { ...current.comparisons[idx], ...data };
+        saveLocalData(current);
+        return current.comparisons[idx];
+      }
+      return null;
+    },
+
+    async findMany({ where, orderBy }: { where?: any; orderBy?: any } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await prisma.comparison.findMany({
+            where: where?.projectId ? { projectId: where.projectId } : where,
+            orderBy: orderBy || { createdAt: "desc" },
+          });
+        } catch (e) {
+          console.error("[DB Error] prisma.comparison.findMany failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = current.comparisons || [];
+      if (where?.projectId) {
+        return list.filter((c: any) => c.projectId === where.projectId);
+      }
+      return list;
+    },
+
+    async delete({ where }: { where: { id: string } }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await prisma.comparison.delete({ where });
+        } catch (e) {
+          console.error("[DB Error] prisma.comparison.delete failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!current.comparisons) current.comparisons = [];
+      const idx = current.comparisons.findIndex((c: any) => c.id === where.id);
+      if (idx !== -1) {
+        const deleted = current.comparisons.splice(idx, 1)[0];
+        saveLocalData(current);
+        return deleted;
+      }
+      return { id: where.id };
+    },
+  },
+
+  // PAIR VERIFICATION
+  pairVerification: {
+    async findUnique({ where }: { where: { beforeAssetId_afterAssetId: { beforeAssetId: string; afterAssetId: string } } }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await prisma.pairVerification.findUnique({ where });
+        } catch (e) {
+          console.error("[DB Error] prisma.pairVerification.findUnique failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).pairVerifications || [];
+      return list.find(
+        (p: any) =>
+          p.beforeAssetId === where.beforeAssetId_afterAssetId.beforeAssetId &&
+          p.afterAssetId === where.beforeAssetId_afterAssetId.afterAssetId
+      ) || null;
+    },
+
+    async findFirst({ where, orderBy }: { where?: any; orderBy?: any } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).pairVerification.findFirst({ where, orderBy });
+        } catch (e) {
+          console.error("[DB Error] prisma.pairVerification.findFirst failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).pairVerifications || [];
+      return list[0] || null;
+    },
+
+    async upsert({
+      where,
+      update,
+      create,
+    }: {
+      where: { beforeAssetId_afterAssetId: { beforeAssetId: string; afterAssetId: string } };
+      update: any;
+      create: any;
+    }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await prisma.pairVerification.upsert({ where, update, create });
+        } catch (e) {
+          console.error("[DB Error] prisma.pairVerification.upsert failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!(current as any).pairVerifications) (current as any).pairVerifications = [];
+      const list = (current as any).pairVerifications;
+      const idx = list.findIndex(
+        (p: any) =>
+          p.beforeAssetId === where.beforeAssetId_afterAssetId.beforeAssetId &&
+          p.afterAssetId === where.beforeAssetId_afterAssetId.afterAssetId
+      );
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...update };
+        saveLocalData(current);
+        return list[idx];
+      }
+      const newRec = {
+        id: `pv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        ...create,
+        createdAt: new Date().toISOString(),
+      };
+      list.push(newRec);
+      saveLocalData(current);
+      return newRec;
+    },
+  },
+
+  // MEDIA EMBEDDING
+  mediaEmbedding: {
+    async findFirst({ where }: { where?: any } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).mediaEmbedding.findFirst({ where });
+        } catch (e) {
+          console.error("[DB Error] prisma.mediaEmbedding.findFirst failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).mediaEmbeddings || [];
+      if (where?.mediaAssetId) {
+        return list.find((e: any) => e.mediaAssetId === where.mediaAssetId) || null;
+      }
+      return list[0] || null;
+    },
+
+    async findMany({ where }: { where?: any } = {}) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).mediaEmbedding.findMany({ where });
+        } catch (e) {
+          console.error("[DB Error] prisma.mediaEmbedding.findMany failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      const list = (current as any).mediaEmbeddings || [];
+      if (where?.mediaAssetId) {
+        return list.filter((e: any) => e.mediaAssetId === where.mediaAssetId);
+      }
+      return list;
+    },
+
+    async upsert({ where, update, create }: { where: any; update: any; create: any }) {
+      if (hasDatabaseUrl()) {
+        try {
+          return await (prisma as any).mediaEmbedding.upsert({ where, update, create });
+        } catch (e) {
+          console.error("[DB Error] prisma.mediaEmbedding.upsert failed:", e);
+          throw e;
+        }
+      }
+      const current = loadLocalData();
+      if (!(current as any).mediaEmbeddings) (current as any).mediaEmbeddings = [];
+      const list = (current as any).mediaEmbeddings;
+      const idx = list.findIndex((e: any) => e.mediaAssetId === where.mediaAssetId);
+      if (idx !== -1) {
+        list[idx] = { ...list[idx], ...update };
+        saveLocalData(current);
+        return list[idx];
+      }
+      const newRec = {
+        id: `emb_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        ...create,
+        createdAt: new Date().toISOString(),
+      };
+      list.push(newRec);
+      saveLocalData(current);
+      return newRec;
+    },
+  },
 };
+
+

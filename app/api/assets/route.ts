@@ -5,13 +5,13 @@ import { authOptions } from "@/lib/auth";
 import { extractCloudinaryAiTags, extractCloudinaryExif } from "@/lib/ai/cloudinaryTagging";
 import { runVisionFallback } from "@/lib/ai/visionFallback";
 import { mapLabelToCategory, determinePrimaryCategory } from "@/lib/ai/categoryMapping";
+import { generateEmbeddingForAsset } from "@/lib/ai/embeddings";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId") || undefined;
     const category = searchParams.get("category") || undefined;
-    const aiCategory = searchParams.get("aiCategory") || undefined;
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
 
@@ -21,12 +21,16 @@ export async function GET(req: NextRequest) {
       where.projectId = projectId;
     }
 
-    if (category && category !== "ALL") {
-      where.manualCategory = category;
-    }
-
-    if (aiCategory && aiCategory !== "ALL") {
-      where.aiCategory = aiCategory;
+    if (category && category.toLowerCase() !== "all") {
+      if (category.toLowerCase() === "uncategorized") {
+        where.OR = [
+          { manualCategory: "Uncategorized" },
+          { manualCategory: null },
+          { manualCategory: "" },
+        ];
+      } else {
+        where.manualCategory = category;
+      }
     }
 
     if (from || to) {
@@ -41,6 +45,10 @@ export async function GET(req: NextRequest) {
 
     const assets = await db.mediaAsset.findMany({
       where,
+      include: {
+        aiTags: { orderBy: { confidence: "desc" } },
+        categories: { include: { category: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
 
@@ -67,6 +75,7 @@ export async function POST(req: NextRequest) {
       width,
       height,
       manualCategory,
+      categorySource: explicitSource,
       manualLocation,
       manualNotes,
       capturedAt,
@@ -86,6 +95,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Determine category and source
+    const categorySource = explicitSource === "user" ? "user" : (manualCategory ? "user" : "ai");
+    const initialCategory = manualCategory ? manualCategory.trim() : null;
 
     // Get session user or fallback
     const session = await getServerSession(authOptions);
@@ -118,10 +131,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Fallback capturedAt to now if not set
-    if (!finalCapturedAt) {
-      finalCapturedAt = new Date();
-    }
+    // Do NOT fall back capturedAt to upload date: assets without capturedAt must have capturedAt null
 
     // Check for inline Cloudinary AI tags
     const inlineAiTags = extractCloudinaryAiTags(info);
@@ -138,7 +148,8 @@ export async function POST(req: NextRequest) {
         bytes: Number(bytes) || 0,
         width: width ? Number(width) : null,
         height: height ? Number(height) : null,
-        manualCategory: manualCategory?.trim() || null,
+        manualCategory: initialCategory,
+        categorySource,
         manualLocation: manualLocation?.trim() || null,
         manualNotes: manualNotes?.trim() || null,
         capturedAt: finalCapturedAt,
@@ -186,6 +197,19 @@ export async function POST(req: NextRequest) {
       await db.mediaAssetCategory.create({
         data: { mediaAssetId: asset.id, categoryId: cat.id },
       });
+
+      // If categorySource is "ai", update manualCategory with the AI primary category
+      if (asset.categorySource === "ai") {
+        await db.mediaAsset.update({
+          where: { id: asset.id },
+          data: { manualCategory: primaryCategory },
+        });
+      }
+
+      // Automatically generate text embedding for pgvector search (Task 3.2)
+      generateEmbeddingForAsset(asset.id).catch((err) => {
+        console.error("Auto generateEmbeddingForAsset error:", err);
+      });
     } else {
       // Asynchronous fallback: Google Vision or fail gracefully without mock tags
       runVisionFallback(asset.id, asset.secureUrl, {
@@ -198,9 +222,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Refresh asset to include aiTags and categories if created inline
-    const finalAsset = hasInlineTags 
-      ? (await db.mediaAsset.findUnique({ where: { id: asset.id } })) || asset
-      : asset;
+    const finalAsset = await db.mediaAsset.findUnique({
+      where: { id: asset.id },
+      include: {
+        aiTags: { orderBy: { confidence: "desc" } },
+        categories: { include: { category: true } },
+      },
+    }) || asset;
 
     return NextResponse.json({ success: true, asset: finalAsset }, { status: 201 });
   } catch (error: any) {

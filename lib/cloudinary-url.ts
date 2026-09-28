@@ -37,3 +37,52 @@ export function getThumbnailUrl(
 
   return secureUrl;
 }
+
+/**
+ * Normalizes a Cloudinary image URL with matched crop and aspect ratio
+ * so before & after images fit perfectly in the comparison slider.
+ */
+export function getNormalizedComparisonUrl(
+  secureUrl: string,
+  width = 800,
+  height = 600
+): string {
+  if (!secureUrl || !secureUrl.includes("cloudinary.com")) {
+    return secureUrl;
+  }
+  const uploadToken = "/image/upload/";
+  const idx = secureUrl.indexOf(uploadToken);
+  if (idx === -1) return secureUrl;
+
+  const prefix = secureUrl.substring(0, idx + uploadToken.length);
+  const suffix = secureUrl.substring(idx + uploadToken.length);
+
+  // If already transformed with c_, return with standard dimensions
+  if (suffix.startsWith("c_") || suffix.startsWith("v")) {
+    return `${prefix}c_fill,w_${width},h_${height},g_auto/${suffix.replace(/^c_[^/]+\//, "")}`;
+  }
+
+  return `${prefix}c_fill,w_${width},h_${height},g_auto/${suffix}`;
+}
+
+/**
+ * Downscales an image URL to w_512 for fast, cost-effective OpenAI GPT-4o-mini vision verification.
+ */
+export function getOptimizedVisionUrl(secureUrl: string, width = 512): string {
+  if (!secureUrl) return "";
+  if (secureUrl.includes("cloudinary.com")) {
+    const uploadToken = "/upload/";
+    const idx = secureUrl.indexOf(uploadToken);
+    if (idx !== -1) {
+      const prefix = secureUrl.substring(0, idx + uploadToken.length);
+      const suffix = secureUrl.substring(idx + uploadToken.length);
+      return `${prefix}c_limit,w_${width},q_auto,f_auto/${suffix.replace(/^c_[^/]+\//, "")}`;
+    }
+  }
+  if (secureUrl.includes("images.unsplash.com")) {
+    return secureUrl.replace(/w=\d+/, `w=${width}`);
+  }
+  return secureUrl;
+}
+
+

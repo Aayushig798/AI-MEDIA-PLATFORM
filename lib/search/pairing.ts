@@ -1,0 +1,241 @@
+import { db } from "@/lib/db";
+import { getNormalizedComparisonUrl } from "@/lib/cloudinary-url";
+import { COMPARISON_CONFIG } from "@/lib/comparison/config";
+import {
+  checkHardRules,
+  checkContentSimilarity,
+  verifyPairWithVision,
+  HardRulesResult,
+} from "@/lib/comparison/verify";
+
+export { getNormalizedComparisonUrl };
+
+export interface ComparisonSuggestion {
+  id: string;
+  projectId: string;
+  locationLabel: string;
+  timeSpanLabel: string;
+  daysApart: number;
+  confidence: number;
+  reason: string;
+  visibleChange: string;
+  verified: boolean;
+  before: any;
+  after: any;
+  alreadySaved: boolean;
+  savedComparisonId?: string;
+}
+
+export interface SuggestedComparisonsResult {
+  suggestions: ComparisonSuggestion[];
+  missingDateCount: number;
+  totalCandidatePairs: number;
+}
+
+/**
+ * Generates verified Before/After evidence pairs for a project.
+ * Adheres strictly to:
+ * 1. Hard rules (image only, non-null capturedAt, >= 1 day gap, GPS <= 200m or matched manual location)
+ * 2. Content similarity gate (weighted tag overlap >= 0.25, vector similarity >= 0.6 if present)
+ * 3. OpenAI GPT-4o-mini vision verification (top 5 candidates, sameScene === true && confidence >= 0.7)
+ * Never generates fake or filler pairs.
+ */
+export async function suggestComparisons(
+  projectId: string
+): Promise<SuggestedComparisonsResult> {
+  const assets = await db.mediaAsset.findMany({
+    where: { projectId },
+    include: {
+      aiTags: { orderBy: { confidence: "desc" } },
+      categories: { include: { category: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const allImages = (assets || []).filter((a: any) => a.resourceType === "image");
+  const missingDateCount = allImages.filter((a: any) => !a.capturedAt).length;
+  const datedImages = allImages.filter((a: any) => Boolean(a.capturedAt));
+
+  if (datedImages.length < 2) {
+    return {
+      suggestions: [],
+      missingDateCount,
+      totalCandidatePairs: 0,
+    };
+  }
+
+  // Load embeddings if available in pgvector
+  const embeddingMap = new Map<string, number[]>();
+  try {
+    const assetIds = datedImages.map((a: any) => a.id);
+    const rawEmbeddings = await db.$queryRawUnsafe<
+      Array<{ mediaAssetId: string; embedding: string }>
+    >(
+      `SELECT "mediaAssetId", embedding::text FROM "MediaEmbedding" WHERE "mediaAssetId" = ANY($1::text[])`,
+      assetIds
+    );
+    for (const row of rawEmbeddings) {
+      if (row.embedding) {
+        const numbers = row.embedding
+          .replace(/[\[\]]/g, "")
+          .split(",")
+          .map(Number);
+        embeddingMap.set(row.mediaAssetId, numbers);
+      }
+    }
+  } catch (e) {
+    // If pgvector query fails or is not enabled, embeddings are optional
+  }
+
+  // 1 & 2. Evaluate all image pairs against Hard Rules and Content Similarity Gate
+  interface CandidatePair {
+    beforeAsset: any;
+    afterAsset: any;
+    daysApart: number;
+    tagOverlap: number;
+    embedSim?: number;
+    rankingScore: number;
+  }
+
+  const candidatePairs: CandidatePair[] = [];
+
+  for (let i = 0; i < datedImages.length; i++) {
+    for (let j = i + 1; j < datedImages.length; j++) {
+      const assetA = datedImages[i];
+      const assetB = datedImages[j];
+
+      // Gate 1: Hard Rules
+      const hardCheck: HardRulesResult = checkHardRules(assetA, assetB);
+      if (!hardCheck.passed || !hardCheck.beforeAsset || !hardCheck.afterAsset) {
+        continue;
+      }
+
+      const before = hardCheck.beforeAsset;
+      const after = hardCheck.afterAsset;
+      const daysApart = hardCheck.daysApart || 1;
+
+      // Gate 2: Content Similarity Gate
+      const embBefore = embeddingMap.get(before.id) || null;
+      const embAfter = embeddingMap.get(after.id) || null;
+      const contentCheck = checkContentSimilarity(
+        before.aiTags || [],
+        after.aiTags || [],
+        embBefore,
+        embAfter
+      );
+
+      if (!contentCheck.passed) {
+        continue;
+      }
+
+      // Ranking score combines tag overlap and optional embedding similarity
+      const rankingScore =
+        contentCheck.tagOverlap * 0.7 + (contentCheck.embedSim ? contentCheck.embedSim * 0.3 : 0);
+
+      candidatePairs.push({
+        beforeAsset: before,
+        afterAsset: after,
+        daysApart,
+        tagOverlap: contentCheck.tagOverlap,
+        embedSim: contentCheck.embedSim,
+        rankingScore,
+      });
+    }
+  }
+
+  if (candidatePairs.length === 0) {
+    return {
+      suggestions: [],
+      missingDateCount,
+      totalCandidatePairs: 0,
+    };
+  }
+
+  // Sort candidate pairs by ranking score descending and take top K
+  candidatePairs.sort((a, b) => b.rankingScore - a.rankingScore);
+  const topCandidates = candidatePairs.slice(0, COMPARISON_CONFIG.VISION_VERIFY_TOP_K);
+
+  // Fetch already saved comparisons to cross-reference alreadySaved state
+  const savedComparisons = await db.comparison.findMany({
+    where: { projectId },
+  });
+
+  const verifiedSuggestions: ComparisonSuggestion[] = [];
+
+  // Gate 3: Vision Verification on top candidates
+  for (const cand of topCandidates) {
+    try {
+      const verification = await verifyPairWithVision(cand.beforeAsset, cand.afterAsset);
+
+      // Only suggest pairs where sameScene is true and confidence >= 0.7
+      if (
+        verification.sameScene &&
+        verification.confidence >= COMPARISON_CONFIG.MIN_VISION_CONFIDENCE
+      ) {
+        const before = cand.beforeAsset;
+        const after = cand.afterAsset;
+
+        let timeSpanLabel = `${cand.daysApart} days apart`;
+        if (cand.daysApart >= 365) {
+          const years = (cand.daysApart / 365).toFixed(1);
+          timeSpanLabel = `${years} years apart`;
+        } else if (cand.daysApart >= 30) {
+          const months = Math.round(cand.daysApart / 30);
+          timeSpanLabel = `${months} month${months > 1 ? "s" : ""} apart`;
+        }
+
+        const locLabel =
+          before.manualLocation ||
+          after.manualLocation ||
+          (before.exifLat ? `${before.exifLat.toFixed(3)}, ${before.exifLng?.toFixed(3)}` : "Verified Site");
+
+        const existing = savedComparisons.find(
+          (c: any) =>
+            (c.beforeAssetId === before.id && c.afterAssetId === after.id) ||
+            (c.beforeAssetId === after.id && c.afterAssetId === before.id)
+        );
+
+        verifiedSuggestions.push({
+          id: `sug_${before.id}_${after.id}`,
+          projectId,
+          locationLabel: locLabel,
+          timeSpanLabel,
+          daysApart: cand.daysApart,
+          confidence: verification.confidence,
+          reason: verification.reason,
+          visibleChange: verification.visibleChange,
+          verified: true,
+          before: {
+            ...before,
+            normalizedUrl: getNormalizedComparisonUrl(before.secureUrl),
+          },
+          after: {
+            ...after,
+            normalizedUrl: getNormalizedComparisonUrl(after.secureUrl),
+          },
+          alreadySaved: Boolean(existing),
+          savedComparisonId: existing?.id,
+        });
+      }
+    } catch (err: any) {
+      console.warn(
+        `[Pair Verification Warning] Pair ${cand.beforeAsset.id} <-> ${cand.afterAsset.id}:`,
+        err.message || err
+      );
+    }
+  }
+
+  // Sort suggestions by confidence (descending), then by time gap (descending)
+  verifiedSuggestions.sort((a, b) => {
+    if (b.confidence !== a.confidence) {
+      return b.confidence - a.confidence;
+    }
+    return b.daysApart - a.daysApart;
+  });
+
+  return {
+    suggestions: verifiedSuggestions,
+    missingDateCount,
+    totalCandidatePairs: candidatePairs.length,
+  };
+}

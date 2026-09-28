@@ -93,38 +93,15 @@
   ],
   "assets": [
     {
-      "id": "asset_1790570174927_i6u83w",
+      "id": "asset_1790594167064_kdkxmc",
       "projectId": "proj_1790538013202_xm15y8",
-      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/576df0ad-4da3-4be9-b656-ff4e35c48389/rzckbc5w7fwjei2iqueg",
-      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790570174/impact-platform/proj_1790538013202_xm15y8/576df0ad-4da3-4be9-b656-ff4e35c48389/rzckbc5w7fwjei2iqueg.jpg",
+      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/238b2c3b-06d7-4609-86a3-203382612fcf/bcuyjbxnswxi9qx3lvbr",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790594165/impact-platform/proj_1790538013202_xm15y8/238b2c3b-06d7-4609-86a3-203382612fcf/bcuyjbxnswxi9qx3lvbr.jpg",
       "resourceType": "image",
       "format": "jpg",
-      "bytes": 2899115,
-      "width": 5472,
-      "height": 3648,
-      "manualCategory": "Infrastructure",
-      "manualLocation": "DELHI",
-      "manualNotes": null,
-      "capturedAt": "2026-09-28T00:00:00.000Z",
-      "uploadedBy": "usr_demo123",
-      "exifLat": null,
-      "exifLng": null,
-      "aiProcessingStatus": "done",
-      "aiTags": [],
-      "categories": [],
-      "createdAt": "2026-09-28T04:36:14.927Z",
-      "updatedAt": "2026-09-28T04:36:15.593Z"
-    },
-    {
-      "id": "asset_1790569799725_9ymsy6",
-      "projectId": "proj_1790538013202_xm15y8",
-      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/da32647c-8526-48eb-96b4-16eadcb26e3e/bmhyojabrr51jwguviwu",
-      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790569798/impact-platform/proj_1790538013202_xm15y8/da32647c-8526-48eb-96b4-16eadcb26e3e/bmhyojabrr51jwguviwu.jpg",
-      "resourceType": "image",
-      "format": "jpg",
-      "bytes": 1871619,
-      "width": 2560,
-      "height": 3840,
+      "bytes": 1500369,
+      "width": 4000,
+      "height": 2667,
       "manualCategory": "Environmental",
       "manualLocation": "DELHI",
       "manualNotes": null,
@@ -135,14 +112,14 @@
       "aiProcessingStatus": "done",
       "aiTags": [],
       "categories": [],
-      "createdAt": "2026-09-28T04:29:59.725Z",
-      "updatedAt": "2026-09-28T04:30:29.546Z"
+      "createdAt": "2026-09-28T11:16:07.065Z",
+      "updatedAt": "2026-09-28T11:16:07.065Z"
     },
     {
-      "id": "asset_1790569604330_s0et4x",
+      "id": "asset_1790593955503_t4ni82",
       "projectId": "proj_1790538013202_xm15y8",
-      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/5d918e99-5b5f-4f07-b99b-d63a28e0abde/aeiwad3odkzrfj0xbmwp",
-      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790569603/impact-platform/proj_1790538013202_xm15y8/5d918e99-5b5f-4f07-b99b-d63a28e0abde/aeiwad3odkzrfj0xbmwp.jpg",
+      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/2b140c19-75d7-4d53-88f4-e634ee78ea7e/utqdmhjja8ouutllugnj",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790593953/impact-platform/proj_1790538013202_xm15y8/2b140c19-75d7-4d53-88f4-e634ee78ea7e/utqdmhjja8ouutllugnj.jpg",
       "resourceType": "image",
       "format": "jpg",
       "bytes": 1847858,
@@ -158,8 +135,54 @@
       "aiProcessingStatus": "done",
       "aiTags": [],
       "categories": [],
-      "createdAt": "2026-09-28T04:26:44.332Z",
-      "updatedAt": "2026-09-28T04:26:45.350Z"
+      "createdAt": "2026-09-28T11:12:35.504Z",
+      "updatedAt": "2026-09-28T11:12:35.504Z"
+    },
+    {
+      "id": "asset_1790593789318_vx0rxa",
+      "projectId": "proj_1790538013202_xm15y8",
+      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/1c14345d-7fef-4e8a-995d-9eff49e5d0c1/wheuxkoft93kzcgzvzlz",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790593787/impact-platform/proj_1790538013202_xm15y8/1c14345d-7fef-4e8a-995d-9eff49e5d0c1/wheuxkoft93kzcgzvzlz.jpg",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 2899115,
+      "width": 5472,
+      "height": 3648,
+      "manualCategory": "Environmental",
+      "manualLocation": "DELHI",
+      "manualNotes": null,
+      "capturedAt": "2026-09-28T00:00:00.000Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": null,
+      "exifLng": null,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-28T11:09:49.318Z",
+      "updatedAt": "2026-09-28T11:09:49.318Z"
+    },
+    {
+      "id": "asset_1790593692898_fxsa4u",
+      "projectId": "proj_1790538013202_xm15y8",
+      "cloudinaryPublicId": "impact-platform/proj_1790538013202_xm15y8/12589e09-405d-4ee3-b6b7-410200e55b60/adrurufvpof7y0g29f0u",
+      "secureUrl": "https://res.cloudinary.com/oxwb4gye/image/upload/v1790593691/impact-platform/proj_1790538013202_xm15y8/12589e09-405d-4ee3-b6b7-410200e55b60/adrurufvpof7y0g29f0u.jpg",
+      "resourceType": "image",
+      "format": "jpg",
+      "bytes": 1871619,
+      "width": 2560,
+      "height": 3840,
+      "manualCategory": "Environmental",
+      "manualLocation": "DELHI",
+      "manualNotes": null,
+      "capturedAt": "2026-09-28T00:00:00.000Z",
+      "uploadedBy": "usr_demo123",
+      "exifLat": null,
+      "exifLng": null,
+      "aiProcessingStatus": "done",
+      "aiTags": [],
+      "categories": [],
+      "createdAt": "2026-09-28T11:08:12.899Z",
+      "updatedAt": "2026-09-28T11:08:12.899Z"
     },
     {
       "id": "asset_1790541056866_prigdr",
@@ -859,6 +882,574 @@
       "confidence": 0.86,
       "source": "external_vision",
       "createdAt": "2026-09-27T20:29:13.905Z"
+    },
+    {
+      "id": "tag_1790593693193_du7f9",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "People",
+      "confidence": 0.994,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.193Z"
+    },
+    {
+      "id": "tag_1790593693266_66xrx",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Hair",
+      "confidence": 0.991,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.266Z"
+    },
+    {
+      "id": "tag_1790593693337_6z03l",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Head",
+      "confidence": 0.986,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.337Z"
+    },
+    {
+      "id": "tag_1790593693407_j74vd",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Crowd",
+      "confidence": 0.982,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.407Z"
+    },
+    {
+      "id": "tag_1790593693480_nzj79",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Hand",
+      "confidence": 0.97,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.480Z"
+    },
+    {
+      "id": "tag_1790593693578_lgtde",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Temple",
+      "confidence": 0.961,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.578Z"
+    },
+    {
+      "id": "tag_1790593693650_2eovc",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Human body",
+      "confidence": 0.955,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.650Z"
+    },
+    {
+      "id": "tag_1790593693726_sor39",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Event",
+      "confidence": 0.948,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.727Z"
+    },
+    {
+      "id": "tag_1790593693792_gh6kl",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Social group",
+      "confidence": 0.94,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.792Z"
+    },
+    {
+      "id": "tag_1790593693864_psbs6",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Community",
+      "confidence": 0.936,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.864Z"
+    },
+    {
+      "id": "tag_1790593693938_p8afk",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Youth",
+      "confidence": 0.934,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:13.938Z"
+    },
+    {
+      "id": "tag_1790593694021_etm2v",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Summer",
+      "confidence": 0.933,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.022Z"
+    },
+    {
+      "id": "tag_1790593694089_tgc4b",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Leisure",
+      "confidence": 0.901,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.089Z"
+    },
+    {
+      "id": "tag_1790593694163_48vhe",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Audience",
+      "confidence": 0.892,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.163Z"
+    },
+    {
+      "id": "tag_1790593694233_z7lb4",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Spring",
+      "confidence": 0.878,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.233Z"
+    },
+    {
+      "id": "tag_1790593694296_ioe7c",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Fun",
+      "confidence": 0.843,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.296Z"
+    },
+    {
+      "id": "tag_1790593694369_1n6h7",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Recreation",
+      "confidence": 0.842,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.369Z"
+    },
+    {
+      "id": "tag_1790593694440_mm0yq",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Public event",
+      "confidence": 0.822,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.440Z"
+    },
+    {
+      "id": "tag_1790593694512_cx5mx",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Party",
+      "confidence": 0.781,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.512Z"
+    },
+    {
+      "id": "tag_1790593694582_19y95",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Feathered hair",
+      "confidence": 0.647,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.583Z"
+    },
+    {
+      "id": "tag_1790593694665_3dpby",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Human back",
+      "confidence": 0.577,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.665Z"
+    },
+    {
+      "id": "tag_1790593694750_bjv3x",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Vacation",
+      "confidence": 0.576,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.750Z"
+    },
+    {
+      "id": "tag_1790593694816_kj3ox",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Holiday",
+      "confidence": 0.52,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.816Z"
+    },
+    {
+      "id": "tag_1790593694880_i5261",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "label": "Block party",
+      "confidence": 0.51,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:08:14.880Z"
+    },
+    {
+      "id": "tag_1790593789648_5qkyn",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "label": "Rubble",
+      "confidence": 0.865,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:09:49.648Z"
+    },
+    {
+      "id": "tag_1790593789749_dm9dk",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "label": "Apartment",
+      "confidence": 0.84,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:09:49.750Z"
+    },
+    {
+      "id": "tag_1790593789836_0v6c1",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "label": "Earthquake",
+      "confidence": 0.677,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:09:49.836Z"
+    },
+    {
+      "id": "tag_1790593789912_uco7b",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "label": "Building material",
+      "confidence": 0.655,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:09:49.912Z"
+    },
+    {
+      "id": "tag_1790593790004_y6v0t",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "label": "Demolition",
+      "confidence": 0.63,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:09:50.004Z"
+    },
+    {
+      "id": "tag_1790593790107_e6dzh",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "label": "Waste",
+      "confidence": 0.615,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:09:50.107Z"
+    },
+    {
+      "id": "tag_1790593790210_jsyhd",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "label": "High-rise building",
+      "confidence": 0.546,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:09:50.210Z"
+    },
+    {
+      "id": "tag_1790593955906_5ptbi",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Wind turbine",
+      "confidence": 0.993,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:35.906Z"
+    },
+    {
+      "id": "tag_1790593955987_rv5py",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Windmill",
+      "confidence": 0.992,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:35.987Z"
+    },
+    {
+      "id": "tag_1790593956070_kwzjy",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Sky",
+      "confidence": 0.991,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.070Z"
+    },
+    {
+      "id": "tag_1790593956145_m7gij",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Wind farm",
+      "confidence": 0.986,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.145Z"
+    },
+    {
+      "id": "tag_1790593956233_ioknt",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Water",
+      "confidence": 0.983,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.233Z"
+    },
+    {
+      "id": "tag_1790593956333_perho",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Horizon",
+      "confidence": 0.958,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.333Z"
+    },
+    {
+      "id": "tag_1790593956417_2qimu",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Fluid",
+      "confidence": 0.956,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.417Z"
+    },
+    {
+      "id": "tag_1790593956588_cye1j",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Dusk",
+      "confidence": 0.946,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.588Z"
+    },
+    {
+      "id": "tag_1790593956720_loj4w",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Afterglow",
+      "confidence": 0.939,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.720Z"
+    },
+    {
+      "id": "tag_1790593956808_zxntm",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Sunset",
+      "confidence": 0.928,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.808Z"
+    },
+    {
+      "id": "tag_1790593956913_1ymfb",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Sea",
+      "confidence": 0.924,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:36.915Z"
+    },
+    {
+      "id": "tag_1790593957033_xrrx4",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Liquid",
+      "confidence": 0.921,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.033Z"
+    },
+    {
+      "id": "tag_1790593957128_08szv",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Wind",
+      "confidence": 0.911,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.128Z"
+    },
+    {
+      "id": "tag_1790593957228_5lyoz",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Cloud",
+      "confidence": 0.903,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.228Z"
+    },
+    {
+      "id": "tag_1790593957319_34e14",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Turbine",
+      "confidence": 0.9,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.319Z"
+    },
+    {
+      "id": "tag_1790593957421_6lti1",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Public utility",
+      "confidence": 0.899,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.421Z"
+    },
+    {
+      "id": "tag_1790593957515_lab2g",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Evening",
+      "confidence": 0.895,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.515Z"
+    },
+    {
+      "id": "tag_1790593957610_ekva6",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Ocean",
+      "confidence": 0.89,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.610Z"
+    },
+    {
+      "id": "tag_1790593957701_58zdt",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Sunrise",
+      "confidence": 0.879,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.701Z"
+    },
+    {
+      "id": "tag_1790593957796_buj6h",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Coastal and oceanic landforms",
+      "confidence": 0.871,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.796Z"
+    },
+    {
+      "id": "tag_1790593957882_017fu",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Machine",
+      "confidence": 0.849,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.882Z"
+    },
+    {
+      "id": "tag_1790593957969_0arfe",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Coast",
+      "confidence": 0.842,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:37.969Z"
+    },
+    {
+      "id": "tag_1790593958111_54wq4",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Electricity",
+      "confidence": 0.841,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.111Z"
+    },
+    {
+      "id": "tag_1790593958200_a1mdo",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Propeller",
+      "confidence": 0.841,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.200Z"
+    },
+    {
+      "id": "tag_1790593958297_o918p",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Morning",
+      "confidence": 0.838,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.297Z"
+    },
+    {
+      "id": "tag_1790593958388_5i78v",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Dawn",
+      "confidence": 0.782,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.388Z"
+    },
+    {
+      "id": "tag_1790593958483_xjly2",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Red sky at morning",
+      "confidence": 0.766,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.483Z"
+    },
+    {
+      "id": "tag_1790593958559_eyvt2",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Reflection",
+      "confidence": 0.711,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.559Z"
+    },
+    {
+      "id": "tag_1790593958657_7n675",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Beach",
+      "confidence": 0.665,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.657Z"
+    },
+    {
+      "id": "tag_1790593958735_9xsvt",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Heat",
+      "confidence": 0.627,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.735Z"
+    },
+    {
+      "id": "tag_1790593958804_wk8nt",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Backlighting",
+      "confidence": 0.6,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.804Z"
+    },
+    {
+      "id": "tag_1790593958884_nkhw9",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Electrical Supply",
+      "confidence": 0.56,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.884Z"
+    },
+    {
+      "id": "tag_1790593958990_ql2v6",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Wave",
+      "confidence": 0.545,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:38.991Z"
+    },
+    {
+      "id": "tag_1790593959072_m5mvm",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
+      "label": "Wetland",
+      "confidence": 0.519,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:12:39.072Z"
+    },
+    {
+      "id": "tag_1790594167364_zxggv",
+      "mediaAssetId": "asset_1790594167064_kdkxmc",
+      "label": "Village",
+      "confidence": 0.726,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:16:07.364Z"
+    },
+    {
+      "id": "tag_1790594167444_rez9m",
+      "mediaAssetId": "asset_1790594167064_kdkxmc",
+      "label": "Pollution",
+      "confidence": 0.72,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:16:07.444Z"
+    },
+    {
+      "id": "tag_1790594167534_0tldp",
+      "mediaAssetId": "asset_1790594167064_kdkxmc",
+      "label": "Tent",
+      "confidence": 0.695,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:16:07.534Z"
+    },
+    {
+      "id": "tag_1790594167616_0hulu",
+      "mediaAssetId": "asset_1790594167064_kdkxmc",
+      "label": "Palm trees",
+      "confidence": 0.674,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:16:07.616Z"
+    },
+    {
+      "id": "tag_1790594167694_hhexx",
+      "mediaAssetId": "asset_1790594167064_kdkxmc",
+      "label": "Tarpaulin",
+      "confidence": 0.654,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:16:07.694Z"
+    },
+    {
+      "id": "tag_1790594167784_zqvq6",
+      "mediaAssetId": "asset_1790594167064_kdkxmc",
+      "label": "Waste",
+      "confidence": 0.536,
+      "source": "cloudinary_google",
+      "createdAt": "2026-09-28T11:16:07.784Z"
     }
   ],
   "categories": [
@@ -930,19 +1521,37 @@
       "categoryId": "cat_env"
     },
     {
-      "id": "mac_1790569605232_q0mxt",
-      "mediaAssetId": "asset_1790569604330_s0et4x",
+      "id": "mac_1790593694989_penzx",
+      "mediaAssetId": "asset_1790593692898_fxsa4u",
+      "categoryId": "cat_comm"
+    },
+    {
+      "id": "mac_1790593790290_mijjg",
+      "mediaAssetId": "asset_1790593789318_vx0rxa",
+      "categoryId": "cat_disaster"
+    },
+    {
+      "id": "mac_1790593959171_kr7o5",
+      "mediaAssetId": "asset_1790593955503_t4ni82",
       "categoryId": "cat_env"
     },
     {
-      "id": "mac_1790569829490_evjj9",
-      "mediaAssetId": "asset_1790569799725_9ymsy6",
-      "categoryId": "cat_env"
-    },
+      "id": "mac_1790594167871_gz48a",
+      "mediaAssetId": "asset_1790594167064_kdkxmc",
+      "categoryId": "cat_comm"
+    }
+  ],
+  "comparisons": [],
+  "pairVerifications": [
     {
-      "id": "mac_1790570175547_6pk4n",
-      "mediaAssetId": "asset_1790570174927_i6u83w",
-      "categoryId": "cat_env"
+      "id": "pv_1790619669847_aq8lc1",
+      "beforeAssetId": "test_a",
+      "afterAssetId": "test_b",
+      "sameScene": true,
+      "confidence": 0.92,
+      "reason": "Same riverbank viewpoint observed before and after restoration.",
+      "visibleChange": "Vegetation coverage increased significantly.",
+      "createdAt": "2026-09-28T18:21:09.847Z"
     }
   ]
 }

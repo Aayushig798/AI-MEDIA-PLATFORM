@@ -4,6 +4,7 @@ import { cloudinary } from "@/lib/cloudinary";
 import { extractCloudinaryAiTags } from "@/lib/ai/cloudinaryTagging";
 import { runVisionFallback } from "@/lib/ai/visionFallback";
 import { determinePrimaryCategory } from "@/lib/ai/categoryMapping";
+import { generateEmbeddingForAsset } from "@/lib/ai/embeddings";
 
 export async function POST(
   req: NextRequest,
@@ -77,9 +78,19 @@ export async function POST(
         },
       });
 
+      const updateData: any = { aiProcessingStatus: "done" };
+      if (asset.categorySource !== "user") {
+        updateData.manualCategory = primaryCategory;
+      }
+
       await db.mediaAsset.update({
         where: { id },
-        data: { aiProcessingStatus: "done" },
+        data: updateData,
+      });
+
+      // Automatically generate text embedding for pgvector search (Task 3.2)
+      generateEmbeddingForAsset(id).catch((err) => {
+        console.error("Auto generateEmbeddingForAsset error:", err);
       });
     } else {
       // Step 2b: Fallback to Google Cloud Vision or mark failed (no mock tags)

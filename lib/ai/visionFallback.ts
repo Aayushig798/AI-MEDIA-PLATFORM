@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { determinePrimaryCategory, DomainCategory } from "./categoryMapping";
+import { generateEmbeddingForAsset } from "./embeddings";
 
 export interface VisionLabelResult {
   label: string;
@@ -85,9 +86,15 @@ export async function runVisionFallback(
       await db.aiTag.deleteMany({ where: { mediaAssetId: assetId } });
       await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: assetId } });
 
+      const currentFailed = await db.mediaAsset.findUnique({ where: { id: assetId } });
+      const failedUpdateData: any = { aiProcessingStatus: "failed" };
+      if (currentFailed?.categorySource !== "user") {
+        failedUpdateData.manualCategory = "Uncategorized";
+      }
+
       const failedAsset = await db.mediaAsset.update({
         where: { id: assetId },
-        data: { aiProcessingStatus: "failed" },
+        data: failedUpdateData,
       });
 
       return {
@@ -140,10 +147,21 @@ export async function runVisionFallback(
       },
     });
 
-    // 8. Update status to done
+    // 8. Update status to done, only update manualCategory if categorySource is "ai"
+    const currentAsset = await db.mediaAsset.findUnique({ where: { id: assetId } });
+    const updateData: any = { aiProcessingStatus: "done" };
+    if (currentAsset?.categorySource !== "user") {
+      updateData.manualCategory = primaryCategory;
+    }
+
     const updatedAsset = await db.mediaAsset.update({
       where: { id: assetId },
-      data: { aiProcessingStatus: "done" },
+      data: updateData,
+    });
+
+    // Automatically generate text embedding for pgvector search (Task 3.2)
+    generateEmbeddingForAsset(assetId).catch((err) => {
+      console.error("Auto generateEmbeddingForAsset error:", err);
     });
 
     return {
