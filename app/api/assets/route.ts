@@ -1,30 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma, Verdict } from "@prisma/client";
 import { db } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getActor } from "@/lib/auth";
+import { tryAppendLedger } from "@/lib/ledger";
+import { INTEGRITY_SUMMARY } from "@/lib/integrity/summary";
+
+const VERDICTS: Verdict[] = ["VERIFIED", "REVIEW", "FLAGGED"];
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const projectId = searchParams.get("projectId") || undefined;
     const category = searchParams.get("category") || undefined;
+    const verdict = searchParams.get("verdict") || undefined;
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
 
-    const where: any = {};
+    const where: Prisma.MediaAssetWhereInput = {};
 
     if (projectId) {
       where.projectId = projectId;
     }
 
     if (category && category !== "ALL") {
-      where.manualCategory = category;
+      where.manualCategory = { equals: category, mode: "insensitive" };
+    }
+
+    if (verdict === "UNVERIFIED") {
+      where.OR = [{ integrity: null }, { integrity: { verdict: null } }];
+    } else if (verdict && VERDICTS.includes(verdict as Verdict)) {
+      where.integrity = { verdict: verdict as Verdict };
     }
 
     if (from || to) {
-      where.capturedAt = {};
+      const range: Prisma.DateTimeFilter = {};
       if (from) {
-        where.capturedAt.gte = new Date(from);
+        range.gte = new Date(from);
       }
       if (to) {
         // Set to end of the day if it's just a date string like YYYY-MM-DD
@@ -32,13 +43,15 @@ export async function GET(req: NextRequest) {
         if (to.length === 10) {
           toDate.setHours(23, 59, 59, 999);
         }
-        where.capturedAt.lte = toDate;
+        range.lte = toDate;
       }
+      where.capturedAt = range;
     }
 
     const assets = await db.mediaAsset.findMany({
       where,
       orderBy: { createdAt: "desc" },
+      include: { integrity: { select: INTEGRITY_SUMMARY } },
     });
 
     return NextResponse.json({ success: true, assets });
@@ -67,7 +80,9 @@ export async function POST(req: NextRequest) {
       manualLocation,
       manualNotes,
       capturedAt,
-      uploadedBy,
+      claimText,
+      etag,
+      phash,
     } = body;
 
     if (!projectId || !cloudinaryPublicId || !secureUrl) {
@@ -80,10 +95,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get session user or fallback
-    const session = await getServerSession(authOptions);
-    const finalUploadedBy =
-      uploadedBy || (session?.user as any)?.id || "usr_demo123";
+    const actor = await getActor();
 
     // Ensure project exists
     const project = await db.project.findUnique({
@@ -110,8 +122,30 @@ export async function POST(req: NextRequest) {
         manualCategory: manualCategory?.trim() || null,
         manualLocation: manualLocation?.trim() || null,
         manualNotes: manualNotes?.trim() || null,
+        claimText: claimText?.trim() || null,
         capturedAt: capturedAt ? new Date(capturedAt) : new Date(),
-        uploadedBy: finalUploadedBy,
+        uploadedBy: actor.id,
+        etag: typeof etag === "string" ? etag : null,
+        phash: typeof phash === "string" ? phash : null,
+        integrity: { create: {} },
+      },
+    });
+
+    await tryAppendLedger({
+      type: "ASSET_UPLOADED",
+      actor: actor.label,
+      assetId: asset.id,
+      projectId,
+      payload: {
+        cloudinaryPublicId: asset.cloudinaryPublicId,
+        secureUrl: asset.secureUrl,
+        resourceType: asset.resourceType,
+        bytes: asset.bytes,
+        etag: asset.etag,
+        phash: asset.phash,
+        claimedCapturedAt: asset.capturedAt,
+        claimedLocation: asset.manualLocation,
+        category: asset.manualCategory,
       },
     });
 

@@ -1,278 +1,118 @@
-# AI-Powered Impact & Sustainability Media Platform
+# EcoEvidence: Proof-of-Impact Media Platform
 
-`License: MIT` `Next.js 14` `TypeScript` `Cloudinary` `PostgreSQL + pgvector` `OpenAI`
+`License: MIT` `Next.js 14` `TypeScript` `Cloudinary` `PostgreSQL` `Prisma`
 
-An AI-powered media intelligence platform, built on Cloudinary, that turns raw field photos and videos from NGOs, governments, and sustainability organizations into organized evidence, searchable knowledge, and reliable impact reports.
+An evidence system, built on Cloudinary, that turns raw field photos and videos from NGOs, CSR teams and government programmes into **verified** evidence: every photo gets a Trust Score, every action lands in a tamper-evident ledger, before/after pairs become a measured number, and donors get a reel they can verify by scanning a QR code.
 
 ## Why this project?
 
-NGOs, governments, and sustainability organizations generate huge volumes of photos and videos from field projects — environmental initiatives, infrastructure work, community programs. Manually organizing, tagging, verifying, and turning this raw media into usable evidence and reports doesn't scale: a field team ends up with thousands of untagged files scattered across folders, with no reliable way to prove what changed, when, or where.
+Field teams produce thousands of photos, and nobody can check them all. Fake and recycled photos are a documented problem: NMMS worksite photos in MGNREGA are now verified by hand (100% at gram-panchayat level under a July 2025 Ministry of Rural Development circular), while CSR impact assessments and SEBI BRSR Core assurance require evidence that holds up to an auditor. Most media tools organise and narrate uploads; EcoEvidence **questions them first**.
 
-This platform solves that with four connected capabilities:
+## What it does
 
-- **Structured Media Storage:** Every asset lives inside a Project, tagged by location, date, and category, delivered through Cloudinary's CDN.
-- **Automatic Media Understanding:** AI tagging identifies objects, scenes, and activity types the moment media is uploaded — no manual tagging required.
-- **Semantic Search & Visual Comparison:** Natural-language search finds relevant evidence even without exact tag matches, and before/after sliders make visible change undeniable.
-- **Grounded Impact Reporting:** An LLM drafts narrative reports from real project statistics — never invented ones — exportable as PDF, with a full traceability trail back to the original source file.
+### 1. Proof-of-Impact Integrity Engine
+Each asset is checked on "Submit for verification" (or automatically after upload) and scored 0–100 with plain-language reasons:
 
-## How it works
+| Check | How |
+|---|---|
+| Exact duplicate | SHA-256 of the stored original + Cloudinary `etag` |
+| Recycled image | Cloudinary pHash (`phash: true`), Hamming distance ≤ 10 against every asset; worst when the match is in another project |
+| Found on the internet | Google Cloud Vision Web Detection |
+| EXIF consistency | Camera time vs claimed/upload time, editing software, stripped metadata (weak signal) |
+| Inside project geofence | Photo GPS vs project site + radius |
+| Weather plausibility | Open-Meteo history vs rain/wet ground/flooding seen by AI Vision |
+| Satellite plausibility | Sentinel-2 NDVI (greening) / NDWI (water) at the site, project start vs photo date |
+| AI auditor | Cloudinary AI Vision answers yes/no questions generated from the project's claim |
+| Provenance | AI Vision: AI-generated/composited or photo-of-a-screen (low weight) |
 
-**1. Upload & Auto-Tagging Flow**
+Scores ≥ 75 are **Verified**, 45–74 **Review**, < 45 **Flagged**. The score is triage: a review queue shows suspicious photos side by side with their matches, and every human decision is ledgered.
 
-When a field asset is uploaded, it passes through an automated understanding pipeline before it's fully indexed:
+### 2. Tamper-evident ledger
+Every upload, edit, check, review, derivative, comparison, measurement, reel and report is an append-only entry with `entryHash = SHA-256(prevHash | canonicalJSON(entry))`. Anyone can re-verify the chain **in their own browser** on the public Verify page. Merkle anchors seal batches of entries; publish the root externally (e.g. a commit to a public repo) to make even a full database rewrite detectable. Derivatives are classified with Cloudinary's Content Credentials vocabulary: **transcoded** (fit/format/quality: still evidence) vs **edited** (crops, overlays: illustrative).
 
-```
-Upload (signed, direct to Cloudinary)
-   → Cloudinary AI add-on / fallback Vision API tags the asset
-   → Raw labels mapped to a domain category
-   → Text embedding generated from tags + category + location
-   → Asset becomes searchable and comparison-eligible
-```
+### 3. Public Verify page — `/verify/[assetId]`
+Trust Score breakdown, map pin, weather card, satellite values, AI auditor answers, matching photos, web matches, signed original URL, a QR code, and the asset's ledger history with in-browser hash recomputation.
 
-**2. Evidence-to-Report Flow**
+### 4. Measured change + donor reel
+Confirmed before/after pairs (auto-suggested from same-spot photos ≥ 7 days apart) get a pixel-measured **green cover** (ExGR with a sky guard) or **water area** percentage, computed in the browser on identically framed Cloudinary derivatives with a manual alignment control. The change mask is stored on Cloudinary and overlaid with `l_…,o_70`. When Copernicus is configured, Sentinel-2 cross-checks the direction of change.
 
-Once a project has enough tagged, embedded, and compared assets, its evidence can be turned into a stakeholder-ready report:
+"Make reel" builds a 9:16 or 1:1 video **entirely from Cloudinary transformations**: text cards rendered by image transformations, an `e_zoompan` title card as the splice base, `fl_splice` cross-fades, the measured metric and mask, verified field clips, and a QR outro, delivered as one URL and generated eagerly.
 
-```
-Select project → assemble structured facts (counts, categories, comparisons)
-   → LLM drafts a narrative strictly grounded in those facts
-   → user edits the draft
-   → exported as PDF with images sourced live from Cloudinary
-```
-
-## Core Features
-
-- **Signed Direct-to-Cloudinary Uploads:** Images and videos upload straight from the browser to Cloudinary using short-lived signed parameters — the API secret never reaches the client.
-- **Automatic AI Tagging & Categorization:** Cloudinary's AI add-ons (or a Vision API fallback) label every asset on upload; labels are mapped into a fixed set of domain categories (Environmental, Infrastructure, Community, Disaster Response) with confidence scores stored per tag.
-- **Hybrid Semantic Search:** Combines OpenAI text embeddings with `pgvector` cosine-similarity search, so a query like *"riverbank erosion damage"* returns relevant results even when no asset is tagged with that exact phrase — filterable by project, category, and date range.
-- **Before/After Evidence Comparison:** Auto-suggests candidate pairs by grouping assets on project + location + date, then renders confirmed pairs in a synced slider using matched Cloudinary transformations.
-- **Grounded Report Generation:** Structured facts are computed first, with no AI involved; only then is an LLM asked to narrate those facts — eliminating hallucinated statistics in stakeholder reports.
-- **Full Traceability:** Every asset carries an audit trail — uploaded → AI-tagged → embedded → used in comparison(s) → used in report(s) — each entry stamped with an actor and timestamp.
-- **PDF Export:** Finished reports render to a polished, shareable PDF via Puppeteer, pulling images directly from Cloudinary's CDN.
+### 5. Grounded impact report
+Facts are computed first with no AI; only verified or human-approved assets are cited. The narrative is a fact template, or (with `OPENAI_API_KEY`) an LLM draft that is **rejected if it contains any number not present in the facts**. The same check applies to human edits. Print or save as PDF from the browser; every cited photo carries a QR code to its Verify page.
 
 ## Quickstart
 
-### Prerequisites
-- Node.js 18+ & npm
-- A PostgreSQL database with the `pgvector` extension available (Neon and Supabase both support this out of the box)
-- A Cloudinary account (cloud name, API key, API secret)
-- An OpenAI API key (needed from the search/reporting phases onward)
+Prerequisites: Node.js 18+, Docker (or any PostgreSQL 14+), a Cloudinary account.
 
-### 1. Setup
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd ai-media-platform
-
-# Install dependencies
 npm install
-
-# Configure environment
-cp .env.example .env.local
-# fill in DATABASE_URL, CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY,
-# CLOUDINARY_API_SECRET, OPENAI_API_KEY, NEXTAUTH_SECRET
-
-# Run database migrations
-npx prisma migrate dev
-```
-
-### 2. Start the app
-```bash
+cp .env.example .env          # fill in Cloudinary keys; see comments for optional checks
+docker run -d --name ecoevidence-postgres -e POSTGRES_USER=ecoevidence -e POSTGRES_PASSWORD=ecoevidence_dev -e POSTGRES_DB=ai_media_platform -p 5433:5432 -v ecoevidence_pgdata:/var/lib/postgresql/data postgres:16-alpine
+npx prisma migrate deploy
+npm run db:seed               # demo projects + photos (uploaded to your Cloudinary), login demo@impactmedia.org / demo123
 npm run dev
 ```
-Opens the dashboard at `http://localhost:3000`.
 
-### 3. Verify the pipeline end to end
-Create a project, upload a batch of test photos, and confirm: thumbnails render from Cloudinary, AI tags appear within seconds, a search query surfaces them semantically, and a generated report references only real project data.
+Then open a project and click **Verify N unverified**. The seed stages two frauds: a byte-identical photo resubmitted to another project (Flagged) and a resized, re-compressed copy (caught by pHash, Review). The seeded Pune before/after pair is **synthetic test data** (two different stock photos); use real same-spot field photos for a demo. Stock photos are on the public web, so Web Detection will flag them once enabled.
 
-## API Usage & Examples
+For QR codes that open on a phone and for Cloudinary webhooks, run behind a public URL (deploy, or `cloudflared tunnel --url http://localhost:3000`) and set `PUBLIC_BASE_URL` / `NEXT_PUBLIC_BASE_URL`.
 
-### Uploading media (signed, direct to Cloudinary)
-```bash
-# 1. Request a signature for the target project
-curl -X POST http://localhost:3000/api/cloudinary/sign \
-  -H "Content-Type: application/json" \
-  -d '{"projectId": "proj_river_cleanup_01"}'
-```
-```json
-{
-  "signature": "a1b2c3d4e5f6...",
-  "timestamp": 1735689600,
-  "folder": "impact-platform/proj_river_cleanup_01",
-  "api_key": "123456789012345",
-  "cloud_name": "your-cloud-name"
-}
-```
-```bash
-# 2. After the frontend uploads directly to Cloudinary with these params,
-#    persist the returned metadata as a MediaAsset
-curl -X POST http://localhost:3000/api/assets \
-  -H "Content-Type: application/json" \
-  -d '{
-    "projectId": "proj_river_cleanup_01",
-    "cloudinaryPublicId": "impact-platform/proj_river_cleanup_01/8f2a91",
-    "secureUrl": "https://res.cloudinary.com/your-cloud/image/upload/v1/impact-platform/...",
-    "resourceType": "image",
-    "manualCategory": "Environmental",
-    "manualLocation": "Sector 4, Riverbank"
-  }'
-```
+### Free-tier notes
+- Cloudinary AI Vision: enable the add-on in the console (free tier; token cost per image is unpublished, so measure it).
+- Google Web Detection: 1,000 units/month. It only runs on explicit verification.
+- Copernicus Data Space: 10,000 processing units/month; a check uses two small statistical requests.
+- Open-Meteo: keyless, free for non-commercial use.
+- C2PA signing (`fl_c2pa`): beta, on request, images only. Set `CLOUDINARY_C2PA_ENABLED=true` once granted.
 
-### Checking AI tags on an asset
-```bash
-curl http://localhost:3000/api/assets/<asset_id>/ai-tags
-```
-```json
-{
-  "tags": [
-    { "label": "flood", "confidence": 0.93, "source": "cloudinary_google" },
-    { "label": "debris", "confidence": 0.81, "source": "cloudinary_google" }
-  ],
-  "category": "Environmental",
-  "aiProcessingStatus": "done"
-}
-```
-
-### Natural-language semantic search
-```bash
-curl -X POST http://localhost:3000/api/search \
-  -H "Content-Type: application/json" \
-  -d '{"query": "riverbank erosion damage", "projectId": "proj_river_cleanup_01"}'
-```
-```json
-{
-  "results": [
-    {
-      "id": "asset_8f2a91",
-      "secureUrl": "https://res.cloudinary.com/.../image/upload/...",
-      "aiCategory": "Environmental",
-      "distance": 0.184
-    }
-  ],
-  "total": 1
-}
-```
-
-### Generating a grounded impact report
-```bash
-curl -X POST http://localhost:3000/api/projects/proj_river_cleanup_01/reports \
-  -H "Content-Type: application/json" -d '{}'
-```
-```json
-{
-  "reportId": "rep_9a41",
-  "generatedSummary": "Over the tracked period, the River Cleanup project documented 42 assets across 3 categories, with 5 before/after comparisons showing visible debris reduction along Sector 4...",
-  "selectedAssetIds": ["asset_8f2a91", "asset_7c11de"]
-}
-```
-
-### Auditing an asset's full traceability
-```bash
-curl http://localhost:3000/api/assets/<asset_id>/audit-log
-```
-```json
-{
-  "timeline": [
-    { "eventType": "uploaded", "actor": "user_priya", "createdAt": "2026-06-01T10:02:00Z" },
-    { "eventType": "ai_tagged", "eventDetail": { "tags": ["flood", "debris"] }, "actor": "system-ai", "createdAt": "2026-06-01T10:02:04Z" },
-    { "eventType": "embedded", "actor": "system-ai", "createdAt": "2026-06-01T10:02:06Z" },
-    { "eventType": "used_in_comparison", "eventDetail": { "comparisonId": "comp_31" }, "actor": "user_priya", "createdAt": "2026-06-02T09:15:00Z" },
-    { "eventType": "used_in_report", "eventDetail": { "reportId": "rep_9a41" }, "actor": "user_priya", "createdAt": "2026-06-03T11:40:00Z" }
-  ]
-}
-```
-
-## API Summary
+## API summary
 
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/projects` | Create a new project |
-| GET | `/api/projects` | List all projects |
-| GET | `/api/projects/[id]` | Get project details + its assets |
-| POST | `/api/cloudinary/sign` | Get signed params for a direct upload |
-| POST | `/api/assets` | Persist a media asset record after upload |
-| GET | `/api/assets` | List/filter assets (project, category, aiCategory, date range) |
-| PATCH | `/api/assets/[id]` | Edit manual metadata |
-| DELETE | `/api/assets/[id]` | Delete asset (Cloudinary + DB) |
-| POST | `/api/assets/[id]/analyze` | Manually re-trigger AI tagging |
-| GET | `/api/assets/[id]/ai-tags` | List AI tags + confidence for an asset |
-| DELETE | `/api/assets/[id]/ai-tags/[tagId]` | Reject an incorrect AI tag |
-| POST | `/api/search` | Natural-language + filtered semantic search |
-| GET | `/api/projects/[id]/suggested-comparisons` | Auto-suggested before/after pairs |
-| POST | `/api/comparisons` | Save a confirmed before/after pair |
-| GET | `/api/comparisons` | List saved comparisons for a project |
-| GET | `/api/projects/[id]/impact-stats` | Structured project facts (no AI) |
-| POST | `/api/projects/[id]/reports` | Generate a grounded LLM report draft |
-| PATCH | `/api/reports/[id]` | Edit a report's narrative |
-| GET | `/api/reports/[id]/export` | Export a report as PDF |
-| GET | `/api/assets/[id]/audit-log` | Full traceability timeline for an asset |
+| GET/POST | `/api/projects` | List / create projects |
+| GET/PATCH | `/api/projects/[id]` | Project + assets; update site, geofence, impact type, claim |
+| POST | `/api/cloudinary/sign` | Signed upload params (includes `phash`, optional `notification_url`) |
+| POST | `/api/cloudinary/webhook` | Signature-verified Cloudinary notifications → ledger |
+| GET/POST | `/api/assets` | List (filter by project, category, verdict, date) / register an upload |
+| GET/PATCH/DELETE | `/api/assets/[id]` | Detail with integrity; edit metadata; delete (Cloudinary first) |
+| POST | `/api/assets/[id]/verify` | Run all integrity checks |
+| POST | `/api/assets/[id]/review` | Human approve/reject |
+| GET | `/api/review-queue` | Review/Flagged assets awaiting a decision |
+| GET | `/api/ledger` · `/api/ledger/verify` | Ledger entries · server-side chain verification |
+| GET/POST | `/api/ledger/anchor` | List / create Merkle anchors |
+| GET | `/api/projects/[id]/suggested-comparisons` | Same-spot before/after candidates |
+| GET/POST | `/api/comparisons` · GET `/api/comparisons/[id]` | Saved pairs |
+| POST | `/api/comparisons/[id]/metric` | Save a measured change + mask (+ satellite cross-check) |
+| POST | `/api/comparisons/[id]/reel` | Build a 9:16 or 1:1 Cloudinary reel |
+| GET/POST | `/api/projects/[id]/reports` · PATCH `/api/reports/[id]` | Grounded reports; number-checked edits |
+| GET | `/api/qr?url=` | SVG QR code |
 
-## Build Roadmap
-
-This project is built in four sequential phases, each documented in the [`docs/`](./docs) directory:
-
-- [x] [**Phase 1 — Foundation & Media Management**](./docs/PHASE1_FOUNDATION_AND_MEDIA_MANAGEMENT.md): projects, signed Cloudinary uploads, gallery, manual tags. *(Implemented & Active)*
-- [ ] [**Phase 2 — AI Understanding & Auto-Organization**](./docs/PHASE2_AI_UNDERSTANDING_AND_AUTO_ORGANIZATION.md): automatic tagging + domain categorization.
-- [ ] [**Phase 3 — Intelligent Search & Evidence Comparison**](./docs/PHASE3_INTELLIGENT_SEARCH_AND_EVIDENCE_COMPARISON.md): semantic search + before/after slider.
-- [ ] [**Phase 4 — Impact Intelligence & Reporting**](./docs/PHASE4_IMPACT_REPORTING.md): grounded LLM reports, PDF export, full traceability, dashboard.
-
-## Project Structure
+## Project structure
 
 ```
-ai-media-platform/
-├── docs/                       # Detailed specifications for Phases 1–4
-├── prisma/
-│   ├── schema.prisma           # User, Project, MediaAsset, AiTag, Category,
-│   │                           #   MediaEmbedding, Comparison, Report, AssetAuditLog
-│   └── migrations/
-├── lib/
-│   ├── db.ts                   # Prisma client singleton
-│   ├── cloudinary.ts           # Signed upload params + destroy helper
-│   ├── ai/
-│   │   ├── categoryMapping.ts  # Raw label -> domain category
-│   │   ├── visionFallback.ts   # External Vision API fallback tagging
-│   │   ├── embeddings.ts       # OpenAI embedding generation
-│   │   └── captioning.ts       # Optional GPT-4o-mini vision captioning
-│   ├── search/
-│   │   ├── vectorSearch.ts     # pgvector cosine-similarity query
-│   │   └── pairing.ts          # Before/after candidate grouping
-│   ├── reports/
-│   │   ├── factAssembly.ts     # Structured facts — no AI
-│   │   ├── narrativeGen.ts     # Grounded LLM narrative generation
-│   │   └── pdfExport.ts        # Puppeteer HTML -> PDF
-│   └── audit/
-│       └── logEvent.ts         # Traceability log helper
-├── app/
-│   ├── api/                    # All route handlers (see API Summary above)
-│   ├── projects/               # Project list, gallery, dashboard, report builder pages
-│   ├── search/                 # Global semantic search page
-│   └── components/             # UploadModal, GalleryGrid, FilterBar, AiTagChips,
-│                                #   CompareSlider, ReportBuilder, TraceabilityTimeline,
-│                                #   ImpactCharts
-└── .env.example
+app/
+  api/…                         route handlers (above)
+  projects/[id]/                gallery + integrity bar
+  projects/[id]/compare/…       pairs, slider, change meter, reel
+  projects/[id]/report/         printable grounded report
+  review/  ledger/  verify/[assetId]/
+components/                     TrustBadge, CheckList, ChainVerifier, ChangeMeter, ReelPanel, …
+lib/
+  integrity/                    run.ts (orchestrator), score.ts, checks/*
+  ledger-core.ts / ledger.ts    hash chain (shared browser/server) and appends
+  change-metric.ts              ExGR / water classification + change mask
+  reel.ts                       Cloudinary card rendering + splice URL
+  reports/                      facts (no AI) + grounded narrative
+  cloudinary.ts / cloudinary-url.ts / derivatives.ts
+prisma/                         schema, migrations, seed.ts
 ```
 
-## Configuration
-
-Environment variables go in `.env.local` (see `.env.example` for the full template):
-
-```bash
-# Database
-DATABASE_URL=postgresql://user:password@host:5432/dbname
-
-# Cloudinary
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
-
-# AI
-OPENAI_API_KEY=sk-...
-GOOGLE_VISION_API_KEY=...        # only needed if the Cloudinary AI add-on is unavailable
-
-# Auth
-NEXTAUTH_SECRET=generate-a-random-string
-```
+## Known limits
+- The Trust Score is a heuristic. Web Detection misses private reuse, EXIF can be forged (and messaging apps strip it), 10 m satellite pixels can't see individual saplings, and "looks AI-generated" answers are unreliable; each check reports its confidence.
+- RGB green cover is noisier on handheld photos than in the agronomy studies behind it; results carry an error band and need aligned pairs.
+- Field-video transcription/subtitles and AI Video Analysis clip selection are not implemented; reels use the first seconds of verified clips.
+- Signing in is optional for the demo; anonymous actions are attributed to the demo user in the ledger.
 
 ## License
 
-This project is licensed under the MIT License.
+MIT

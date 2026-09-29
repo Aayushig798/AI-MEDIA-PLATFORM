@@ -17,6 +17,7 @@ import {
   Layers
 } from "lucide-react";
 import { CATEGORIES } from "./GalleryFilterBar";
+import { TrustBadge, IntegritySummary } from "./TrustBadge";
 
 interface StagedFile {
   id: string;
@@ -27,9 +28,10 @@ interface StagedFile {
   manualLocation: string;
   manualNotes: string;
   capturedAt: string;
-  status: "idle" | "uploading" | "success" | "error";
+  status: "idle" | "uploading" | "verifying" | "success" | "error";
   progress: number;
   errorMessage?: string;
+  integrity?: IntegritySummary | null;
 }
 
 interface UploadModalProps {
@@ -51,6 +53,7 @@ export function UploadModal({
   const [isDragging, setIsDragging] = useState(false);
   const [batchUploading, setBatchUploading] = useState(false);
   const [batchCategory, setBatchCategory] = useState("Environmental");
+  const [autoVerify, setAutoVerify] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -125,16 +128,6 @@ export function UploadModal({
     });
   };
 
-  // Helper to convert file to Base64 data URL
-  const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(file);
-    });
-  };
-
   const uploadSingleAsset = async (staged: StagedFile): Promise<boolean> => {
     try {
       updateStagedField(staged.id, "status", "uploading");
@@ -152,12 +145,17 @@ export function UploadModal({
       }
 
       const signData = await signRes.json();
-      const { signature, timestamp, apiKey, cloudName, folder } = signData;
+      const { signature, apiKey, cloudName, params: signedParams } = signData;
+      if (!apiKey || !cloudName || cloudName === "demo") {
+        throw new Error("Cloudinary is not configured on the server");
+      }
 
       updateStagedField(staged.id, "progress", 30);
 
       let publicId = "";
       let secureUrl = "";
+      let etag: string | null = null;
+      let phash: string | null = null;
       let resourceType = staged.resourceType;
       let format = staged.file.name.split(".").pop() || (resourceType === "video" ? "mp4" : "jpg");
       let bytes = staged.file.size;
@@ -173,58 +171,37 @@ export function UploadModal({
         // ignore
       }
 
-      // Step 2: Attempt direct upload to Cloudinary
-      let uploadedToCloudinary = false;
-
-      // Only attempt network upload if we have an API key and valid cloud name
-      if (apiKey && apiKey !== "" && cloudName && cloudName !== "demo") {
-        try {
-          const uploadFormData = new FormData();
-          uploadFormData.append("file", staged.file);
-          uploadFormData.append("api_key", apiKey);
-          uploadFormData.append("timestamp", timestamp.toString());
-          uploadFormData.append("signature", signature);
-          uploadFormData.append("folder", folder);
-
-          updateStagedField(staged.id, "progress", 50);
-
-          const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
-          const cldRes = await fetch(uploadUrl, {
-            method: "POST",
-            body: uploadFormData,
-          });
-
-          if (cldRes.ok) {
-            const cldData = await cldRes.json();
-            publicId = cldData.public_id;
-            secureUrl = cldData.secure_url;
-            resourceType = cldData.resource_type || resourceType;
-            format = cldData.format || format;
-            bytes = cldData.bytes || bytes;
-            width = cldData.width || width;
-            height = cldData.height || height;
-            uploadedToCloudinary = true;
-          } else {
-            console.warn("Cloudinary direct upload responded with:", await cldRes.text());
-          }
-        } catch (cldErr) {
-          console.warn("Cloudinary upload failed over network, using fallback storage:", cldErr);
-        }
+      // Step 2: Direct signed upload to Cloudinary. Every signed parameter
+      // (folder, phash, timestamp, notification_url) must be sent exactly as signed.
+      const uploadFormData = new FormData();
+      uploadFormData.append("file", staged.file);
+      uploadFormData.append("api_key", apiKey);
+      uploadFormData.append("signature", signature);
+      for (const [key, value] of Object.entries(signedParams as Record<string, string>)) {
+        uploadFormData.append(key, value);
       }
 
-      // Fallback for development / mock mode when real Cloudinary API credentials aren't active
-      if (!uploadedToCloudinary) {
-        const uuidStr = Math.random().toString(36).substring(2, 9);
-        publicId = `${folder}/${uuidStr}_${staged.file.name.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-        
-        // If file is an image, convert to data URL so it displays immediately and offline!
-        if (staged.resourceType === "image" && staged.file.size < 5 * 1024 * 1024) {
-          secureUrl = await fileToDataUrl(staged.file);
-        } else {
-          // Sample Cloudinary CDN delivery URL for video or large files
-          secureUrl = `https://res.cloudinary.com/${cloudName || "demo"}/image/upload/${folder}/${uuidStr}.jpg`;
-        }
+      updateStagedField(staged.id, "progress", 50);
+
+      const cldRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+        method: "POST",
+        body: uploadFormData,
+      });
+      const cldData = await cldRes.json();
+      if (!cldRes.ok) {
+        throw new Error(cldData?.error?.message || "Cloudinary rejected the upload");
       }
+
+      publicId = cldData.public_id;
+      secureUrl = cldData.secure_url;
+      resourceType = cldData.resource_type || resourceType;
+      format = cldData.format || format;
+      bytes = cldData.bytes || bytes;
+      width = cldData.width || width;
+      height = cldData.height || height;
+      etag = cldData.etag || null;
+      // Cloudinary drops leading zeros from the 64-bit hash
+      phash = typeof cldData.phash === "string" ? cldData.phash.toLowerCase().padStart(16, "0") : null;
 
       updateStagedField(staged.id, "progress", 80);
 
@@ -242,6 +219,8 @@ export function UploadModal({
         manualLocation: staged.manualLocation || null,
         manualNotes: staged.manualNotes || null,
         capturedAt: staged.capturedAt ? new Date(staged.capturedAt).toISOString() : new Date().toISOString(),
+        etag,
+        phash,
       };
 
       const dbRes = await fetch("/api/assets", {
@@ -250,12 +229,25 @@ export function UploadModal({
         body: JSON.stringify(assetPayload),
       });
 
+      const dbJson = await dbRes.json();
       if (!dbRes.ok) {
-        const errJson = await dbRes.json();
-        throw new Error(errJson.error || "Failed to persist media asset to database");
+        throw new Error(dbJson.error || "Failed to persist media asset to database");
       }
 
       updateStagedField(staged.id, "progress", 100);
+
+      // Step 4: Integrity Engine (duplicates, pHash, web, EXIF, weather, AI auditor...)
+      if (autoVerify) {
+        updateStagedField(staged.id, "status", "verifying");
+        try {
+          const vRes = await fetch(`/api/assets/${dbJson.asset.id}/verify`, { method: "POST" });
+          const vJson = await vRes.json();
+          if (vJson.integrity) updateStagedField(staged.id, "integrity", vJson.integrity);
+        } catch (verifyErr) {
+          console.warn("Verification failed after upload:", verifyErr);
+        }
+      }
+
       updateStagedField(staged.id, "status", "success");
       return true;
     } catch (err: any) {
@@ -368,6 +360,17 @@ export function UploadModal({
                   </button>
                 </div>
 
+                <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoVerify}
+                    onChange={(e) => setAutoVerify(e.target.checked)}
+                    disabled={batchUploading}
+                    className="accent-emerald-500"
+                  />
+                  Verify automatically after upload
+                </label>
+
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">Apply Category to All:</span>
                   <select
@@ -424,9 +427,15 @@ export function UploadModal({
                               <Loader2 className="w-3 h-3 animate-spin" /> Uploading ({item.progress}%)
                             </span>
                           )}
+                          {item.status === "verifying" && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-cyan-300 font-medium mt-1">
+                              <Loader2 className="w-3 h-3 animate-spin" /> Running integrity checks
+                            </span>
+                          )}
                           {item.status === "success" && (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium mt-1">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium mt-1">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
+                              {item.integrity && <TrustBadge integrity={item.integrity} />}
                             </span>
                           )}
                           {item.status === "error" && (

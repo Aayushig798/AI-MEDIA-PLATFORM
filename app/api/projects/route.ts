@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getActor } from "@/lib/auth";
+import { parseProjectIntegrityFields } from "@/lib/project-fields";
 
 export async function GET() {
   try {
     const projects = await db.project.findMany({
       orderBy: { createdAt: "desc" },
+      include: { _count: { select: { assets: true } } },
     });
     return NextResponse.json({ success: true, projects });
   } catch (error: any) {
@@ -30,21 +31,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Attempt to get logged-in user or fallback to seeded demo user
-    const session = await getServerSession(authOptions);
-    const userId = (session?.user as any)?.id || "usr_demo123";
+    const fields = parseProjectIntegrityFields(body);
+    if ("error" in fields) {
+      return NextResponse.json({ success: false, error: fields.error }, { status: 400 });
+    }
 
-    // Ensure user exists in database
-    let user = await db.user.findUnique({ where: { id: userId } });
+    const actor = await getActor();
+    const user = await db.user.findUnique({ where: { id: actor.id } });
     if (!user) {
-      user = await db.user.create({
-        data: {
-          id: userId,
-          email: session?.user?.email || "demo@impactmedia.org",
-          name: session?.user?.name || "Field Officer Elena",
-          password: "demo123_plain_or_hash",
-        },
-      });
+      return NextResponse.json(
+        { success: false, error: "Demo user missing. Run `npx prisma db seed` first." },
+        { status: 500 }
+      );
     }
 
     const project = await db.project.create({
@@ -54,6 +52,7 @@ export async function POST(req: NextRequest) {
         location: location?.trim() || null,
         startDate: startDate ? new Date(startDate) : null,
         createdBy: user.id,
+        ...fields.data,
       },
     });
 

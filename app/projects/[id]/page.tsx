@@ -19,14 +19,16 @@ import { GalleryFilterBar } from "@/components/GalleryFilterBar";
 import { GalleryGrid, MediaAssetItem } from "@/components/GalleryGrid";
 import { UploadModal } from "@/components/UploadModal";
 import { AssetDetailModal } from "@/components/AssetDetailModal";
+import { ProjectIntegrityBar, ProjectIntegrityFields } from "@/components/ProjectIntegrityBar";
 
-interface ProjectDetail {
+interface ProjectDetail extends ProjectIntegrityFields {
   id: string;
   name: string;
   description: string | null;
   location: string | null;
   startDate: string | null;
   createdAt: string;
+  assets?: MediaAssetItem[];
   _count?: {
     assets: number;
   };
@@ -46,6 +48,7 @@ export default function ProjectGalleryPage() {
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [verdictFilter, setVerdictFilter] = useState("ALL");
 
   // Modals
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -81,6 +84,9 @@ export default function ProjectGalleryPage() {
       if (toDate) {
         queryParams.append("to", toDate);
       }
+      if (verdictFilter !== "ALL") {
+        queryParams.append("verdict", verdictFilter);
+      }
 
       const res = await fetch(`/api/assets?${queryParams.toString()}`);
       const data = await res.json();
@@ -92,7 +98,7 @@ export default function ProjectGalleryPage() {
     } finally {
       setLoadingAssets(false);
     }
-  }, [projectId, selectedCategory, fromDate, toDate]);
+  }, [projectId, selectedCategory, fromDate, toDate, verdictFilter]);
 
   useEffect(() => {
     fetchProjectInfo();
@@ -106,6 +112,7 @@ export default function ProjectGalleryPage() {
     setSelectedCategory("ALL");
     setFromDate("");
     setToDate("");
+    setVerdictFilter("ALL");
   };
 
   const handleUploadComplete = () => {
@@ -118,6 +125,7 @@ export default function ProjectGalleryPage() {
       prev.map((a) => (a.id === updatedAsset.id ? updatedAsset : a))
     );
     setSelectedAsset(updatedAsset);
+    fetchProjectInfo();
   };
 
   const handleAssetDeleted = (deletedId: string) => {
@@ -180,7 +188,7 @@ export default function ProjectGalleryPage() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Verified Project
+                {project.impactType.charAt(0) + project.impactType.slice(1).toLowerCase()} project
               </span>
 
               {project.startDate && (
@@ -228,6 +236,19 @@ export default function ProjectGalleryPage() {
           </div>
         </div>
       </div>
+
+      {/* Integrity summary, verify-all, and project evidence settings */}
+      <ProjectIntegrityBar
+        project={project}
+        assets={project.assets ?? assets}
+        verdictFilter={verdictFilter}
+        onVerdictFilter={setVerdictFilter}
+        onAssetsVerified={() => {
+          fetchAssets();
+          fetchProjectInfo();
+        }}
+        onProjectUpdated={(p) => setProject((prev) => (prev ? { ...prev, ...p } : prev))}
+      />
 
       {/* Filter Bar */}
       <GalleryFilterBar

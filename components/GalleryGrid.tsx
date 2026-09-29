@@ -2,6 +2,7 @@
 
 import { Video, Image as ImageIcon, MapPin, Calendar, HardDrive, Play } from "lucide-react";
 import { getThumbnailUrl } from "@/lib/cloudinary-url";
+import { TrustBadge, IntegritySummary } from "./TrustBadge";
 
 export interface MediaAssetItem {
   id: string;
@@ -20,6 +21,8 @@ export interface MediaAssetItem {
   uploadedBy: string;
   createdAt: string;
   updatedAt: string;
+  claimText?: string | null;
+  integrity?: IntegritySummary | null;
 }
 
 interface GalleryGridProps {
@@ -104,18 +107,10 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                 </span>
               </div>
 
-              {/* Category Badge */}
-              {asset.manualCategory && (
-                <div className="absolute top-2.5 right-2.5">
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border backdrop-blur-md ${getCategoryColor(
-                      asset.manualCategory
-                    )}`}
-                  >
-                    {asset.manualCategory}
-                  </span>
-                </div>
-              )}
+              {/* Trust Score Badge */}
+              <div className="absolute top-2.5 right-2.5">
+                <TrustBadge integrity={asset.integrity} />
+              </div>
 
               {/* Video Play Overlay */}
               {isVideo && (
@@ -140,6 +135,15 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
             {/* Content Details */}
             <div className="p-3.5 flex-1 flex flex-col justify-between">
               <div>
+                {asset.manualCategory && (
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 mb-1.5 rounded-md text-[10px] font-semibold border ${getCategoryColor(
+                      asset.manualCategory
+                    )}`}
+                  >
+                    {asset.manualCategory}
+                  </span>
+                )}
                 {/* Location text */}
                 {asset.manualLocation ? (
                   <div className="flex items-center gap-1 text-[11px] text-teal-400 font-medium truncate mb-1">

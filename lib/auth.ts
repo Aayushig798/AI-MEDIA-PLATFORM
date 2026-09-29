@@ -1,6 +1,9 @@
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+
+export const DEMO_USER_ID = "usr_demo123";
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -14,41 +17,15 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email) {
-          return null;
-        }
+        if (!credentials?.email || !credentials.password) return null;
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email },
-        });
+        const user = await db.user.findUnique({ where: { email: credentials.email.toLowerCase() } });
+        if (!user) return null;
 
-        // For demo convenience, allow demo@impactmedia.org or any valid user
-        if (user) {
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name || "Field Officer",
-          };
-        }
+        const valid = await bcrypt.compare(credentials.password, user.password);
+        if (!valid) return null;
 
-        // Auto-seed demo user if requested
-        if (credentials.email === "demo@impactmedia.org") {
-          const newUser = await db.user.create({
-            data: {
-              id: "usr_demo123",
-              email: "demo@impactmedia.org",
-              name: "Field Officer Elena",
-              password: credentials.password || "demo123",
-            },
-          });
-          return {
-            id: newUser.id,
-            email: newUser.email,
-            name: newUser.name || "Field Officer",
-          };
-        }
-
-        return null;
+        return { id: user.id, email: user.email, name: user.name || "Field Officer" };
       },
     }),
   ],
@@ -66,8 +43,17 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
   },
-  pages: {
-    signIn: "/auth/signin",
-  },
-  secret: process.env.NEXTAUTH_SECRET || "impact-platform-super-secret-default-key-32chars",
+  secret: process.env.NEXTAUTH_SECRET,
 };
+
+/**
+ * The user acting on this request. Signing in is optional for the demo, so
+ * anonymous requests act as the seeded demo field officer; the ledger records
+ * which one it was.
+ */
+export async function getActor(): Promise<{ id: string; label: string; signedIn: boolean }> {
+  const session = await getServerSession(authOptions);
+  const id = (session?.user as any)?.id as string | undefined;
+  if (id) return { id, label: session?.user?.email || id, signedIn: true };
+  return { id: DEMO_USER_ID, label: `${DEMO_USER_ID} (anonymous demo session)`, signedIn: false };
+}
