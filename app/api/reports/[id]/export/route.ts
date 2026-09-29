@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { assembleProjectFacts } from "@/lib/reports/factAssembly";
+import { assembleProjectFacts, effectiveVerdict } from "@/lib/reports/factAssembly";
+import { prisma } from "@/lib/db";
+import { publicBaseUrl } from "@/lib/cloudinary";
+import { withTransformation } from "@/lib/cloudinary-url";
+import QRCode from "qrcode";
 import { buildReportHtml, renderReportPdf } from "@/lib/reports/pdfExport";
 
 export async function GET(
@@ -31,6 +35,21 @@ export async function GET(
     // Assemble facts
     const facts = await assembleProjectFacts(report.projectId);
 
+    // Integrity verdicts (PostgreSQL only) and QR codes to each public Verify page
+    const origin = process.env.PUBLIC_BASE_URL ? publicBaseUrl()! : new URL(req.url).origin;
+    const integrityRows = await prisma.assetIntegrity
+      .findMany({
+        where: { asset: { projectId: report.projectId } },
+        select: { assetId: true, status: true, verdict: true, reviewDecision: true, trustScore: true },
+      })
+      .catch(() => []);
+    const integrityById = new Map(integrityRows.map((r) => [r.assetId, r]));
+    const verdictOf = (id: string) => effectiveVerdict(integrityById.get(id));
+    const qrFor = (assetId: string) =>
+      QRCode.toDataURL(`${origin}/verify/${assetId}`, { width: 160, margin: 1 }).catch(() => null);
+    // Print-sized, evidence-grade ("transcoded") derivative instead of the full original
+    const printUrl = (url: string) => withTransformation(url, "c_fit,w_900/f_jpg,q_auto");
+
     // Fetch comparisons
     const comparisons = await db.comparison.findMany({
       where: { projectId: report.projectId },
@@ -44,10 +63,18 @@ export async function GET(
           db.mediaAsset.findUnique({ where: { id: c.afterAssetId } }),
         ]);
 
+        const measuredFact = facts.measuredChanges.find((m) => m.comparisonId === c.id);
+        const measured = measuredFact
+          ? `${measuredFact.metric === "GREEN_COVER" ? "Green cover" : "Water area"} ${measuredFact.beforePct}% → ${measuredFact.afterPct}% (${measuredFact.deltaPp > 0 ? "+" : ""}${measuredFact.deltaPp} pp)`
+          : null;
+
         return {
           id: c.id,
-          beforeUrl: before?.secureUrl || "",
-          afterUrl: after?.secureUrl || "",
+          flagged: verdictOf(c.beforeAssetId) === "FLAGGED" || verdictOf(c.afterAssetId) === "FLAGGED",
+          measured,
+          qrDataUrl: after ? await qrFor(after.id) : null,
+          beforeUrl: before?.secureUrl ? printUrl(before.secureUrl) : "",
+          afterUrl: after?.secureUrl ? printUrl(after.secureUrl) : "",
           beforeDate: before?.capturedAt
             ? new Date(before.capturedAt).toISOString().split("T")[0]
             : null,
@@ -72,14 +99,17 @@ export async function GET(
       take: 6,
     });
 
-    const formattedAssets = selectedAssets.map((a: any) => ({
+    const formattedAssets = await Promise.all(selectedAssets.map(async (a: any) => ({
       id: a.id,
-      url: a.secureUrl,
+      url: printUrl(a.secureUrl),
+      trustScore: integrityById.get(a.id)?.trustScore ?? null,
+      verdict: verdictOf(a.id),
+      qrDataUrl: await qrFor(a.id),
       category: a.manualCategory,
       location: a.manualLocation,
       capturedAt: a.capturedAt ? a.capturedAt.toISOString() : null,
       tags: a.aiTags?.map((t: any) => t.label) || [],
-    }));
+    })));
 
     // Build print HTML
     const html = buildReportHtml({
@@ -95,8 +125,12 @@ export async function GET(
         verifiedComparisonsCount: facts.verifiedComparisonsCount,
         totalComparisons: facts.totalComparisons,
       },
-      comparisons: enrichedComparisons.filter(c => c.beforeUrl && c.afterUrl),
-      selectedAssets: formattedAssets,
+      // Pairs involving a flagged photo are never presented as evidence
+      comparisons: enrichedComparisons.filter((c) => c.beforeUrl && c.afterUrl && !c.flagged),
+      selectedAssets: formattedAssets.filter((a) => a.verdict !== "FLAGGED"),
+      integrity: facts.integrity,
+      ledger: facts.ledger,
+      verifyBaseUrl: origin,
     });
 
     // Render PDF with Puppeteer

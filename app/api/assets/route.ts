@@ -21,12 +21,35 @@ export async function GET(req: NextRequest) {
 
     const where: any = {};
 
-    // Integrity Engine verdict filter (VERIFIED | REVIEW | FLAGGED | UNVERIFIED)
+    // Integrity Engine verdict filter (VERIFIED | REVIEW | FLAGGED | UNVERIFIED).
+    // A reviewer's decision overrides the machine verdict.
+    const and: any[] = [];
     if (verdict === "UNVERIFIED") {
-      where.AND = [{ OR: [{ integrity: null }, { integrity: { verdict: null } }] }];
-    } else if (verdict === "VERIFIED" || verdict === "REVIEW" || verdict === "FLAGGED") {
-      where.integrity = { verdict };
+      and.push({ OR: [{ integrity: null }, { integrity: { status: { not: "DONE" } } }] });
+    } else if (verdict === "VERIFIED") {
+      and.push({
+        integrity: {
+          status: "DONE",
+          OR: [{ reviewDecision: "APPROVED" }, { reviewDecision: null, verdict: "VERIFIED" }],
+        },
+      });
+    } else if (verdict === "FLAGGED") {
+      and.push({
+        integrity: {
+          status: "DONE",
+          OR: [{ reviewDecision: "REJECTED" }, { reviewDecision: null, verdict: "FLAGGED" }],
+        },
+      });
+    } else if (verdict === "REVIEW") {
+      and.push({ integrity: { status: "DONE", reviewDecision: null, verdict: "REVIEW" } });
     }
+
+    // Phase 2 FR-13: filter by the AI-assigned domain category
+    const aiCategory = searchParams.get("aiCategory") || undefined;
+    if (aiCategory && aiCategory.toLowerCase() !== "all") {
+      and.push({ categories: { some: { category: { name: { equals: aiCategory, mode: "insensitive" } } } } });
+    }
+    if (and.length > 0) where.AND = and;
 
     if (projectId) {
       where.projectId = projectId;

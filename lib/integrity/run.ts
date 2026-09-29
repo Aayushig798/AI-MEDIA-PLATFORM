@@ -7,7 +7,7 @@ import { getAnalysisImageUrl, EVIDENCE_TRANSFORMATION } from "@/lib/cloudinary-u
 import { registerDerivative } from "@/lib/derivatives";
 import { appendLedger } from "@/lib/ledger";
 import { canonicalJSON, sha256Hex } from "@/lib/ledger-core";
-import { CheckResult, IntegrityContext, errored } from "./types";
+import { CHECK_LABELS, CheckResult, IntegrityContext, errored } from "./types";
 import { checkDuplicate, checkPhash } from "./checks/fingerprints";
 import { checkExif, checkLocation } from "./checks/exif";
 import { checkWeb } from "./checks/web";
@@ -166,8 +166,18 @@ export async function runIntegrity(assetId: string, actor: string) {
       settle("provenance", () => checkProvenance(ctx)),
     ]);
 
-    const checks = [duplicate, phash, web, exif, location, weather, satellite, claim, provenance];
-    const { trustScore, verdict } = scoreChecks(checks);
+    const checks: CheckResult[] = [duplicate, phash, web, exif, location, weather, satellite, claim, provenance];
+    const { trustScore, verdict, evidenceChecks, capped } = scoreChecks(checks);
+    if (capped) {
+      checks.push({
+        id: "coverage",
+        label: CHECK_LABELS.coverage,
+        status: "warn",
+        penalty: 0,
+        confidence: "high",
+        summary: `Only ${evidenceChecks} check${evidenceChecks === 1 ? "" : "s"} could run on this asset, too few to verify it automatically; a reviewer should confirm it.`,
+      });
+    }
     const checksJson = JSON.parse(JSON.stringify(checks)) as Prisma.InputJsonValue;
 
     const integrity = await db.assetIntegrity.update({

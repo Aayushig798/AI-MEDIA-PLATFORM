@@ -2,6 +2,12 @@ import QRCode from "qrcode";
 import type { ChangeMetric, MediaAsset, Project } from "@prisma/client";
 import { cloudinary, uploadGenerated, publicBaseUrl } from "@/lib/cloudinary";
 import { encodeOverlayText, overlayId } from "@/lib/cloudinary-url";
+import { pickClipStart } from "@/lib/clip-picker";
+
+/** Field-video voice notes are transcribed at upload (Cloudinary auto_transcription) when enabled. */
+export function transcriptionEnabled(): boolean {
+  return process.env.CLOUDINARY_AUTO_TRANSCRIPTION === "true";
+}
 
 /**
  * Measured Impact Reel, built entirely from Cloudinary transformations:
@@ -150,8 +156,33 @@ export async function buildReel(input: ReelInput) {
   // 5. One URL: base + cross-faded splices.
   const imageSegment = (id: string, seconds = IMAGE_SECONDS) =>
     `${TRANSITION},l_${overlayId(id)}/du_${seconds}/${frame}/fl_layer_apply`;
-  const clipSegment = (clip: MediaAsset) =>
-    `${TRANSITION},l_video:${overlayId(clip.cloudinaryPublicId)},so_1,du_${CLIP_SECONDS}/${frame}/fl_layer_apply`;
+  // 5a. Field clips: AI Vision picks the moment that shows the claimed work; when
+  // transcription is on, the voice note is burned in as subtitles on a rendered clip.
+  const clipPicks = await Promise.all(clips.map((c) => pickClipStart(c, project, CLIP_SECONDS)));
+  const clipIds = await Promise.all(
+    clips.map(async (clip, i) => {
+      if (!transcriptionEnabled()) return { id: clip.cloudinaryPublicId, trimmed: false };
+      try {
+        const url =
+          `https://res.cloudinary.com/${cloudName()}/video/upload/` +
+          [
+            // Subtitles first (their timings are relative to the full video), then trim and frame.
+            `l_subtitles:arial_40:${overlayId(clip.cloudinaryPublicId)}.transcript/fl_layer_apply,g_south,y_60`,
+            `so_${clipPicks[i].start},du_${CLIP_SECONDS}`,
+            frame,
+          ].join("/") +
+          `/${clip.cloudinaryPublicId}.mp4`;
+        return { id: await renderCard(url, `${prefix}_clip${i}`, "video"), trimmed: true };
+      } catch (err: any) {
+        console.warn(`[reel] subtitles unavailable for ${clip.id}, using the raw clip:`, err?.message || err);
+        return { id: clip.cloudinaryPublicId, trimmed: false };
+      }
+    })
+  );
+  const clipSegment = (_clip: MediaAsset, i: number) =>
+    clipIds[i].trimmed
+      ? `${TRANSITION},l_video:${overlayId(clipIds[i].id)}/${frame}/fl_layer_apply`
+      : `${TRANSITION},l_video:${overlayId(clipIds[i].id)},so_${clipPicks[i].start},du_${CLIP_SECONDS}/${frame}/fl_layer_apply`;
 
   const transformation = [
     frame,
@@ -180,5 +211,6 @@ export async function buildReel(input: ReelInput) {
     deliveryUrl,
     transformation,
     cards: { titleId, beforeCard, afterCard, metricCard, outroCard, qrId },
+    clipPicks: clips.map((c, i) => ({ assetId: c.id, ...clipPicks[i], subtitled: clipIds[i].trimmed })),
   };
 }

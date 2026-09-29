@@ -104,6 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           deliveryUrl: reel.deliveryUrl,
           metricId: metric?.id ?? null,
           sourceAssetIds,
+          clipPicks: reel.clipPicks,
         },
       });
     }

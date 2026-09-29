@@ -10,7 +10,8 @@ export type CheckId =
   | "weather"
   | "satellite"
   | "claim"
-  | "provenance";
+  | "provenance"
+  | "coverage";
 
 export type CheckStatus = "pass" | "warn" | "fail" | "skipped" | "error";
 export type Confidence = "high" | "medium" | "low";
@@ -60,6 +61,7 @@ export const CHECK_LABELS: Record<CheckId, string> = {
   satellite: "Satellite plausibility",
   claim: "Shows what the claim says (AI auditor)",
   provenance: "AI-generated / edited signals",
+  coverage: "Evidence coverage",
 };
 
 export function skipped(id: CheckId, summary: string, details?: Record<string, unknown>): CheckResult {

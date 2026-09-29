@@ -9,6 +9,7 @@ import { withTransformation, EVIDENCE_TRANSFORMATION, getThumbnailUrl } from "@/
 import { TrustBadge, effectiveVerdict } from "@/components/TrustBadge";
 import { CheckList, CheckResultView } from "@/components/CheckList";
 import { ChainVerifier } from "@/components/ChainVerifier";
+import { AskAuditor } from "@/components/AskAuditor";
 
 export const dynamic = "force-dynamic";
 
@@ -252,6 +253,8 @@ export default async function VerifyPage({ params }: { params: { assetId: string
           )}
         </div>
       )}
+
+      <AskAuditor assetId={asset.id} />
 
       <ChainVerifier assetId={asset.id} title="This asset's tamper-evident history" />
     </div>

@@ -1,4 +1,7 @@
 import OpenAI from "openai";
+import { prisma } from "@/lib/db";
+import { generateImageCaption } from "@/lib/ai/captioning";
+import { getOptimizedVisionUrl } from "@/lib/cloudinary-url";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/audit/logEvent";
 
@@ -107,6 +110,24 @@ export async function embedQueryText(query: string): Promise<number[]> {
  * Builds text summary for an asset from tags, categories, location, notes
  * and persists the embedding into the MediaEmbedding table in pgvector.
  */
+/**
+ * One-sentence visual description for the embedding text: reuse the Cloudinary
+ * AI Vision description from the integrity run when present, else caption it.
+ */
+async function describeAsset(assetId: string, secureUrl: string, resourceType: string): Promise<string | null> {
+  try {
+    const integrity = await prisma.assetIntegrity.findUnique({ where: { assetId }, select: { checks: true } });
+    const claim = ((integrity?.checks as any[]) ?? []).find((c) => c?.id === "claim");
+    const description = claim?.details?.description;
+    if (typeof description === "string" && description.trim()) return `Visual description: ${description.trim()}`;
+  } catch {
+    // file-store mode: no integrity table
+  }
+  if (resourceType !== "image") return null;
+  const caption = await generateImageCaption(getOptimizedVisionUrl(secureUrl));
+  return caption ? `Visual description: ${caption}` : null;
+}
+
 export async function generateEmbeddingForAsset(assetId: string): Promise<number[] | null> {
   try {
     const asset = await db.mediaAsset.findUnique({
@@ -137,6 +158,7 @@ export async function generateEmbeddingForAsset(assetId: string): Promise<number
       asset.manualLocation ? `Location: ${asset.manualLocation}.` : "",
       asset.manualNotes ? `Field notes: ${asset.manualNotes}.` : "",
       asset.resourceType ? `Media type: ${asset.resourceType}.` : "",
+      (await describeAsset(asset.id, asset.secureUrl, asset.resourceType)) ?? "",
     ];
     const textSummary = textParts.filter(Boolean).join(" ");
 

@@ -22,6 +22,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { ImpactCharts } from "@/components/ImpactCharts";
+import { IntegritySummaryCards } from "@/components/IntegritySummaryCards";
+import { ImpactMap } from "@/components/ImpactMap";
 
 export default function ProjectDashboardPage() {
   const params = useParams();
@@ -210,6 +212,15 @@ export default function ProjectDashboardPage() {
           totalComparisons={stats.totalComparisons}
           verifiedComparisonsCount={stats.verifiedComparisonsCount}
         />
+
+        {/* Proof-of-Impact integrity, ledger and measured change */}
+        <IntegritySummaryCards facts={stats} projectId={projectId} />
+
+        {/* Map of verified evidence for this project */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-bold text-white">Where the verified evidence was captured</h3>
+          <ImpactMap projectId={projectId} height={380} />
+        </div>
 
         {/* Detailed Sections Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

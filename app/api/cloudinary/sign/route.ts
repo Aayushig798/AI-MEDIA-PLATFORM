@@ -5,7 +5,7 @@ import crypto from "crypto";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { projectId } = body;
+    const { projectId, resourceType } = body;
 
     if (!projectId) {
       return NextResponse.json(
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     const folderUuid = crypto.randomUUID();
-    const signedParams = generateUploadSignature(projectId, folderUuid);
+    const signedParams = generateUploadSignature(projectId, folderUuid, resourceType);
 
     return NextResponse.json({
       success: true,
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       imageMetadata: signedParams.imageMetadata,
       phash: signedParams.phash,
       notification_url: signedParams.notificationUrl,
+      auto_transcription: signedParams.autoTranscription,
     });
   } catch (error: any) {
     console.error("POST /api/cloudinary/sign error:", error);

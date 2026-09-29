@@ -16,9 +16,11 @@ export async function GET(req: NextRequest) {
     const projectId = searchParams.get("projectId") || undefined;
     const limit = Math.min(Number(searchParams.get("limit")) || 500, MAX_LIMIT);
     const order = searchParams.get("order") === "desc" ? "desc" : "asc";
+    // Paging for full-chain verification: entries with seq > afterSeq
+    const afterSeq = Number(searchParams.get("afterSeq")) || 0;
 
     const entries = await db.ledgerEntry.findMany({
-      where: { ...(assetId && { assetId }), ...(projectId && { projectId }) },
+      where: { ...(assetId && { assetId }), ...(projectId && { projectId }), ...(afterSeq > 0 && { seq: { gt: afterSeq } }) },
       orderBy: { seq: order },
       take: limit,
     });

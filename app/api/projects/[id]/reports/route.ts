@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { assembleProjectFacts, effectiveVerdict } from "@/lib/reports/factAssembly";
 import { generateNarrative } from "@/lib/reports/narrativeGen";
 import { logEvent } from "@/lib/audit/logEvent";
+import { tryAppendLedger } from "@/lib/ledger";
+import { canonicalJSON, sha256Hex } from "@/lib/ledger-core";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -84,6 +86,19 @@ export async function POST(
         generatedSummary: narrative,
         selectedAssetIds,
         createdBy: author,
+      },
+    });
+
+    // 5a. Tamper-evident record of the report itself (digest of narrative + facts)
+    await tryAppendLedger({
+      type: "REPORT_GENERATED",
+      actor: author,
+      projectId,
+      payload: {
+        reportId: report.id,
+        citedAssetIds: selectedAssetIds,
+        narrativeDigest: await sha256Hex(narrative),
+        factsDigest: await sha256Hex(canonicalJSON(JSON.parse(JSON.stringify(facts)))),
       },
     });
 

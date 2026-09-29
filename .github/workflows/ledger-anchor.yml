@@ -1,0 +1,50 @@
+name: Anchor evidence ledger
+
+# Daily: seal new ledger entries under a Merkle root and publish the root in this
+# public repository, an external timestamp the app's own database can't rewrite.
+# Needs repository secrets APP_URL (e.g. https://your-domain) and ANCHOR_TOKEN
+# (same value as the app's ANCHOR_TOKEN env var).
+
+on:
+  schedule:
+    - cron: "30 18 * * *" # 00:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  anchor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create anchor
+        id: anchor
+        run: |
+          RESPONSE=$(curl -sf -X POST "${{ secrets.APP_URL }}/api/ledger/anchor")
+          echo "$RESPONSE"
+          ID=$(echo "$RESPONSE" | jq -r '.anchor.id // empty')
+          if [ -z "$ID" ]; then echo "No new entries to anchor."; exit 0; fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "row=| $(date -u +%Y-%m-%dT%H:%MZ) | #$(echo "$RESPONSE" | jq -r '.anchor.fromSeq')–#$(echo "$RESPONSE" | jq -r '.anchor.toSeq') ($(echo "$RESPONSE" | jq -r '.anchor.entryCount')) | \`$(echo "$RESPONSE" | jq -r '.anchor.root')\` |" >> "$GITHUB_OUTPUT"
+
+      - name: Commit root
+        if: steps.anchor.outputs.id != ''
+        run: |
+          echo "${{ steps.anchor.outputs.row }}" >> ledger-anchors/ANCHORS.md
+          git config user.name "ledger-anchor-bot"
+          git config user.email "ledger-anchor-bot@users.noreply.github.com"
+          git add ledger-anchors/ANCHORS.md
+          # [skip ci] so the anchor commit doesn't trigger a redeploy
+          git commit -m "chore(ledger): anchor ${{ steps.anchor.outputs.id }} [skip ci]"
+          git push
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Link anchor to commit
+        if: steps.anchor.outputs.id != ''
+        run: |
+          curl -sf -X PATCH "${{ secrets.APP_URL }}/api/ledger/anchor/${{ steps.anchor.outputs.id }}" \
+            -H "Authorization: Bearer ${{ secrets.ANCHOR_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"externalRef\":\"https://github.com/${{ github.repository }}/commit/${sha}\"}"
