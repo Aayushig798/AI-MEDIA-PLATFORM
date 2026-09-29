@@ -1,5 +1,5 @@
 import type { MediaAsset } from "@prisma/client";
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/db";
 import { classifyTransformation, withTransformation } from "@/lib/cloudinary-url";
 import { tryAppendLedger } from "@/lib/ledger";
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { assembleProjectFacts } from "@/lib/reports/factAssembly";
+import { ungroundedNumbers } from "@/lib/reports/grounding";
 
 export async function GET(
   req: NextRequest,
@@ -74,6 +75,21 @@ export async function PATCH(
         { success: false, error: "Report not found" },
         { status: 404 }
       );
+    }
+
+    // Grounding guard: an edit may not introduce a number that isn't in the project facts.
+    if (typeof generatedSummary === "string") {
+      const facts = await assembleProjectFacts(existing.projectId);
+      const invented = ungroundedNumbers(generatedSummary, facts);
+      if (invented.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `These numbers are not in the project facts: ${invented.join(", ")}. Reports may only state measured figures.`,
+          },
+          { status: 422 }
+        );
+      }
     }
 
     const updateData: any = {};

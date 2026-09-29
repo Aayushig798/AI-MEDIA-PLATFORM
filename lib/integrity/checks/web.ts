@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/db";
 import { CHECK_LABELS, CheckResult, IntegrityContext, skipped } from "../types";
 
 interface WebImage {

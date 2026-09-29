@@ -9,8 +9,6 @@ import {
   ShieldQuestion,
   Loader2,
   Settings2,
-  Columns2,
-  FileText,
   ListChecks,
   Link2,
   Save,
@@ -143,12 +141,6 @@ export function ProjectIntegrityBar({ project, assets, verdictFilter, onVerdictF
             {verifyingAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
             {verifyingAll ? `Verifying ${progress.done}/${progress.total}` : `Verify ${pendingCount} unverified`}
           </button>
-          <Link href={`/projects/${project.id}/compare`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200">
-            <Columns2 className="w-3.5 h-3.5 text-cyan-300" /> Compare & Reel
-          </Link>
-          <Link href={`/projects/${project.id}/report`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200">
-            <FileText className="w-3.5 h-3.5 text-emerald-300" /> Impact report
-          </Link>
           <Link href={`/review?projectId=${project.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200">
             <ListChecks className="w-3.5 h-3.5 text-amber-300" /> Review queue
           </Link>

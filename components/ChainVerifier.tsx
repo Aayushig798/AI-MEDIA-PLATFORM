@@ -18,6 +18,9 @@ interface AnchorRow {
 
 const TYPE_LABELS: Record<string, string> = {
   ASSET_UPLOADED: "Uploaded",
+  AI_TAGGED: "AI tagged",
+  EMBEDDED: "Embedded for search",
+  USED_IN_COMPARISON: "Used in comparison",
   METADATA_EDITED: "Metadata edited",
   INTEGRITY_CHECKED: "Integrity checked",
   REVIEW_DECISION: "Human review",

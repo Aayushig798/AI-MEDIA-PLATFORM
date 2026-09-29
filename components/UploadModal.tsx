@@ -232,6 +232,9 @@ export function UploadModal({
           uploadFormData.append("categorization", signData.categorization || "google_tagging");
           uploadFormData.append("auto_tagging", (signData.auto_tagging ?? signData.autoTagging ?? 0.6).toString());
           uploadFormData.append("image_metadata", (signData.image_metadata ?? signData.imageMetadata ?? true).toString());
+          // Signed too: perceptual hash for the Integrity Engine, optional webhook
+          if (signData.phash) uploadFormData.append("phash", "true");
+          if (signData.notification_url) uploadFormData.append("notification_url", signData.notification_url);
 
           updateStagedField(staged.id, "progress", 50);
 

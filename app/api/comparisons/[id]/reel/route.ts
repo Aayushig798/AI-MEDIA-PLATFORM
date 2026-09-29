@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/db";
 import { getActor } from "@/lib/auth";
 import { appendLedger } from "@/lib/ledger";
 import { isCloudinaryConfigured, publicBaseUrl } from "@/lib/cloudinary";

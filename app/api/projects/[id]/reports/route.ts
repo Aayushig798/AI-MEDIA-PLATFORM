@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { assembleProjectFacts } from "@/lib/reports/factAssembly";
+import { assembleProjectFacts, effectiveVerdict } from "@/lib/reports/factAssembly";
 import { generateNarrative } from "@/lib/reports/narrativeGen";
 import { logEvent } from "@/lib/audit/logEvent";
 import { getServerSession } from "next-auth";
@@ -64,9 +64,12 @@ export async function POST(
     if (!selectedAssetIds || !Array.isArray(selectedAssetIds) || selectedAssetIds.length === 0) {
       const allAssets = await db.mediaAsset.findMany({
         where: { projectId },
-        select: { id: true },
+        include: { integrity: { select: { status: true, verdict: true, reviewDecision: true } } },
       });
-      selectedAssetIds = allAssets.map((a: any) => a.id);
+      // Cite verified (or reviewer-approved) evidence; never flagged or rejected assets.
+      const verified = allAssets.filter((a: any) => effectiveVerdict(a.integrity) === "VERIFIED");
+      const notFlagged = allAssets.filter((a: any) => effectiveVerdict(a.integrity) !== "FLAGGED");
+      selectedAssetIds = (verified.length > 0 ? verified : notFlagged).map((a: any) => a.id);
     }
 
     // 4. Save Report record
