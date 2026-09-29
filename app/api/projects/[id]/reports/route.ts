@@ -1,66 +1,118 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { getActor } from "@/lib/auth";
-import { appendLedger } from "@/lib/ledger";
-import { canonicalJSON, sha256Hex } from "@/lib/ledger-core";
-import { assembleFacts } from "@/lib/reports/facts";
-import { llmNarrative, templateNarrative } from "@/lib/reports/narrative";
+import { assembleProjectFacts } from "@/lib/reports/factAssembly";
+import { generateNarrative } from "@/lib/reports/narrativeGen";
+import { logEvent } from "@/lib/audit/logEvent";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
-export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const reports = await db.report.findMany({ where: { projectId: params.id }, orderBy: { createdAt: "desc" }, take: 10 });
-    return NextResponse.json({ success: true, reports });
+    const projectId = params.id;
+    if (!projectId) {
+      return NextResponse.json(
+        { success: false, error: "Project ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const reports = await db.report.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({ success: true, count: reports.length, reports });
   } catch (error: any) {
-    console.error(`GET /api/projects/${params.id}/reports error:`, error);
-    return NextResponse.json({ success: false, error: error.message || "Failed to list reports" }, { status: 500 });
+    console.error("GET /api/projects/[id]/reports error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to fetch reports" },
+      { status: 500 }
+    );
   }
 }
 
-/** Facts first (no AI), then a narrative strictly grounded in them. */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const project = await db.project.findUnique({ where: { id: params.id }, select: { name: true } });
-    if (!project) return NextResponse.json({ success: false, error: "Project not found" }, { status: 404 });
+    const projectId = params.id;
+    if (!projectId) {
+      return NextResponse.json(
+        { success: false, error: "Project ID is required" },
+        { status: 400 }
+      );
+    }
 
-    const facts = await assembleFacts(params.id);
-    const llm = await llmNarrative(facts);
-    const narrative = "text" in llm ? llm.text : templateNarrative(facts);
-    const narrativeBy = "text" in llm ? llm.model : "template";
+    const body = await req.json().catch(() => ({}));
+    const { title, selectedAssetIds: inputAssetIds, createdBy } = body;
 
-    const factsJson = JSON.parse(JSON.stringify(facts)) as Prisma.InputJsonValue;
+    const session = await getServerSession(authOptions);
+    const author = createdBy || (session?.user as any)?.id || "usr_demo123";
+
+    // 1. Assemble structured empirical facts without AI
+    const facts = await assembleProjectFacts(projectId);
+
+    // 2. Generate grounded narrative from facts
+    const narrative = await generateNarrative(facts);
+
+    // 3. Resolve selected asset IDs (either passed explicitly or auto-select all project assets)
+    let selectedAssetIds = inputAssetIds;
+    if (!selectedAssetIds || !Array.isArray(selectedAssetIds) || selectedAssetIds.length === 0) {
+      const allAssets = await db.mediaAsset.findMany({
+        where: { projectId },
+        select: { id: true },
+      });
+      selectedAssetIds = allAssets.map((a: any) => a.id);
+    }
+
+    // 4. Save Report record
+    const reportTitle =
+      title ||
+      `${facts.projectName} — Impact Intelligence Report (${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })})`;
+
     const report = await db.report.create({
       data: {
-        projectId: params.id,
-        title: `${project.name}: verified impact report`,
-        facts: factsJson,
-        narrative,
-        narrativeBy,
-        citedAssetIds: facts.cited.map((c) => c.id),
+        projectId,
+        title: reportTitle,
+        generatedSummary: narrative,
+        selectedAssetIds,
+        createdBy: author,
       },
     });
 
-    const actor = await getActor();
-    const factsDigest = await sha256Hex(canonicalJSON(factsJson));
-    for (const assetId of report.citedAssetIds) {
-      await appendLedger({
-        type: "REPORT_GENERATED",
-        actor: actor.label,
-        assetId,
-        projectId: params.id,
-        payload: { reportId: report.id, factsDigest, narrativeBy },
-      });
-    }
+    // 5. Retrofit audit log: log used_in_report for every selected asset
+    await Promise.all(
+      selectedAssetIds.map((assetId: string) =>
+        logEvent(
+          assetId,
+          "used_in_report",
+          {
+            reportId: report.id,
+            reportTitle: report.title,
+            createdAt: report.createdAt,
+          },
+          author
+        )
+      )
+    );
 
     return NextResponse.json(
-      { success: true, report, llmNote: "rejected" in llm ? llm.rejected : null },
+      {
+        success: true,
+        message: "Impact report generated and saved successfully",
+        report,
+      },
       { status: 201 }
     );
   } catch (error: any) {
-    console.error(`POST /api/projects/${params.id}/reports error:`, error);
-    return NextResponse.json({ success: false, error: error.message || "Failed to generate report" }, { status: 500 });
+    console.error("POST /api/projects/[id]/reports error:", error);
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to generate report" },
+      { status: 500 }
+    );
   }
 }

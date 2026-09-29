@@ -1,14 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
-import { suggestComparisons } from "@/lib/comparisons";
+import { suggestComparisons } from "@/lib/search/pairing";
+import { db } from "@/lib/db";
 
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
-    const suggestions = await suggestComparisons(params.id);
-    return NextResponse.json({ success: true, suggestions });
+    const { id } = params;
+
+    // Check project exists
+    const project = await db.project.findUnique({
+      where: { id },
+    });
+
+    if (!project) {
+      return NextResponse.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    const result = await suggestComparisons(id);
+
+    return NextResponse.json({
+      success: true,
+      projectId: id,
+      projectName: project.name,
+      count: result.suggestions.length,
+      suggestions: result.suggestions,
+      missingDateCount: result.missingDateCount,
+      missingDateAssets: result.missingDateAssets,
+      totalCandidatePairs: result.totalCandidatePairs,
+      totalImagesCount: result.totalImagesCount,
+      noQualifyingReason: result.noQualifyingReason,
+      message: result.message,
+    });
   } catch (error: any) {
     console.error(`GET /api/projects/${params.id}/suggested-comparisons error:`, error);
-    return NextResponse.json({ success: false, error: error.message || "Failed to suggest comparisons" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error.message || "Failed to load suggested comparisons" },
+      { status: 500 }
+    );
   }
 }
