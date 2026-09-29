@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { parseProjectIntegrityFields } from "@/lib/project-fields";
-import { INTEGRITY_SUMMARY } from "@/lib/integrity/summary";
+import { destroyCloudinaryAsset } from "@/lib/cloudinary";
 
 export async function GET(
   req: NextRequest,
@@ -21,7 +20,10 @@ export async function GET(
       include: {
         assets: {
           orderBy: { createdAt: "desc" },
-          include: { integrity: { select: INTEGRITY_SUMMARY } },
+          include: {
+            aiTags: true,
+            categories: { include: { category: true } },
+          },
         },
         _count: { select: { assets: true } },
       },
@@ -44,29 +46,55 @@ export async function GET(
   }
 }
 
-/** Update the Integrity Engine inputs: site coordinates, geofence, impact type, claim. */
-export async function PATCH(
+export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await req.json();
-    const fields = parseProjectIntegrityFields(body);
-    if ("error" in fields) {
-      return NextResponse.json({ success: false, error: fields.error }, { status: 400 });
+    const { id } = params;
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: "Project ID is required" },
+        { status: 400 }
+      );
     }
 
-    const existing = await db.project.findUnique({ where: { id: params.id } });
-    if (!existing) {
-      return NextResponse.json({ success: false, error: "Project not found" }, { status: 404 });
+    const project = await db.project.findUnique({
+      where: { id },
+      include: { assets: true },
+    });
+
+    if (!project) {
+      return NextResponse.json(
+        { success: false, error: "Project not found" },
+        { status: 404 }
+      );
     }
 
-    const project = await db.project.update({ where: { id: params.id }, data: fields.data });
-    return NextResponse.json({ success: true, project });
+    // Destroy all associated Cloudinary assets first
+    const assets = (project as any).assets || [];
+    for (const asset of assets) {
+      try {
+        await destroyCloudinaryAsset(asset.cloudinaryPublicId, asset.resourceType);
+      } catch (cldErr) {
+        console.warn(`Could not destroy Cloudinary asset ${asset.cloudinaryPublicId}:`, cldErr);
+      }
+    }
+
+    // Delete project from database (cascades to assets, tags, categories)
+    await db.project.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Project '${project.name}' and ${assets.length} associated media asset(s) were permanently deleted.`,
+      deletedId: id,
+    });
   } catch (error: any) {
-    console.error(`PATCH /api/projects/${params.id} error:`, error);
+    console.error(`DELETE /api/projects/${params.id} error:`, error);
     return NextResponse.json(
-      { success: false, error: error.message || "Failed to update project" },
+      { success: false, error: error.message || "Failed to delete project" },
       { status: 500 }
     );
   }

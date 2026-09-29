@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { destroyCloudinaryAsset } from "@/lib/cloudinary";
-import { getActor } from "@/lib/auth";
-import { tryAppendLedger } from "@/lib/ledger";
+import { determinePrimaryCategory } from "@/lib/ai/categoryMapping";
 
 export async function GET(
   req: NextRequest,
@@ -12,11 +11,6 @@ export async function GET(
     const { id } = params;
     const asset = await db.mediaAsset.findUnique({
       where: { id },
-      include: {
-        integrity: true,
-        webMatches: { orderBy: { kind: "asc" } },
-        derived: { orderBy: { createdAt: "desc" } },
-      },
     });
 
     if (!asset) {
@@ -36,10 +30,6 @@ export async function GET(
   }
 }
 
-const EDITABLE = ["manualCategory", "manualLocation", "manualNotes", "capturedAt", "claimText"] as const;
-// Changing these invalidates a previous verdict: the checks compare against them.
-const EVIDENCE_FIELDS = new Set(["capturedAt", "claimText"]);
-
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -47,6 +37,7 @@ export async function PATCH(
   try {
     const { id } = params;
     const body = await req.json();
+    const { manualCategory, manualLocation, manualNotes, capturedAt, categorySource, resetToAi } = body;
 
     const existing = await db.mediaAsset.findUnique({
       where: { id },
@@ -59,44 +50,61 @@ export async function PATCH(
       );
     }
 
-    const data: Record<string, unknown> = {};
-    const changes: Record<string, { from: unknown; to: unknown }> = {};
-    for (const field of EDITABLE) {
-      if (body[field] === undefined) continue;
-      let next: unknown = body[field];
-      if (field === "capturedAt") next = body[field] ? new Date(body[field]) : null;
-      else if (typeof next === "string") next = next.trim() || null;
+    // Handle "Reset to AI suggestion"
+    if (resetToAi) {
+      const tags = await db.aiTag.findMany({
+        where: { mediaAssetId: id },
+        orderBy: { confidence: "desc" },
+      });
+      const aiPrimary = determinePrimaryCategory(tags);
 
-      const prev = existing[field];
-      const same =
-        prev instanceof Date && next instanceof Date ? prev.getTime() === next.getTime() : prev === next;
-      if (!same) {
-        data[field] = next;
-        changes[field] = { from: prev, to: next };
-      }
+      // Also ensure Category and MediaAssetCategory record reflect the AI primary category
+      const cat = await db.category.upsert({
+        where: { name: aiPrimary },
+        update: {},
+        create: { name: aiPrimary },
+      });
+      await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: id } });
+      await db.mediaAssetCategory.create({
+        data: { mediaAssetId: id, categoryId: cat.id },
+      });
+
+      const updated = await db.mediaAsset.update({
+        where: { id },
+        data: {
+          manualCategory: aiPrimary,
+          categorySource: "ai",
+        },
+        include: {
+          aiTags: { orderBy: { confidence: "desc" } },
+          categories: { include: { category: true } },
+        },
+      });
+
+      return NextResponse.json({ success: true, asset: updated });
     }
 
-    if (Object.keys(changes).length === 0) {
-      return NextResponse.json({ success: true, asset: existing });
+    // If category changed or explicitly provided as user
+    let finalCategorySource = existing.categorySource;
+    if (categorySource) {
+      finalCategorySource = categorySource;
+    } else if (manualCategory !== undefined && manualCategory !== existing.manualCategory) {
+      finalCategorySource = "user";
     }
 
     const updated = await db.mediaAsset.update({
       where: { id },
-      data,
-      include: { integrity: { select: { status: true, trustScore: true, verdict: true, reviewDecision: true, computedAt: true } } },
-    });
-
-    if (Object.keys(changes).some((f) => EVIDENCE_FIELDS.has(f))) {
-      await db.assetIntegrity.updateMany({ where: { assetId: id }, data: { status: "PENDING" } });
-    }
-
-    const actor = await getActor();
-    await tryAppendLedger({
-      type: "METADATA_EDITED",
-      actor: actor.label,
-      assetId: id,
-      projectId: existing.projectId,
-      payload: { changes },
+      data: {
+        manualCategory: manualCategory !== undefined ? manualCategory : existing.manualCategory,
+        categorySource: finalCategorySource,
+        manualLocation: manualLocation !== undefined ? manualLocation : existing.manualLocation,
+        manualNotes: manualNotes !== undefined ? manualNotes : existing.manualNotes,
+        capturedAt: capturedAt !== undefined ? (capturedAt ? new Date(capturedAt) : null) : existing.capturedAt,
+      },
+      include: {
+        aiTags: { orderBy: { confidence: "desc" } },
+        categories: { include: { category: true } },
+      },
     });
 
     return NextResponse.json({ success: true, asset: updated });
@@ -144,24 +152,9 @@ export async function DELETE(
       );
     }
 
-    // Step 2: Now that Cloudinary deletion succeeded, remove from DB.
-    // Comparisons reference assets by id without a FK, so drop those first.
-    await db.comparison.deleteMany({
-      where: { OR: [{ beforeAssetId: id }, { afterAssetId: id }] },
-    });
-    await db.phashMatch.deleteMany({ where: { matchAssetId: id } });
+    // Step 2: Now that Cloudinary deletion succeeded, remove from DB
     await db.mediaAsset.delete({
       where: { id },
-    });
-
-    // The ledger keeps the asset's history; this entry records its removal.
-    const actor = await getActor();
-    await tryAppendLedger({
-      type: "ASSET_DELETED",
-      actor: actor.label,
-      assetId: id,
-      projectId: asset.projectId,
-      payload: { cloudinaryPublicId: asset.cloudinaryPublicId, sha256: asset.sha256 },
     });
 
     return NextResponse.json({
