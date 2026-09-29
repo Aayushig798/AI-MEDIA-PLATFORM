@@ -11,42 +11,241 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   name      String?
-  password  String
-  createdAt DateTime @default(now())
+  password  String // bcrypt hash
+  createdAt DateTime  @default(now())
   projects  Project[]
 }
 
+// What kind of change the project claims, used to pick satellite indices
+// and the direction of change we expect to see.
+enum ImpactType {
+  GREENING // plantation, reforestation, mangroves -> NDVI should rise
+  WATER // ponds, check dams, wells -> NDWI should rise
+  INFRASTRUCTURE // built structures, not visible to 10 m satellite pixels
+  COMMUNITY
+  OTHER
+}
+
 model Project {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  location    String?
-  startDate   DateTime?
-  createdBy   String
-  user        User     @relation(fields: [createdBy], references: [id])
-  createdAt   DateTime @default(now())
-  assets      MediaAsset[]
+  id              String       @id @default(cuid())
+  name            String
+  description     String?
+  location        String?
+  startDate       DateTime?
+  createdBy       String
+  user            User         @relation(fields: [createdBy], references: [id])
+  createdAt       DateTime     @default(now())
+  // Integrity Engine inputs
+  latitude        Float?
+  longitude       Float?
+  geofenceRadiusM Int          @default(5000)
+  impactType      ImpactType   @default(OTHER)
+  claim           String? // e.g. "Built a stone check dam and planted 2,000 saplings with tree guards"
+  assets          MediaAsset[]
+  comparisons     Comparison[]
+  reels           Reel[]
+  reports         Report[]
 }
 
 model MediaAsset {
-  id                  String   @id @default(cuid())
-  projectId           String
-  project             Project  @relation(fields: [projectId], references: [id])
-  cloudinaryPublicId  String   @unique
-  secureUrl           String
-  resourceType        String   // "image" | "video"
-  format              String
-  bytes               Int
-  width               Int?
-  height              Int?
-  manualCategory      String?
-  manualLocation       String?
-  manualNotes         String?
-  capturedAt          DateTime?
-  uploadedBy          String
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                 String          @id @default(cuid())
+  projectId          String
+  project            Project         @relation(fields: [projectId], references: [id])
+  cloudinaryPublicId String          @unique
+  secureUrl          String
+  resourceType       String // "image" | "video"
+  format             String
+  bytes              Int
+  width              Int?
+  height             Int?
+  manualCategory     String?
+  manualLocation     String?
+  manualNotes        String?
+  capturedAt         DateTime?
+  uploadedBy         String
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  // Fingerprints (filled at upload and/or by the integrity run)
+  etag               String?
+  sha256             String?
+  phash              String? // 16 hex chars from Cloudinary
+  claimText          String? // per-asset claim, overrides Project.claim
+  integrity          AssetIntegrity?
+  phashMatches       PhashMatch[]    @relation("PhashSource")
+  webMatches         WebMatch[]
+  derived            DerivedAsset[]
+}
+
+enum IntegrityStatus {
+  PENDING
+  RUNNING
+  DONE
+  ERROR
+}
+
+enum Verdict {
+  VERIFIED
+  REVIEW
+  FLAGGED
+}
+
+enum ReviewDecision {
+  APPROVED
+  REJECTED
+}
+
+model AssetIntegrity {
+  id             String          @id @default(cuid())
+  assetId        String          @unique
+  asset          MediaAsset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  status         IntegrityStatus @default(PENDING)
+  trustScore     Int?
+  verdict        Verdict?
+  checks         Json            @default("[]") // CheckResult[]
+  exif           Json?
+  gpsLat         Float?
+  gpsLng         Float?
+  takenAt        DateTime?
+  error          String?
+  reviewDecision ReviewDecision?
+  reviewNote     String?
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  computedAt     DateTime?
+  updatedAt      DateTime        @updatedAt
+}
+
+model PhashMatch {
+  id           String     @id @default(cuid())
+  assetId      String
+  asset        MediaAsset @relation("PhashSource", fields: [assetId], references: [id], onDelete: Cascade)
+  matchAssetId String
+  hamming      Int
+  crossProject Boolean
+  createdAt    DateTime   @default(now())
+
+  @@unique([assetId, matchAssetId])
+}
+
+enum WebMatchKind {
+  FULL
+  PARTIAL
+  PAGE
+}
+
+model WebMatch {
+  id        String       @id @default(cuid())
+  assetId   String
+  asset     MediaAsset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  url       String
+  kind      WebMatchKind
+  score     Float?
+  pageTitle String?
+  createdAt DateTime     @default(now())
+}
+
+// Cloudinary's Content Credentials vocabulary: "transcoded" derivatives keep
+// evidentiary value, "edited" ones are illustrative only.
+enum DerivationClass {
+  TRANSCODED
+  EDITED
+}
+
+model DerivedAsset {
+  id             String          @id @default(cuid())
+  assetId        String
+  asset          MediaAsset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  transformation String
+  url            String          @unique
+  class          DerivationClass
+  purpose        String
+  createdAt      DateTime        @default(now())
+}
+
+// Append-only, hash-chained audit log. assetId/projectId are plain strings
+// (no FK) so entries survive deletion of the thing they describe.
+model LedgerEntry {
+  id        String   @id @default(cuid())
+  seq       Int      @unique
+  type      String
+  assetId   String?
+  projectId String?
+  actor     String
+  payload   Json
+  prevHash  String
+  entryHash String
+  createdAt DateTime
+
+  @@index([assetId])
+  @@index([projectId])
+}
+
+model MerkleAnchor {
+  id          String   @id @default(cuid())
+  fromSeq     Int
+  toSeq       Int
+  entryCount  Int
+  root        String
+  externalRef String?
+  createdAt   DateTime @default(now())
+}
+
+model Comparison {
+  id            String         @id @default(cuid())
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  beforeAssetId String
+  afterAssetId  String
+  note          String?
+  createdBy     String
+  createdAt     DateTime       @default(now())
+  metrics       ChangeMetric[]
+}
+
+enum MetricKind {
+  GREEN_COVER
+  WATER_AREA
+}
+
+model ChangeMetric {
+  id           String     @id @default(cuid())
+  comparisonId String
+  comparison   Comparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  metric       MetricKind
+  beforePct    Float
+  afterPct     Float
+  deltaPp      Float
+  method       String
+  maskPublicId String?
+  maskUrl      String?
+  alignment    Json?
+  satDelta     Json?
+  createdAt    DateTime   @default(now())
+}
+
+model Reel {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comparisonId   String?
+  aspect         String // "9:16" | "1:1"
+  deliveryUrl    String
+  sourceAssetIds String[]
+  createdAt      DateTime @default(now())
+}
+
+model Report {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title         String
+  facts         Json
+  narrative     String
+  narrativeBy   String // "template" | model id
+  citedAssetIds String[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

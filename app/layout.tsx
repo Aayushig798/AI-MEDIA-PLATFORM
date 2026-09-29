@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { 
-  FolderKanban, 
-  Layers, 
-  Sparkles, 
-  ShieldCheck, 
+import {
+  FolderKanban,
+  ListChecks,
+  Link2,
+  ShieldCheck,
   UploadCloud,
   Globe2
 } from "lucide-react";
@@ -26,17 +26,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased min-h-screen flex flex-col bg-[#090d16] text-slate-100`}>
+      <body className={`${inter.variable} font-sans antialiased min-h-screen flex flex-col bg-[#090d16] text-slate-100 print:bg-white`}>
         {/* Top Notification / Phase Bar */}
-        <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border-b border-emerald-900/40 px-4 py-1.5 text-xs flex items-center justify-between">
+        <div className="print:hidden bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border-b border-emerald-900/40 px-4 py-1.5 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-400">
             <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-semibold tracking-wide uppercase text-[10px] text-emerald-300">Phase 1 Active</span>
+            <span className="font-semibold tracking-wide uppercase text-[10px] text-emerald-300">Proof-of-Impact</span>
             <span className="text-slate-400 hidden sm:inline">|</span>
-            <span className="text-slate-300 hidden sm:inline">Foundation, Direct Cloudinary Uploads & Project Media Management</span>
+            <span className="text-slate-300 hidden sm:inline">Every photo gets a Trust Score and a tamper-evident history</span>
           </div>
           <div className="flex items-center gap-3 text-slate-400 text-[11px]">
             <span className="hidden md:inline">Field Officer Session:</span>
@@ -48,7 +48,7 @@ export default function RootLayout({
         </div>
 
         {/* Main Navbar */}
-        <header className="sticky top-0 z-40 w-full glass-panel border-b border-white/5">
+        <header className="print:hidden sticky top-0 z-40 w-full glass-panel border-b border-white/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             {/* Logo */}
             <Link href="/projects" className="flex items-center gap-3 group">
@@ -77,14 +77,20 @@ export default function RootLayout({
                 <FolderKanban className="w-4 h-4 text-emerald-400" />
                 Projects
               </Link>
-              <div className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed flex items-center gap-2 title='Phase 3 feature'">
-                <Sparkles className="w-4 h-4 text-slate-600" />
-                Semantic Search <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400">Phase 3</span>
-              </div>
-              <div className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-500 cursor-not-allowed flex items-center gap-2 title='Phase 3 feature'">
-                <Layers className="w-4 h-4 text-slate-600" />
-                Compare Pairs <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400">Phase 3</span>
-              </div>
+              <Link
+                href="/review"
+                className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition flex items-center gap-2"
+              >
+                <ListChecks className="w-4 h-4 text-amber-400" />
+                Review Queue
+              </Link>
+              <Link
+                href="/ledger"
+                className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition flex items-center gap-2"
+              >
+                <Link2 className="w-4 h-4 text-cyan-400" />
+                Ledger
+              </Link>
             </nav>
 
             {/* Action CTA */}
@@ -102,25 +108,25 @@ export default function RootLayout({
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:p-0 print:max-w-none">
           {children}
         </main>
 
         {/* Global Footer */}
-        <footer className="border-t border-white/5 bg-[#070b12] py-8 text-xs text-slate-500">
+        <footer className="print:hidden border-t border-white/5 bg-[#070b12] py-8 text-xs text-slate-500">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span>EcoEvidence Platform &bull; Built with Next.js 14, Prisma, PostgreSQL & Cloudinary</span>
             </div>
             <div className="flex items-center gap-4 text-slate-400">
-              <span className="text-emerald-400 font-medium">Phase 1: Foundation</span>
+              <span>Trust Score</span>
               <span>&rarr;</span>
-              <span className="text-slate-500">Phase 2: AI Tagging</span>
+              <span>Human review</span>
               <span>&rarr;</span>
-              <span className="text-slate-500">Phase 3: Semantic Discovery</span>
+              <span>Measured change</span>
               <span>&rarr;</span>
-              <span className="text-slate-500">Phase 4: Impact Reports</span>
+              <span>Verifiable reels &amp; reports</span>
             </div>
           </div>
         </footer>

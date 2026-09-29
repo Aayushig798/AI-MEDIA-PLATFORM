@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { 
   X, 
   ExternalLink, 
@@ -17,8 +18,12 @@ import {
   Loader2,
   FileText,
   Layers,
-  Sparkles
+  ShieldCheck,
+  RefreshCw,
+  Fingerprint,
 } from "lucide-react";
+import { TrustBadge, IntegritySummary } from "./TrustBadge";
+import { CheckList, CheckResultView } from "./CheckList";
 import { MediaAssetItem } from "./GalleryGrid";
 import { CATEGORIES } from "./GalleryFilterBar";
 
@@ -38,18 +43,59 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-export function AssetDetailModal({
+export function AssetDetailModal(props: AssetDetailModalProps) {
+  if (!props.isOpen || !props.asset) return null;
+  // Keyed so form state resets when a different asset is opened.
+  return <AssetDetailContent key={props.asset.id} {...props} asset={props.asset} />;
+}
+
+interface FullIntegrity extends IntegritySummary {
+  checks: CheckResultView[];
+  error?: string | null;
+  reviewNote?: string | null;
+  reviewedBy?: string | null;
+}
+
+function AssetDetailContent({
   asset,
-  isOpen,
   onClose,
   onAssetUpdated,
   onAssetDeleted,
-}: AssetDetailModalProps) {
-  if (!isOpen || !asset) return null;
-
+}: AssetDetailModalProps & { asset: MediaAssetItem }) {
   const [category, setCategory] = useState(asset.manualCategory || "Environmental");
   const [location, setLocation] = useState(asset.manualLocation || "");
   const [notes, setNotes] = useState(asset.manualNotes || "");
+  const [claimText, setClaimText] = useState(asset.claimText || "");
+
+  const [integrity, setIntegrity] = useState<FullIntegrity | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
+
+  const loadIntegrity = useCallback(async () => {
+    const res = await fetch(`/api/assets/${asset.id}`);
+    const data = await res.json();
+    if (data.success) setIntegrity(data.asset.integrity);
+  }, [asset.id]);
+
+  useEffect(() => {
+    loadIntegrity();
+  }, [loadIntegrity]);
+
+  const handleVerify = async () => {
+    try {
+      setVerifying(true);
+      setVerifyError("");
+      const res = await fetch(`/api/assets/${asset.id}/verify`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Verification failed");
+      setIntegrity(data.integrity);
+      onAssetUpdated({ ...asset, integrity: data.integrity });
+    } catch (err: any) {
+      setVerifyError(err.message || "Verification failed");
+    } finally {
+      setVerifying(false);
+    }
+  };
   const [capturedAt, setCapturedAt] = useState(
     asset.capturedAt ? asset.capturedAt.split("T")[0] : new Date().toISOString().split("T")[0]
   );
@@ -90,6 +136,7 @@ export function AssetDetailModal({
           manualCategory: category,
           manualLocation: location,
           manualNotes: notes,
+          claimText,
           capturedAt: capturedAt ? new Date(capturedAt).toISOString() : null,
         }),
       });
@@ -101,6 +148,7 @@ export function AssetDetailModal({
 
       setSaveSuccess(true);
       onAssetUpdated(data.asset);
+      loadIntegrity();
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
       setSaveError(err.message || "Failed to save changes");
@@ -223,6 +271,62 @@ export function AssetDetailModal({
 
           {/* Right Column: Metadata & Edit Form (5 cols) */}
           <div className="lg:col-span-5 flex flex-col justify-between space-y-6">
+            {/* Integrity Engine */}
+            <div className="glass-panel rounded-2xl p-4 space-y-3 text-xs border border-white/5">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Fingerprint className="w-3.5 h-3.5 text-emerald-400" />
+                  Proof-of-Impact Integrity
+                </h3>
+                <TrustBadge integrity={integrity ?? asset.integrity} size="lg" />
+              </div>
+
+              {verifyError && (
+                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300">{verifyError}</div>
+              )}
+              {integrity?.status === "ERROR" && integrity.error && (
+                <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300">{integrity.error}</div>
+              )}
+
+              {integrity?.status === "DONE" && integrity.checks?.length > 0 ? (
+                <CheckList checks={integrity.checks} compact />
+              ) : (
+                <p className="text-slate-400">
+                  Runs 9 checks: duplicates, recycled-image pHash, web copies, EXIF, geofence, weather, satellite,
+                  AI claim match and provenance.
+                </p>
+              )}
+
+              {integrity?.reviewDecision && (
+                <p className="text-[11px] text-slate-400">
+                  Human review: <span className="font-semibold text-slate-200">{integrity.reviewDecision.toLowerCase()}</span>
+                  {integrity.reviewedBy ? ` by ${integrity.reviewedBy}` : ""}
+                  {integrity.reviewNote ? ` — “${integrity.reviewNote}”` : ""}
+                </p>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  id="verify-asset-btn"
+                  onClick={handleVerify}
+                  disabled={verifying}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-50 transition"
+                >
+                  {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : integrity?.status === "DONE" ? <RefreshCw className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                  <span>{verifying ? "Running checks..." : integrity?.status === "DONE" ? "Re-run verification" : "Submit for verification"}</span>
+                </button>
+                <Link
+                  href={`/verify/${asset.id}`}
+                  target="_blank"
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Public page
+                </Link>
+              </div>
+            </div>
+
             {/* Technical Metadata Box */}
             <div className="glass-panel rounded-2xl p-4 space-y-2.5 text-xs border border-white/5">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2">
@@ -325,6 +429,20 @@ export function AssetDetailModal({
                   placeholder="Detailed notes on visible environmental indicators, project progress, or field activity..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Claim this photo is evidence for <span className="text-slate-500">(optional, overrides the project claim)</span>
+                </label>
+                <input
+                  id="asset-detail-claim-input"
+                  type="text"
+                  placeholder="e.g. Saplings planted with tree guards along the bund"
+                  value={claimText}
+                  onChange={(e) => setClaimText(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
                 />
               </div>
