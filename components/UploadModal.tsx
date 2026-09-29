@@ -16,6 +16,7 @@ import {
   Calendar,
   Layers
 } from "lucide-react";
+import { extractExifCaptureDate } from "@/lib/exif";
 const CATEGORY_OPTIONS = [
   "Environmental",
   "Infrastructure",
@@ -33,6 +34,8 @@ interface StagedFile {
   manualLocation: string;
   manualNotes: string;
   capturedAt: string;
+  hasExifDate?: boolean;
+  exifChecking?: boolean;
   status: "idle" | "uploading" | "success" | "error";
   progress: number;
   errorMessage?: string;
@@ -64,8 +67,8 @@ export function UploadModal({
   const handleFilesSelected = (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const todayStr = new Date().toISOString().split("T")[0];
-    const newItems: StagedFile[] = Array.from(files).map((file, idx) => {
+    const fileList = Array.from(files);
+    const newItems: StagedFile[] = fileList.map((file, idx) => {
       const isVideo = file.type.startsWith("video/");
       const preview = URL.createObjectURL(file);
       return {
@@ -77,12 +80,45 @@ export function UploadModal({
         manualLocation: defaultLocation || "",
         manualNotes: "",
         capturedAt: "",
+        hasExifDate: false,
+        exifChecking: !isVideo,
         status: "idle",
         progress: 0,
       };
     });
 
     setStagedFiles((prev) => [...prev, ...newItems]);
+
+    // Asynchronously extract EXIF capture date (DateTimeOriginal) from image files
+    newItems.forEach((staged) => {
+      if (staged.resourceType === "image") {
+        extractExifCaptureDate(staged.file).then((exifIso) => {
+          if (exifIso) {
+            const dateOnly = exifIso.split("T")[0];
+            setStagedFiles((prev) =>
+              prev.map((item) =>
+                item.id === staged.id
+                  ? {
+                      ...item,
+                      capturedAt: dateOnly,
+                      hasExifDate: true,
+                      exifChecking: false,
+                    }
+                  : item
+              )
+            );
+          } else {
+            setStagedFiles((prev) =>
+              prev.map((item) =>
+                item.id === staged.id
+                  ? { ...item, hasExifDate: false, exifChecking: false }
+                  : item
+              )
+            );
+          }
+        });
+      }
+    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -487,17 +523,41 @@ export function UploadModal({
                           />
                         </div>
 
-                        {/* Date taken */}
-                        <div>
-                          <label className="block text-[10px] text-slate-400 mb-1 font-medium">Date taken</label>
+                        {/* Date taken (Required for Comparisons) */}
+                        <div className="relative">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] text-slate-300 font-semibold flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-emerald-400" />
+                              <span>Date taken</span>
+                            </label>
+                            {item.hasExifDate && (
+                              <span className="text-[9px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                EXIF detected
+                              </span>
+                            )}
+                            {item.exifChecking && (
+                              <span className="text-[9px] text-slate-400 animate-pulse">
+                                Reading EXIF...
+                              </span>
+                            )}
+                          </div>
                           <input
                             id={`staged-date-${index}`}
                             type="date"
                             value={item.capturedAt}
                             onChange={(e) => updateStagedField(item.id, "capturedAt", e.target.value)}
                             disabled={batchUploading}
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                            className={`w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border text-xs text-white focus:outline-none transition ${
+                              !item.capturedAt
+                                ? "border-amber-500/50 focus:border-amber-400"
+                                : "border-white/10 focus:border-emerald-500"
+                            }`}
                           />
+                          {!item.capturedAt && !item.exifChecking && (
+                            <p className="text-[10px] text-amber-300/90 mt-1 leading-tight">
+                              No EXIF date — set manually for comparisons
+                            </p>
+                          )}
                         </div>
                       </div>
 

@@ -29,13 +29,23 @@ export interface ComparisonSuggestion {
 export interface SuggestedComparisonsResult {
   suggestions: ComparisonSuggestion[];
   missingDateCount: number;
+  missingDateAssets: Array<{
+    id: string;
+    secureUrl: string;
+    manualLocation?: string | null;
+    manualNotes?: string | null;
+    createdAt: string;
+  }>;
   totalCandidatePairs: number;
+  totalImagesCount: number;
+  noQualifyingReason?: "MISSING_DATES" | "NO_CONTENT_MATCH" | "INSUFFICIENT_IMAGES";
+  message?: string;
 }
 
 /**
  * Generates verified Before/After evidence pairs for a project.
  * Adheres strictly to:
- * 1. Hard rules (image only, non-null capturedAt, >= 1 day gap, GPS <= 200m or matched manual location)
+ * 1. Hard rules (image only, non-null capturedAt, >= 4 hours gap, GPS <= 200m or matched manual location)
  * 2. Content similarity gate (weighted tag overlap >= 0.25, vector similarity >= 0.6 if present)
  * 3. OpenAI GPT-4o-mini vision verification (top 5 candidates, sameScene === true && confidence >= 0.7)
  * Never generates fake or filler pairs.
@@ -53,14 +63,39 @@ export async function suggestComparisons(
   });
 
   const allImages = (assets || []).filter((a: any) => a.resourceType === "image");
-  const missingDateCount = allImages.filter((a: any) => !a.capturedAt).length;
+  const missingDateAssets = allImages
+    .filter((a: any) => !a.capturedAt)
+    .map((a: any) => ({
+      id: a.id,
+      secureUrl: a.secureUrl,
+      manualLocation: a.manualLocation,
+      manualNotes: a.manualNotes,
+      createdAt: a.createdAt,
+    }));
+  const missingDateCount = missingDateAssets.length;
   const datedImages = allImages.filter((a: any) => Boolean(a.capturedAt));
+
+  if (allImages.length < 2) {
+    return {
+      suggestions: [],
+      missingDateCount,
+      missingDateAssets,
+      totalCandidatePairs: 0,
+      totalImagesCount: allImages.length,
+      noQualifyingReason: "INSUFFICIENT_IMAGES",
+      message: "Upload at least 2 photos to enable before/after comparison suggestions.",
+    };
+  }
 
   if (datedImages.length < 2) {
     return {
       suggestions: [],
       missingDateCount,
+      missingDateAssets,
       totalCandidatePairs: 0,
+      totalImagesCount: allImages.length,
+      noQualifyingReason: "MISSING_DATES",
+      message: `${missingDateCount} photo${missingDateCount === 1 ? "" : "s"} are missing a capture date. Add dates to enable comparison suggestions.`,
     };
   }
 
@@ -144,10 +179,17 @@ export async function suggestComparisons(
   }
 
   if (candidatePairs.length === 0) {
+    const isMissingDates = missingDateCount > 0;
     return {
       suggestions: [],
       missingDateCount,
+      missingDateAssets,
       totalCandidatePairs: 0,
+      totalImagesCount: allImages.length,
+      noQualifyingReason: isMissingDates ? "MISSING_DATES" : "NO_CONTENT_MATCH",
+      message: isMissingDates
+        ? `${missingDateCount} photo${missingDateCount === 1 ? "" : "s"} are missing a capture date. Add dates to enable comparison suggestions.`
+        : "No valid before/after pairs found. Upload photos of the same location taken at different times.",
     };
   }
 
@@ -175,8 +217,11 @@ export async function suggestComparisons(
         const before = cand.beforeAsset;
         const after = cand.afterAsset;
 
-        let timeSpanLabel = `${cand.daysApart} days apart`;
-        if (cand.daysApart >= 365) {
+        let timeSpanLabel = `${Math.round(cand.daysApart)} days apart`;
+        if (cand.daysApart < 1) {
+          const hours = Math.max(1, Math.round(cand.daysApart * 24));
+          timeSpanLabel = `${hours} hour${hours > 1 ? "s" : ""} apart (same day)`;
+        } else if (cand.daysApart >= 365) {
           const years = (cand.daysApart / 365).toFixed(1);
           timeSpanLabel = `${years} years apart`;
         } else if (cand.daysApart >= 30) {
@@ -233,9 +278,27 @@ export async function suggestComparisons(
     return b.daysApart - a.daysApart;
   });
 
+  const noQualifyingReason =
+    verifiedSuggestions.length === 0
+      ? missingDateCount > 0
+        ? "MISSING_DATES"
+        : "NO_CONTENT_MATCH"
+      : undefined;
+
+  const message =
+    verifiedSuggestions.length === 0
+      ? noQualifyingReason === "MISSING_DATES"
+        ? `${missingDateCount} photo${missingDateCount === 1 ? "" : "s"} are missing a capture date. Add dates to enable comparison suggestions.`
+        : "No valid before/after pairs found. Upload photos of the same location taken at different times."
+      : undefined;
+
   return {
     suggestions: verifiedSuggestions,
     missingDateCount,
+    missingDateAssets,
     totalCandidatePairs: candidatePairs.length,
+    totalImagesCount: allImages.length,
+    noQualifyingReason,
+    message,
   };
 }

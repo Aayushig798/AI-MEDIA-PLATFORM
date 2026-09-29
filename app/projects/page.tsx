@@ -164,10 +164,17 @@ function ProjectsPageContent() {
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-3">
             <ShieldCheck className="w-3.5 h-3.5" />
             Field Evidence Repository
+            <span className="text-emerald-500/40">•</span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 tracking-wider">
+              AI MEDIA
+            </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
             Impact & Sustainability Projects
           </h1>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-emerald-400/90">
+            Sustainability Impact Intelligence
+          </p>
           <p className="mt-2 text-sm text-slate-400 max-w-2xl">
             Centralized hub for field initiatives, environmental restoration, community infrastructure, and visual evidence timelines.
           </p>
@@ -203,7 +210,7 @@ function ProjectsPageContent() {
         <div className="glass-panel p-4 rounded-2xl">
           <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">AI Intelligence</p>
           <p className="text-2xl font-bold text-cyan-400 mt-1">Active</p>
-          <span className="text-[11px] text-slate-400">Phase 2 Auto-Tagging</span>
+          <span className="text-[11px] text-slate-400">Automated Vision Analysis</span>
         </div>
       </div>
 

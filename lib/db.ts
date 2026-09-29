@@ -117,7 +117,7 @@ function loadLocalData(): LocalDBData {
     console.error("Failed to load local dev_data.json:", e);
   }
 
-  // Seed default demo data with Phase 2 fields
+  // Seed default initial data with vision intelligence fields
   const defaultData: LocalDBData = {
     users: [
       {

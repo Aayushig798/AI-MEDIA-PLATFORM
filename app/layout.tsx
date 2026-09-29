@@ -27,22 +27,20 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} font-sans antialiased min-h-screen flex flex-col bg-[#090d16] text-slate-100`}>
-        {/* Top Notification / Phase Bar */}
-        <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 border-b border-emerald-900/40 px-4 py-1.5 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2 text-emerald-400">
+        {/* Top Status Bar */}
+        <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-950 border-b border-white/5 px-4 py-1.5 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-300">
             <span className="flex h-2 w-2 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="font-semibold tracking-wide uppercase text-[10px] text-emerald-300">Phase 3 Active</span>
-            <span className="text-slate-400 hidden sm:inline">|</span>
-            <span className="text-slate-300 hidden sm:inline">Retrieval AI, Vector Search & Evidence Comparison</span>
+            <span className="font-medium text-slate-300">Field Evidence Repository</span>
           </div>
           <div className="flex items-center gap-3 text-slate-400 text-[11px]">
-            <span className="hidden md:inline">Field Officer Session:</span>
+            <span className="hidden md:inline">Field Lead:</span>
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              Elena (Field Lead)
+              Elena Ramos
             </span>
           </div>
         </div>
@@ -56,15 +54,9 @@ export default function RootLayout({
                 <Globe2 className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-emerald-200 bg-clip-text text-transparent">
-                    EcoEvidence
-                  </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 tracking-wider">
-                    AI MEDIA
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-none">Sustainability Impact Intelligence</p>
+                <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-emerald-200 bg-clip-text text-transparent">
+                  EcoEvidence
+                </span>
               </div>
             </Link>
 
@@ -110,16 +102,10 @@ export default function RootLayout({
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>EcoEvidence Platform &bull; Built with Next.js 14, Prisma, PostgreSQL & Cloudinary</span>
+              <span>EcoEvidence Platform &bull; Built with Next.js, Prisma, PostgreSQL & Cloudinary</span>
             </div>
-            <div className="flex items-center gap-4 text-slate-400">
-              <span className="text-emerald-400 font-medium">Phase 1: Foundation</span>
-              <span>&rarr;</span>
-              <span className="text-slate-500">Phase 2: AI Tagging</span>
-              <span>&rarr;</span>
-              <span className="text-slate-500">Phase 3: Semantic Discovery</span>
-              <span>&rarr;</span>
-              <span className="text-slate-500">Phase 4: Impact Reports</span>
+            <div className="text-slate-500 text-[11px]">
+              Verifiable Environmental Impact Platform
             </div>
           </div>
         </footer>

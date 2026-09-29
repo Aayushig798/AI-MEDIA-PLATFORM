@@ -21,7 +21,8 @@ import {
   Image as ImageIcon,
   Search,
   FileText,
-  BarChart3
+  BarChart3,
+  MoreHorizontal
 } from "lucide-react";
 import { GalleryFilterBar } from "@/components/GalleryFilterBar";
 import { GalleryGrid, MediaAssetItem } from "@/components/GalleryGrid";
@@ -61,7 +62,7 @@ export default function ProjectGalleryPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<MediaAssetItem | null>(null);
 
-  // Tabs (Phase 3: Media Gallery vs Before/After Comparisons)
+  // Active View: Gallery vs Before/After Comparisons
   const [activeTab, setActiveTab] = useState<"gallery" | "comparisons">("gallery");
   const [comparisonsRefreshKey, setComparisonsRefreshKey] = useState(0);
 
@@ -69,6 +70,8 @@ export default function ProjectGalleryPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  const [showIdMenu, setShowIdMenu] = useState(false);
+  const [copiedProjectId, setCopiedProjectId] = useState(false);
 
   const fetchProjectInfo = useCallback(async () => {
     try {
@@ -137,6 +140,7 @@ export default function ProjectGalleryPage() {
       prev.map((a) => (a.id === updatedAsset.id ? updatedAsset : a))
     );
     setSelectedAsset(updatedAsset);
+    setComparisonsRefreshKey((k) => k + 1);
   };
 
   const handleAssetDeleted = (deletedId: string) => {
@@ -205,8 +209,42 @@ export default function ProjectGalleryPage() {
           <span>Back to All Projects</span>
         </Link>
 
-        <div className="flex items-center gap-3 text-[11px]">
-          <span className="font-mono text-slate-500">ID: {project.id}</span>
+        {/* Project Options / Debug Menu */}
+        <div className="relative">
+          <button
+            type="button"
+            id="project-options-menu-btn"
+            onClick={() => setShowIdMenu(!showIdMenu)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center gap-1 text-[11px]"
+            title="Project Options"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+
+          {showIdMenu && (
+            <div
+              onMouseLeave={() => setShowIdMenu(false)}
+              className="absolute right-0 top-full mt-1.5 z-40 p-3 rounded-2xl bg-slate-900/95 border border-white/10 shadow-2xl backdrop-blur-md text-xs space-y-2.5 min-w-[220px] animate-fade-in"
+            >
+              <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                System Identifier
+              </div>
+              <div className="font-mono text-[11px] text-slate-300 break-all bg-black/40 p-1.5 rounded-lg border border-white/5">
+                {project.id}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(project.id);
+                  setCopiedProjectId(true);
+                  setTimeout(() => setCopiedProjectId(false), 2000);
+                }}
+                className="w-full py-1 text-left text-[11px] font-medium text-emerald-400 hover:underline flex items-center gap-1.5"
+              >
+                {copiedProjectId ? "✓ Copied Project ID" : "Copy Project ID"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -282,65 +320,66 @@ export default function ProjectGalleryPage() {
         </div>
       </div>
 
-      {/* Tabs Switcher (Phase 3: Media Evidence vs Before/After Comparisons) */}
-      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
-        <button
-          type="button"
-          id="project-tab-gallery"
-          onClick={() => setActiveTab("gallery")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "gallery"
-              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
-              : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
-          }`}
-        >
-          <ImageIcon className="w-4 h-4" />
-          <span>Media Evidence Stream ({assets.length})</span>
-        </button>
+      {/* Views and Project Tools Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
+        {/* In-page View Tabs */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            id="project-tab-gallery"
+            onClick={() => setActiveTab("gallery")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+              activeTab === "gallery"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
+                : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span>Media Evidence ({assets.length})</span>
+          </button>
 
-        <button
-          type="button"
-          id="project-tab-comparisons"
-          onClick={() => setActiveTab("comparisons")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
-            activeTab === "comparisons"
-              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
-              : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
-          }`}
-        >
-          <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
-          <span>Before / After Comparisons</span>
-        </button>
+          <button
+            type="button"
+            id="project-tab-comparisons"
+            onClick={() => setActiveTab("comparisons")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
+              activeTab === "comparisons"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
+                : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
+            <span>Before / After Comparisons</span>
+          </button>
+        </div>
 
-        <Link
-          href={`/search?projectId=${project.id}`}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition"
-        >
-          <Search className="w-4 h-4 text-cyan-400" />
-          <span>Semantic Search</span>
-        </Link>
+        {/* Project Intelligence & Reporting Tools */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href={`/search?projectId=${project.id}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition"
+            title="Search media within this project"
+          >
+            <Search className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Project Search</span>
+          </Link>
 
-        <Link
-          href={`/projects/${project.id}/report`}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition"
-        >
-          <FileText className="w-4 h-4 text-rose-400" />
-          <span>Impact Report Studio</span>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/20">
-            Phase 4
-          </span>
-        </Link>
+          <Link
+            href={`/projects/${project.id}/report`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition"
+          >
+            <FileText className="w-3.5 h-3.5 text-rose-400" />
+            <span>Report Studio</span>
+          </Link>
 
-        <Link
-          href={`/projects/${project.id}/dashboard`}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition"
-        >
-          <BarChart3 className="w-4 h-4 text-amber-400" />
-          <span>Impact Dashboard</span>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
-            Phase 4
-          </span>
-        </Link>
+          <Link
+            href={`/projects/${project.id}/dashboard`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Analytics Dashboard</span>
+          </Link>
+        </div>
       </div>
 
       {activeTab === "gallery" ? (
@@ -365,7 +404,7 @@ export default function ProjectGalleryPage() {
                 Field Media Stream &bull; Newest First
               </span>
               <span className="text-[11px] text-slate-400">
-                Thumbnails rendered via Cloudinary dynamic transformations
+                {assets.length} visual asset{assets.length === 1 ? "" : "s"}
               </span>
             </div>
 
@@ -379,6 +418,7 @@ export default function ProjectGalleryPage() {
                 assets={assets}
                 onSelectAsset={(asset) => setSelectedAsset(asset)}
                 onOpenUpload={() => setIsUploadOpen(true)}
+                onAssetUpdated={handleAssetUpdated}
               />
             )}
           </div>
@@ -388,6 +428,7 @@ export default function ProjectGalleryPage() {
           {/* Suggested Comparisons Section */}
           <SuggestedComparisons
             projectId={projectId}
+            refreshTrigger={comparisonsRefreshKey}
             onComparisonSaved={() => setComparisonsRefreshKey((k) => k + 1)}
           />
 

@@ -10,6 +10,7 @@ import {
   Search,
   BarChart3,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { ReportBuilder } from "@/components/ReportBuilder";
 
@@ -49,73 +50,45 @@ export default function ProjectReportPage() {
   const projectName = project?.name || "Impact Evidence Project";
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      {/* Top Header & Navigation */}
-      <header className="sticky top-0 z-30 bg-slate-950/80 backdrop-blur-xl border-b border-white/10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Link
-              href={`/projects/${projectId}`}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition"
-              title="Return to Gallery"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  Reporting & Traceability
-                </span>
-                <span className="text-xs text-slate-400">•</span>
-                <span className="text-xs text-slate-400">{projectName}</span>
-              </div>
-              <h1 className="text-xl font-bold text-white tracking-tight mt-0.5">
-                Impact Report Studio
-              </h1>
-            </div>
-          </div>
-
-          {/* Quick Action Navigation Tabs */}
-          <div className="flex items-center flex-wrap gap-2">
-            <Link
-              href={`/projects/${projectId}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition"
-            >
-              <ImageIcon className="w-3.5 h-3.5" />
-              <span>Evidence Gallery</span>
-            </Link>
-
-            <Link
-              href={`/projects/${projectId}?tab=comparisons`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition"
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Comparisons</span>
-            </Link>
-
-            <Link
-              href={`/search?projectId=${projectId}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition"
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Semantic Search</span>
-            </Link>
-
-            <Link
-              href={`/projects/${projectId}/dashboard`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition"
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Impact Dashboard</span>
-            </Link>
-          </div>
+    <div className="space-y-8 animate-fade-in">
+      {/* Breadcrumb Navigation */}
+      <div className="flex items-center justify-between text-xs text-slate-400">
+        <Link
+          href={`/projects/${projectId}`}
+          className="inline-flex items-center gap-1.5 hover:text-white transition group"
+        >
+          <ArrowLeft className="w-4 h-4 text-emerald-400 group-hover:-translate-x-1 transition-transform" />
+          <span>Back to {projectName}</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/projects/${projectId}/dashboard`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold transition"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Impact Dashboard</span>
+          </Link>
         </div>
-      </header>
+      </div>
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <ReportBuilder projectId={projectId} projectName={projectName} />
-      </main>
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-6">
+        <div>
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-2">
+            <FileText className="w-3.5 h-3.5" />
+            Impact Reporting Studio
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Stakeholder Impact Report
+          </h1>
+          <p className="text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            Generate, customize, and export audit-ready sustainability impact evidence reports for {projectName}.
+          </p>
+        </div>
+      </div>
+
+      {/* Main Report Builder */}
+      <ReportBuilder projectId={projectId} projectName={projectName} />
     </div>
   );
 }

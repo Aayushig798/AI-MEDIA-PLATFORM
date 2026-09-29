@@ -1,6 +1,19 @@
 "use client";
 
-import { Video, Image as ImageIcon, MapPin, Calendar, Play, Sparkles, Navigation, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { 
+  Video, 
+  Image as ImageIcon, 
+  MapPin, 
+  Calendar, 
+  Play, 
+  Sparkles, 
+  Navigation, 
+  Loader2,
+  AlertTriangle,
+  Check,
+  X
+} from "lucide-react";
 import { getThumbnailUrl } from "@/lib/cloudinary-url";
 import { AiTagItem } from "./AiTagChips";
 
@@ -33,6 +46,7 @@ interface GalleryGridProps {
   assets: MediaAssetItem[];
   onSelectAsset: (asset: MediaAssetItem) => void;
   onOpenUpload: () => void;
+  onAssetUpdated?: (updated: MediaAssetItem) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -43,22 +57,53 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-function getCategoryColor(category: string | null): string {
+export function getCategoryBadgeClasses(category: string | null): string {
   switch (category?.toLowerCase()) {
     case "environmental":
-      return "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
+      return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
     case "infrastructure":
-      return "bg-cyan-500/10 text-cyan-300 border-cyan-500/20";
+      return "bg-cyan-500/15 text-cyan-300 border-cyan-500/30";
     case "community":
-      return "bg-amber-500/10 text-amber-300 border-amber-500/20";
+      return "bg-amber-500/15 text-amber-200 border-amber-500/30";
     case "disaster response":
-      return "bg-rose-500/10 text-rose-300 border-rose-500/20";
+      return "bg-rose-500/15 text-rose-200 border-rose-500/30";
     default:
-      return "bg-slate-500/10 text-slate-300 border-slate-500/20";
+      return "bg-slate-700/40 text-slate-200 border-slate-600/40";
   }
 }
 
-export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGridProps) {
+export function GalleryGrid({ assets, onSelectAsset, onOpenUpload, onAssetUpdated }: GalleryGridProps) {
+  const [editingDateAssetId, setEditingDateAssetId] = useState<string | null>(null);
+  const [selectedDateInput, setSelectedDateInput] = useState<string>("");
+  const [savingDate, setSavingDate] = useState(false);
+  const [activeTagPopoverId, setActiveTagPopoverId] = useState<string | null>(null);
+
+  const handleSaveInlineDate = async (asset: MediaAssetItem) => {
+    if (!selectedDateInput) return;
+    try {
+      setSavingDate(true);
+      const res = await fetch(`/api/assets/${asset.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          capturedAt: new Date(selectedDateInput).toISOString(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update capture date");
+      }
+      setEditingDateAssetId(null);
+      if (onAssetUpdated) {
+        onAssetUpdated({ ...asset, capturedAt: data.asset.capturedAt });
+      }
+    } catch (err: any) {
+      alert(err.message || "Failed to save capture date");
+    } finally {
+      setSavingDate(false);
+    }
+  };
+
   if (assets.length === 0) {
     return (
       <div className="glass-panel rounded-2xl p-16 text-center max-w-lg mx-auto">
@@ -88,10 +133,6 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
         const isAiPending =
           asset.aiProcessingStatus === "pending" ||
           asset.aiProcessingStatus === "processing";
-        const primaryAiCategory =
-          asset.categories?.[0]?.category?.name ||
-          asset.categories?.[0]?.name ||
-          null;
 
         return (
           <div
@@ -142,7 +183,7 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                 ) : (
                   <span
                     id={`category-badge-${asset.id}`}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border backdrop-blur-md ${getCategoryColor(
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border backdrop-blur-md ${getCategoryBadgeClasses(
                       asset.manualCategory || "Uncategorized"
                     )}`}
                   >
@@ -185,26 +226,121 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
                   <div className="text-[11px] text-slate-500 italic mb-1">Location not set</div>
                 )}
 
-                {/* Notes */}
-                <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
-                  {asset.manualNotes || "No notes recorded."}
-                </p>
+                {/* Notes (Only rendered when note actually exists) */}
+                {asset.manualNotes && asset.manualNotes.trim() && (
+                  <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                    {asset.manualNotes}
+                  </p>
+                )}
 
-                {/* AI Tags Preview Pill Stream */}
+                {/* Missing Capture Date Warning Badge with one-click Set Date */}
+                {!asset.capturedAt && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/25 flex flex-col gap-1.5 text-[11px] text-amber-300"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="flex items-center gap-1 font-medium leading-tight">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>No capture date — comparisons unavailable</span>
+                      </span>
+                      {editingDateAssetId !== asset.id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingDateAssetId(asset.id);
+                            setSelectedDateInput(new Date().toISOString().split("T")[0]);
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[10px] shrink-0 border border-amber-500/40 transition"
+                        >
+                          Set date
+                        </button>
+                      )}
+                    </div>
+
+                    {editingDateAssetId === asset.id && (
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-amber-500/20">
+                        <input
+                          type="date"
+                          value={selectedDateInput}
+                          onChange={(e) => setSelectedDateInput(e.target.value)}
+                          className="flex-1 px-2 py-1 rounded-lg bg-slate-900 border border-amber-500/40 text-xs text-white focus:outline-none focus:border-amber-400"
+                        />
+                        <button
+                          type="button"
+                          disabled={savingDate}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveInlineDate(asset);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[10px] flex items-center gap-1 transition"
+                        >
+                          {savingDate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                          <span>Save</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingDateAssetId(null);
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-white transition"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* AI Tags Preview Pill Stream with +N overflow popover */}
                 {asset.aiTags && asset.aiTags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2.5">
+                  <div className="flex flex-wrap items-center gap-1 mt-2.5 relative">
                     {asset.aiTags.slice(0, 3).map((t) => (
                       <span
-                        key={t.id}
+                        key={t.id || t.label}
                         className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/5 text-slate-300 font-mono"
                       >
                         #{t.label}
                       </span>
                     ))}
                     {asset.aiTags.length > 3 && (
-                      <span className="text-[10px] px-1 py-0.5 text-slate-500 font-mono">
-                        +{asset.aiTags.length - 3}
-                      </span>
+                      <div className="relative inline-block">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveTagPopoverId(
+                              activeTagPopoverId === asset.id ? null : asset.id
+                            );
+                          }}
+                          onMouseEnter={() => setActiveTagPopoverId(asset.id)}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-slate-300 font-mono transition"
+                          title="Click to view all tags"
+                        >
+                          +{asset.aiTags.length - 3}
+                        </button>
+                        {activeTagPopoverId === asset.id && (
+                          <div
+                            onMouseLeave={() => setActiveTagPopoverId(null)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute bottom-full left-0 mb-1.5 z-30 p-2.5 rounded-xl bg-slate-900/95 border border-white/15 shadow-2xl backdrop-blur-md flex flex-wrap gap-1 w-48 animate-fade-in"
+                          >
+                            <div className="w-full text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                              All Tags ({asset.aiTags.length})
+                            </div>
+                            {asset.aiTags.slice(3).map((t) => (
+                              <span
+                                key={t.id || t.label}
+                                className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-200 font-mono"
+                              >
+                                #{t.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -214,11 +350,17 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload }: GalleryGrid
               <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3 text-slate-500" />
-                  {new Date(asset.capturedAt || asset.createdAt).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {asset.capturedAt ? (
+                    <span>
+                      {new Date(asset.capturedAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 italic">No date</span>
+                  )}
                 </span>
                 <span className="text-[10px] text-emerald-400 font-semibold group-hover:underline">
                   Inspect &rarr;

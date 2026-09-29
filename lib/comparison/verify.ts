@@ -134,14 +134,18 @@ export function checkHardRules(assetA: any, assetB: any): HardRulesResult {
     return { passed: false, reason: "Invalid Date taken format on one or both photos" };
   }
 
-  // 3. Time gap between capturedAt values is at least MIN_GAP_DAYS (default 1)
+  // 3. Time gap between capturedAt values is at least MIN_GAP_HOURS (default 4 hours)
   const diffMs = Math.abs(dateB.getTime() - dateA.getTime());
+  const hoursApart = diffMs / (1000 * 60 * 60);
   const daysApart = diffMs / (1000 * 60 * 60 * 24);
 
-  if (daysApart < COMPARISON_CONFIG.MIN_GAP_DAYS) {
+  if (hoursApart < COMPARISON_CONFIG.MIN_GAP_HOURS) {
+    const isZero = hoursApart === 0;
     return {
       passed: false,
-      reason: "Both photos have the same date or were taken within 24 hours of each other",
+      reason: isZero
+        ? "Both photos have the exact same capture timestamp"
+        : `Photos were taken only ${hoursApart.toFixed(1)} hour(s) apart (minimum ${COMPARISON_CONFIG.MIN_GAP_HOURS} hours required)`,
       daysApart: Math.round(daysApart * 10) / 10,
     };
   }

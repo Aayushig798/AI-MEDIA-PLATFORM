@@ -3,8 +3,14 @@
  */
 
 export const COMPARISON_CONFIG = {
-  // Hard rule minimum time difference in days between capturedAt dates
-  MIN_GAP_DAYS: 1,
+  // Hard rule minimum time difference in hours between capturedAt dates (default 4 hours allows same-day comparisons)
+  MIN_GAP_HOURS: 4,
+
+  // Backward compatibility alias for days (4 hours = 0.1667 days)
+  MIN_GAP_DAYS: 4 / 24,
+
+  // Threshold for cleaning up unverified comparisons
+  CLEANUP_CONFIDENCE_THRESHOLD: 0.3,
 
   // Maximum GPS distance in meters between two photos if both have EXIF GPS
   MAX_GPS_DISTANCE_METERS: 200,

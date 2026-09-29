@@ -33,6 +33,21 @@ const CATEGORY_OPTIONS = [
   "Uncategorized",
 ];
 
+function getCategoryBadgeClasses(category: string | null): string {
+  switch (category?.toLowerCase()) {
+    case "environmental":
+      return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+    case "infrastructure":
+      return "bg-cyan-500/15 text-cyan-300 border-cyan-500/30";
+    case "community":
+      return "bg-amber-500/15 text-amber-200 border-amber-500/30";
+    case "disaster response":
+      return "bg-rose-500/15 text-rose-200 border-rose-500/30";
+    default:
+      return "bg-slate-700/40 text-slate-200 border-slate-600/40";
+  }
+}
+
 interface AssetDetailModalProps {
   asset: MediaAssetItem | null;
   isOpen: boolean;
@@ -323,7 +338,7 @@ export function AssetDetailModal({
               </div>
             </div>
 
-            {/* Phase 4: Full Lifecycle Traceability Timeline */}
+            {/* Media Provenance & Lifecycle Traceability Timeline */}
             <div className="w-full mt-4 pt-4 border-t border-white/10">
               <TraceabilityTimeline assetId={asset.id} />
             </div>
@@ -331,7 +346,7 @@ export function AssetDetailModal({
 
           {/* Right Column: AI Analysis, Metadata & Edit Form (5 cols) */}
           <div className="lg:col-span-5 flex flex-col justify-between space-y-5">
-            {/* Phase 2: AI Understanding & Classification Panel */}
+            {/* Visual Analysis & Classification Panel */}
             <div className="glass-panel rounded-2xl p-4 space-y-3 border border-emerald-500/20 bg-emerald-950/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-300 uppercase tracking-wider">
@@ -356,7 +371,12 @@ export function AssetDetailModal({
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">Category:</span>
-                  <span className="px-2.5 py-0.5 rounded-lg text-xs font-semibold bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/20">
+                  <span
+                    id="asset-detail-category-badge"
+                    className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold border ${getCategoryBadgeClasses(
+                      category
+                    )}`}
+                  >
                     {category || "Uncategorized"}
                   </span>
                   <span
@@ -465,6 +485,48 @@ export function AssetDetailModal({
                 </div>
               )}
 
+              {/* Prominent Date Taken Card */}
+              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-emerald-400" />
+                    <span>Date taken (Capture Date)</span>
+                  </label>
+                  {capturedAt ? (
+                    <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      Capture date set
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      No capture date — comparisons unavailable
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="asset-detail-date-input"
+                    type="date"
+                    value={capturedAt}
+                    onChange={(e) => setCapturedAt(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-500 transition"
+                  />
+                  {capturedAt && (
+                    <button
+                      type="button"
+                      onClick={() => setCapturedAt("")}
+                      className="px-2.5 py-1.5 rounded-xl text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-white/5 transition"
+                      title="Clear date"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  Field capture timestamp used for chronological ordering in before/after comparisons.
+                </p>
+              </div>
+
+              {/* Category & Location */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -513,30 +575,17 @@ export function AssetDetailModal({
 
                 <div>
                   <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                    Date taken
+                    Location Text / GPS Point
                   </label>
                   <input
-                    id="asset-detail-date-input"
-                    type="date"
-                    value={capturedAt}
-                    onChange={(e) => setCapturedAt(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+                    id="asset-detail-location-input"
+                    type="text"
+                    placeholder="e.g. Madre de Dios, Plot B"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-medium text-slate-300 mb-1">
-                  Location Text / GPS Point
-                </label>
-                <input
-                  id="asset-detail-location-input"
-                  type="text"
-                  placeholder="e.g. Madre de Dios, Plot B"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-xl bg-slate-900 border border-white/10 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500"
-                />
               </div>
 
               <div>

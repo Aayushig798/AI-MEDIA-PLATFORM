@@ -30,7 +30,11 @@ export async function GET(
       count: result.suggestions.length,
       suggestions: result.suggestions,
       missingDateCount: result.missingDateCount,
+      missingDateAssets: result.missingDateAssets,
       totalCandidatePairs: result.totalCandidatePairs,
+      totalImagesCount: result.totalImagesCount,
+      noQualifyingReason: result.noQualifyingReason,
+      message: result.message,
     });
   } catch (error: any) {
     console.error(`GET /api/projects/${params.id}/suggested-comparisons error:`, error);

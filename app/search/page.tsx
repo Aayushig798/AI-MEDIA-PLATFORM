@@ -34,15 +34,15 @@ const QUICK_PROMPTS = [
 function getCategoryColor(category: string | null): string {
   switch (category?.toLowerCase()) {
     case "environmental":
-      return "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
+      return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
     case "infrastructure":
-      return "bg-cyan-500/10 text-cyan-300 border-cyan-500/20";
+      return "bg-cyan-500/15 text-cyan-300 border-cyan-500/30";
     case "community":
-      return "bg-amber-500/10 text-amber-300 border-amber-500/20";
+      return "bg-amber-500/15 text-amber-200 border-amber-500/30";
     case "disaster response":
-      return "bg-rose-500/10 text-rose-300 border-rose-500/20";
+      return "bg-rose-500/15 text-rose-200 border-rose-500/30";
     default:
-      return "bg-slate-500/10 text-slate-300 border-slate-500/20";
+      return "bg-slate-700/40 text-slate-200 border-slate-600/40";
   }
 }
 
@@ -73,6 +73,7 @@ export default function SearchPage() {
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningReason, setWarningReason] = useState("");
   const [pendingSavePayload, setPendingSavePayload] = useState<any>(null);
+  const [activeTagPopoverId, setActiveTagPopoverId] = useState<string | null>(null);
   const [savingAnyway, setSavingAnyway] = useState(false);
 
   // Load projects list for filter dropdown
@@ -176,7 +177,7 @@ export default function SearchPage() {
         projectId: before.projectId || second.projectId,
         beforeAssetId: before.id,
         afterAssetId: after.id,
-        notes: `Comparison created via Semantic Search for "${query}"`,
+        notes: "",
       };
 
       const res = await fetch("/api/comparisons", {
@@ -259,13 +260,13 @@ export default function SearchPage() {
         <div>
           <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-1">
             <Sparkles className="w-4 h-4" />
-            <span>Phase 3 &bull; Retrieval AI & Vector Search</span>
+            <span>Semantic Discovery & Vector Search</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Intelligent Media Search
           </h1>
           <p className="text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Search unstructured visual evidence using natural language queries powered by dense vector embeddings (<code className="text-emerald-300 font-mono">pgvector</code> cosine similarity) combined with structured filters.
+            Search unstructured visual evidence using natural language queries powered by semantic vector embeddings combined with structured filters.
           </p>
         </div>
 
@@ -566,19 +567,51 @@ export default function SearchPage() {
 
                       {/* AI Tags Preview */}
                       {item.aiTags && item.aiTags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
+                        <div className="flex flex-wrap items-center gap-1 mt-1.5 relative">
                           {item.aiTags.slice(0, 3).map((t) => (
                             <span
                               key={t.id || t.label}
-                              className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-slate-300 border border-white/5"
+                              className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-slate-300 border border-white/5 font-mono"
                             >
-                              {t.label}
+                              #{t.label}
                             </span>
                           ))}
                           {item.aiTags.length > 3 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/5 text-slate-500">
-                              +{item.aiTags.length - 3}
-                            </span>
+                            <div className="relative inline-block">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveTagPopoverId(
+                                    activeTagPopoverId === item.id ? null : item.id
+                                  );
+                                }}
+                                onMouseEnter={() => setActiveTagPopoverId(item.id)}
+                                className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-slate-300 font-mono transition"
+                                title="Click to view all tags"
+                              >
+                                +{item.aiTags.length - 3}
+                              </button>
+                              {activeTagPopoverId === item.id && (
+                                <div
+                                  onMouseLeave={() => setActiveTagPopoverId(null)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute bottom-full left-0 mb-1 z-30 p-2.5 rounded-xl bg-slate-900/95 border border-white/15 shadow-2xl backdrop-blur-md flex flex-wrap gap-1 w-48 animate-fade-in"
+                                >
+                                  <div className="w-full text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                                    All Tags ({item.aiTags.length})
+                                  </div>
+                                  {item.aiTags.slice(3).map((t) => (
+                                    <span
+                                      key={t.id || t.label}
+                                      className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-200 font-mono"
+                                    >
+                                      #{t.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
