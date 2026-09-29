@@ -11,6 +11,7 @@ import {
   Globe2,
   ListChecks,
   Link2,
+  Map as MapIcon,
 } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -91,6 +92,13 @@ export default function RootLayout({
               >
                 <Link2 className="w-4 h-4 text-cyan-400" />
                 Ledger
+              </Link>
+              <Link
+                href="/map"
+                className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition flex items-center gap-2"
+              >
+                <MapIcon className="w-4 h-4 text-teal-400" />
+                Impact Map
               </Link>
             </nav>
 

@@ -9,6 +9,7 @@ interface Entry extends LedgerEntryLike {
 }
 interface AnchorRow {
   id: string;
+  externalRef?: string | null;
   fromSeq: number;
   toSeq: number;
   entryCount: number;
@@ -76,11 +77,17 @@ export function ChainVerifier({ assetId, projectId, title = "Tamper-evident ledg
     try {
       setLoading(true);
       setError("");
-      const [ledgerRes, anchorRes] = await Promise.all([fetch("/api/ledger?limit=5000"), fetch("/api/ledger/anchor")]);
-      const ledger = await ledgerRes.json();
-      const anchorJson = await anchorRes.json();
-      if (!ledger.success) throw new Error(ledger.error);
-      const all: Entry[] = ledger.entries;
+      // Page through the whole chain (5,000 entries per request)
+      const all: Entry[] = [];
+      for (let afterSeq = 0; ; ) {
+        const ledgerRes = await fetch(`/api/ledger?limit=5000&afterSeq=${afterSeq}`);
+        const ledger = await ledgerRes.json();
+        if (!ledger.success) throw new Error(ledger.error);
+        all.push(...ledger.entries);
+        if (ledger.entries.length < 5000) break;
+        afterSeq = ledger.entries[ledger.entries.length - 1].seq;
+      }
+      const anchorJson = await (await fetch("/api/ledger/anchor")).json();
 
       setResult(await verifyChain(all));
       setEntries(all);
@@ -156,6 +163,14 @@ export function ChainVerifier({ assetId, projectId, title = "Tamper-evident ledg
             <p key={anchor.id} className="text-[11px] font-mono text-slate-300">
               <span className={ok ? "text-emerald-400" : "text-rose-400"}>{ok ? "✓" : "✗"}</span> #{anchor.fromSeq}–#{anchor.toSeq} ·{" "}
               {short(anchor.root)} · {new Date(anchor.createdAt).toLocaleString()}
+              {anchor.externalRef && (
+                <>
+                  {" · "}
+                  <a href={anchor.externalRef} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline">
+                    published
+                  </a>
+                </>
+              )}
             </p>
           ))}
         </div>

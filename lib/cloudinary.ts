@@ -21,6 +21,7 @@ export interface CloudinarySignedParams {
   imageMetadata: boolean;
   phash: boolean;
   notificationUrl: string | null;
+  autoTranscription: boolean;
 }
 
 /**
@@ -28,7 +29,11 @@ export interface CloudinarySignedParams {
  * Folder convention: impact-platform/{projectId}/{uuid}
  * Signed params include Google Auto Tagging add-on and EXIF metadata extraction.
  */
-export function generateUploadSignature(projectId: string, folderUuid: string): CloudinarySignedParams {
+export function generateUploadSignature(
+  projectId: string,
+  folderUuid: string,
+  resourceType?: string
+): CloudinarySignedParams {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "demo";
   const apiKey = process.env.CLOUDINARY_API_KEY || "";
   const apiSecret = process.env.CLOUDINARY_API_SECRET || "";
@@ -52,6 +57,10 @@ export function generateUploadSignature(projectId: string, folderUuid: string): 
   const notificationUrl = base && !/localhost|127\.0\.0\.1/.test(base) ? `${base}/api/cloudinary/webhook` : null;
   if (notificationUrl) paramsToSign.notification_url = notificationUrl;
 
+  // Voice notes on field video -> "<public_id>.transcript" for reel subtitles (opt-in)
+  const autoTranscription = resourceType === "video" && process.env.CLOUDINARY_AUTO_TRANSCRIPTION === "true";
+  if (autoTranscription) paramsToSign.auto_transcription = true;
+
   let signature = "";
   if (apiSecret) {
     signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
@@ -71,6 +80,7 @@ export function generateUploadSignature(projectId: string, folderUuid: string): 
     imageMetadata: true,
     phash: true,
     notificationUrl,
+    autoTranscription,
   };
 }
 

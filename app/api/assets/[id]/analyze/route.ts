@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { cloudinary } from "@/lib/cloudinary";
 import { extractCloudinaryAiTags } from "@/lib/ai/cloudinaryTagging";
 import { runVisionFallback } from "@/lib/ai/visionFallback";
+import { logEvent } from "@/lib/audit/logEvent";
 import { determinePrimaryCategory } from "@/lib/ai/categoryMapping";
 import { generateEmbeddingForAsset } from "@/lib/ai/embeddings";
 
@@ -87,6 +88,19 @@ export async function POST(
         where: { id },
         data: updateData,
       });
+
+      await logEvent(
+        id,
+        "ai_tagged",
+        {
+          tags: cloudinaryTags.map((t) => t.label),
+          confidences: cloudinaryTags.map((t) => t.confidence),
+          source: cloudinaryTags[0]?.source || "cloudinary_google",
+          primaryCategory,
+          trigger: "manual re-analyze",
+        },
+        "system-ai"
+      );
 
       // Automatically generate text embedding for pgvector search (Task 3.2)
       generateEmbeddingForAsset(id).catch((err) => {

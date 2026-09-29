@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { TrustBadge } from "@/components/TrustBadge";
 import {
   Sparkles,
   Search,
@@ -52,6 +53,8 @@ export default function SearchPage() {
   const [category, setCategory] = useState("ALL");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [excludeFlagged, setExcludeFlagged] = useState(true);
+  const [hiddenFlagged, setHiddenFlagged] = useState(0);
 
   const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [results, setResults] = useState<SearchResultItem[]>([]);
@@ -118,6 +121,7 @@ export default function SearchPage() {
           from: fromDate || undefined,
           to: toDate || undefined,
           limit: 30,
+          excludeFlagged,
         }),
       });
 
@@ -127,6 +131,7 @@ export default function SearchPage() {
       }
 
       setResults(data.results || []);
+      setHiddenFlagged(data.hiddenFlagged ?? 0);
     } catch (err: any) {
       setError(err.message || "Failed to execute search");
     } finally {
@@ -406,6 +411,16 @@ export default function SearchPage() {
               />
             </div>
           </div>
+          <label className="mt-3 inline-flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={excludeFlagged}
+              onChange={(e) => setExcludeFlagged(e.target.checked)}
+              className="accent-emerald-500"
+            />
+            Hide evidence the Integrity Engine flagged (recycled, lifted or inconsistent)
+            {hiddenFlagged > 0 && <span className="text-rose-300">· {hiddenFlagged} hidden</span>}
+          </label>
         </form>
       </div>
 
@@ -502,6 +517,11 @@ export default function SearchPage() {
                     <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full text-[11px] font-bold bg-black/80 text-emerald-400 border border-emerald-500/30 backdrop-blur-md flex items-center gap-1 shadow">
                       <Sparkles className="w-3 h-3 text-emerald-400" />
                       <span>{matchPercent}% match</span>
+                    </div>
+
+                    {/* Integrity Engine Trust Score */}
+                    <div className="absolute bottom-2 left-2">
+                      <TrustBadge integrity={item.integrity} />
                     </div>
 
                     {/* AI Domain Badge or Compare Selection Indicator */}

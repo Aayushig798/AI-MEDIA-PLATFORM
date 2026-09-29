@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { assembleProjectFacts } from "@/lib/reports/factAssembly";
 import { ungroundedNumbers } from "@/lib/reports/grounding";
+import { tryAppendLedger } from "@/lib/ledger";
+import { sha256Hex } from "@/lib/ledger-core";
+import { getActor } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
@@ -106,6 +109,17 @@ export async function PATCH(
     const updated = await db.report.update({
       where: { id: reportId },
       data: updateData,
+    });
+
+    await tryAppendLedger({
+      type: "REPORT_EDITED",
+      actor: (await getActor()).label,
+      projectId: existing.projectId,
+      payload: {
+        reportId,
+        fields: Object.keys(updateData),
+        narrativeDigest: await sha256Hex(updated.generatedSummary ?? ""),
+      },
     });
 
     return NextResponse.json({

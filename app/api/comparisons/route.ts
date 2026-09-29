@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, prisma } from "@/lib/db";
+import { effectiveVerdict } from "@/lib/reports/factAssembly";
 import { getNormalizedComparisonUrl } from "@/lib/cloudinary-url";
 import { COMPARISON_CONFIG } from "@/lib/comparison/config";
 import {
@@ -192,6 +193,26 @@ export async function POST(req: NextRequest) {
       aiReason = callerReason ?? (cached?.reason ?? (body.warningReason || "Saved manually without full verification"));
       changeSummary = callerChangeSummary ?? (cached?.visibleChange ?? null);
     } else {
+      // Step 0: Integrity Engine: a flagged (or reviewer-rejected) photo is not evidence
+      const integrity = await prisma.assetIntegrity
+        .findMany({
+          where: { assetId: { in: [beforeAsset.id, afterAsset.id] } },
+          select: { assetId: true, status: true, verdict: true, reviewDecision: true, trustScore: true },
+        })
+        .catch(() => []);
+      const flagged = integrity.filter((i) => effectiveVerdict(i) === "FLAGGED");
+      if (flagged.length > 0) {
+        const which = flagged.map((f) => (f.assetId === beforeAsset.id ? "before" : "after")).join(" and ");
+        return NextResponse.json({
+          success: false,
+          warning: true,
+          needsConfirmation: true,
+          reason: `The ${which} photo was flagged by the Integrity Engine (Trust Score ${flagged.map((f) => f.trustScore).join(", ")}). Review it before using it as evidence.`,
+          orderedBeforeId: beforeAsset.id,
+          orderedAfterId: afterAsset.id,
+        });
+      }
+
       // Step 1: Check Hard Rules
       const hardCheck = checkHardRules(beforeAsset, afterAsset);
       if (!hardCheck.passed) {
