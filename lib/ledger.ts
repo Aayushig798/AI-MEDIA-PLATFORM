@@ -1,9 +1,12 @@
 import { Prisma } from "@prisma/client";
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/db";
 import { GENESIS_HASH, computeEntryHash, merkleRoot, verifyChain } from "@/lib/ledger-core";
 
 export type LedgerEventType =
   | "ASSET_UPLOADED"
+  | "AI_TAGGED"
+  | "EMBEDDED"
+  | "USED_IN_COMPARISON"
   | "METADATA_EDITED"
   | "INTEGRITY_CHECKED"
   | "REVIEW_DECISION"

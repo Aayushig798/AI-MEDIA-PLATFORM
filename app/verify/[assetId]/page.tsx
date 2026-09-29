@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { MapPin, CloudRain, Satellite, Bot, Fingerprint, Globe, ExternalLink, ShieldCheck } from "lucide-react";
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/db";
 import { signedOriginalUrl } from "@/lib/cloudinary";
 import { withTransformation, EVIDENCE_TRANSFORMATION, getThumbnailUrl } from "@/lib/cloudinary-url";
 import { TrustBadge, effectiveVerdict } from "@/components/TrustBadge";

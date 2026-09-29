@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import exifr from "exifr";
 import type { Prisma } from "@prisma/client";
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/db";
 import { getResourceFacts } from "@/lib/cloudinary";
 import { getAnalysisImageUrl, EVIDENCE_TRANSFORMATION } from "@/lib/cloudinary-url";
 import { registerDerivative } from "@/lib/derivatives";

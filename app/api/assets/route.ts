@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db, prisma } from "@/lib/db";
+import { normalizePhash } from "@/lib/cloudinary";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { extractCloudinaryAiTags, extractCloudinaryExif } from "@/lib/ai/cloudinaryTagging";
@@ -7,6 +8,7 @@ import { runVisionFallback } from "@/lib/ai/visionFallback";
 import { mapLabelToCategory, determinePrimaryCategory } from "@/lib/ai/categoryMapping";
 import { generateEmbeddingForAsset } from "@/lib/ai/embeddings";
 import { logEvent } from "@/lib/audit/logEvent";
+import { INTEGRITY_SUMMARY } from "@/lib/integrity/summary";
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,8 +17,16 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get("category") || undefined;
     const from = searchParams.get("from") || undefined;
     const to = searchParams.get("to") || undefined;
+    const verdict = searchParams.get("verdict") || undefined;
 
     const where: any = {};
+
+    // Integrity Engine verdict filter (VERIFIED | REVIEW | FLAGGED | UNVERIFIED)
+    if (verdict === "UNVERIFIED") {
+      where.AND = [{ OR: [{ integrity: null }, { integrity: { verdict: null } }] }];
+    } else if (verdict === "VERIFIED" || verdict === "REVIEW" || verdict === "FLAGGED") {
+      where.integrity = { verdict };
+    }
 
     if (projectId) {
       where.projectId = projectId;
@@ -49,6 +59,7 @@ export async function GET(req: NextRequest) {
       include: {
         aiTags: { orderBy: { confidence: "desc" } },
         categories: { include: { category: true } },
+        integrity: { select: INTEGRITY_SUMMARY },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -160,6 +171,21 @@ export async function POST(req: NextRequest) {
         aiProcessingStatus: hasInlineTags ? "done" : "pending",
       },
     });
+
+    // Integrity Engine fingerprints (Cloudinary etag = MD5, phash = 64-bit perceptual hash)
+    // and a pending integrity record. Needs PostgreSQL; skipped in file-store mode.
+    try {
+      await prisma.mediaAsset.update({
+        where: { id: asset.id },
+        data: {
+          etag: typeof info?.etag === "string" ? info.etag : null,
+          phash: normalizePhash(info?.phash),
+          integrity: { create: {} },
+        },
+      });
+    } catch (err) {
+      console.warn("[integrity] could not store fingerprints:", (err as Error).message);
+    }
 
     // Log upload event for asset traceability
     await logEvent(

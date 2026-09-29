@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { IntegrityPanel } from "./IntegrityPanel";
 import { 
   X, 
   ExternalLink, 
@@ -64,14 +65,19 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-export function AssetDetailModal({
+export function AssetDetailModal(props: AssetDetailModalProps) {
+  if (!props.isOpen || !props.asset) return null;
+  // Keyed inner component so hooks never run conditionally and state resets per asset.
+  return <AssetDetailContent key={props.asset.id} {...props} asset={props.asset} />;
+}
+
+function AssetDetailContent({
   asset,
   isOpen,
   onClose,
   onAssetUpdated,
   onAssetDeleted,
-}: AssetDetailModalProps) {
-  if (!isOpen || !asset) return null;
+}: AssetDetailModalProps & { asset: MediaAssetItem }) {
 
   const [category, setCategory] = useState(asset.manualCategory || "Uncategorized");
   const [categorySource, setCategorySource] = useState(asset.categorySource || "ai");
@@ -346,6 +352,14 @@ export function AssetDetailModal({
 
           {/* Right Column: AI Analysis, Metadata & Edit Form (5 cols) */}
           <div className="lg:col-span-5 flex flex-col justify-between space-y-5">
+            {/* Proof-of-Impact Integrity Engine */}
+            <IntegrityPanel
+              assetId={asset.id}
+              initial={asset.integrity}
+              initialClaim={asset.claimText}
+              onVerified={(integrity) => onAssetUpdated({ ...asset, integrity })}
+            />
+
             {/* Visual Analysis & Classification Panel */}
             <div className="glass-panel rounded-2xl p-4 space-y-3 border border-emerald-500/20 bg-emerald-950/20">
               <div className="flex items-center justify-between">

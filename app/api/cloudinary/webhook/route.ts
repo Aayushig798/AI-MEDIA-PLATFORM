@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cloudinary } from "@/lib/cloudinary";
-import { db } from "@/lib/db";
+import { prisma as db } from "@/lib/db";
 import { tryAppendLedger } from "@/lib/ledger";
 
 const MAX_AGE_SECONDS = 7200;

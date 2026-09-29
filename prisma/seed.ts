@@ -234,6 +234,7 @@ async function main() {
         etag: up.etag,
         phash: up.phash,
         manualCategory: a.manualCategory,
+        categorySource: "user",
         manualLocation: a.manualLocation,
         manualNotes: a.manualNotes,
         capturedAt: new Date(a.capturedAt),

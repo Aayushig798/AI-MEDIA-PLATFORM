@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
       autoTagging: signedParams.autoTagging,
       image_metadata: signedParams.imageMetadata,
       imageMetadata: signedParams.imageMetadata,
+      phash: signedParams.phash,
+      notification_url: signedParams.notificationUrl,
     });
   } catch (error: any) {
     console.error("POST /api/cloudinary/sign error:", error);

@@ -21,6 +21,8 @@ import {
   Edit2,
   Brush
 } from "lucide-react";
+import Link from "next/link";
+import { Ruler } from "lucide-react";
 import { CompareSlider } from "./CompareSlider";
 
 export interface SavedComparisonItem {
@@ -289,6 +291,13 @@ export function SavedComparisons({
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
+                    <Link
+                      href={`/projects/${comp.projectId}/compare/${comp.id}`}
+                      title="Measure the change and make a donor reel"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-cyan-300 hover:text-white hover:bg-cyan-500/15 border border-cyan-500/30 transition"
+                    >
+                      <Ruler className="w-3.5 h-3.5" /> Measure &amp; reel
+                    </Link>
                     <button
                       type="button"
                       onClick={() => setExpandedComp(comp)}

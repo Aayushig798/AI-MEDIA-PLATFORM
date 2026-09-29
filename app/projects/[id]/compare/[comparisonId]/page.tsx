@@ -46,8 +46,8 @@ export default function ComparisonDetailPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <Link href={`/projects/${projectId}/compare`} className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
-        <ArrowLeft className="w-4 h-4 text-emerald-400" /> All comparisons
+      <Link href={`/projects/${projectId}`} className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white">
+        <ArrowLeft className="w-4 h-4 text-emerald-400" /> Back to project
       </Link>
 
       <div className="flex flex-wrap items-end justify-between gap-4">
