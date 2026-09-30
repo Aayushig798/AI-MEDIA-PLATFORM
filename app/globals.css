@@ -3,76 +3,190 @@
 @tailwind utilities;
 
 :root {
-  --background: #090d16;
-  --foreground: #f8fafc;
-  --card-bg: rgba(15, 23, 42, 0.75);
-  --card-border: rgba(255, 255, 255, 0.08);
+  --background: #f7f8f7;
+  --foreground: #18181b;
+}
+
+html {
+  color-scheme: light;
 }
 
 body {
   color: var(--foreground);
   background-color: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
-  background-image: 
-    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.07) 0px, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.04) 0px, transparent 50%);
-  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Glassmorphism */
-.glass-panel {
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+/* Soft brand wash and dot texture behind every page */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 420px at 12% -8%, rgba(16, 185, 129, 0.11), transparent 70%),
+    radial-gradient(700px 360px at 92% -6%, rgba(14, 165, 233, 0.07), transparent 70%);
+}
+.app-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(24, 24, 27, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, black, transparent 420px);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 420px);
 }
 
-.glass-card {
-  background: rgba(17, 24, 39, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+@layer components {
+  /* Surfaces */
+  .card {
+    @apply rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.04)];
+  }
+  .card-interactive {
+    @apply rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_1px_3px_rgba(16,24,40,0.04)]
+      transition duration-200 hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-[0_12px_28px_-12px_rgba(16,24,40,0.18)];
+  }
+  .card-muted {
+    @apply rounded-2xl border border-zinc-200/70 bg-zinc-50/80;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium transition
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30 active:translate-y-px
+      disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-sm {
+    @apply h-8 px-3 text-[13px];
+  }
+  .btn-lg {
+    @apply h-11 rounded-xl px-5 text-[15px];
+  }
+  .btn-icon {
+    @apply w-9 px-0;
+  }
+  .btn-sm.btn-icon {
+    @apply w-8 px-0;
+  }
+  .btn-primary {
+    @apply bg-emerald-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_rgba(6,78,59,0.25)] hover:bg-emerald-700;
+  }
+  .btn-dark {
+    @apply bg-zinc-900 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] hover:bg-zinc-800;
+  }
+  .btn-secondary {
+    @apply border border-zinc-200 bg-white text-zinc-800 shadow-[0_1px_2px_rgba(16,24,40,0.05)] hover:border-zinc-300 hover:bg-zinc-50;
+  }
+  .btn-ghost {
+    @apply text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900;
+  }
+  .btn-danger {
+    @apply bg-red-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] hover:bg-red-700;
+  }
+  .btn-glass {
+    @apply border border-white/25 bg-white/10 text-white backdrop-blur-md hover:bg-white/20;
+  }
+
+  /* Forms */
+  .input {
+    @apply h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition
+      placeholder:text-zinc-400 focus:border-emerald-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/10;
+  }
+  textarea.input {
+    @apply h-auto py-2 leading-relaxed;
+  }
+  .label {
+    @apply mb-1.5 block text-[13px] font-medium text-zinc-700;
+  }
+
+  /* Badges */
+  .badge {
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset;
+  }
+  .badge-neutral {
+    @apply bg-zinc-50 text-zinc-600 ring-zinc-500/15;
+  }
+  .badge-green {
+    @apply bg-emerald-50 text-emerald-700 ring-emerald-600/15;
+  }
+  .badge-amber {
+    @apply bg-amber-50 text-amber-700 ring-amber-600/20;
+  }
+  .badge-red {
+    @apply bg-red-50 text-red-700 ring-red-600/15;
+  }
+  .badge-blue {
+    @apply bg-sky-50 text-sky-700 ring-sky-600/15;
+  }
+  .badge-violet {
+    @apply bg-violet-50 text-violet-700 ring-violet-600/15;
+  }
+
+  /* Chip on top of photos */
+  .photo-chip {
+    @apply inline-flex items-center gap-1 rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-medium text-zinc-800 shadow-sm ring-1 ring-black/5 backdrop-blur;
+  }
+
+  /* Menus and popovers */
+  .menu {
+    @apply z-40 min-w-[200px] rounded-xl border border-zinc-200 bg-white p-1 shadow-[0_16px_40px_-12px_rgba(16,24,40,0.25)];
+  }
+  .menu-item {
+    @apply flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900;
+  }
+
+  /* Legacy aliases, kept so nothing renders unstyled */
+  .glass-panel,
+  .glass-card,
+  .glass-dropdown {
+    @apply rounded-2xl border border-zinc-200/80 bg-white;
+  }
 }
 
-.glass-card:hover {
-  border-color: rgba(52, 211, 153, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px -8px rgba(16, 185, 129, 0.15);
+/* Calmer basemap colours so the evidence markers stand out */
+.map-tiles-muted {
+  filter: grayscale(0.7) brightness(1.04);
 }
 
-.glass-dropdown {
-  background: rgba(13, 20, 36, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+/* Opacity only, no fill-mode: a transform would trap fixed-position modals inside the page. */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-/* Custom scrollbars */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-::-webkit-scrollbar-track {
-  background: #090d16;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out;
 }
 
-/* Glow animations */
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
-.animate-pulse-glow {
-  animation: pulseGlow 3s ease-in-out infinite;
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #f0f1f0;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .skeleton::after {
+    animation: none;
+  }
 }

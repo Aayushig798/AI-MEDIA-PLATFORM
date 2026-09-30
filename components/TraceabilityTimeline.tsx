@@ -1,26 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ComponentType, type ReactNode } from "react";
 import {
   Upload,
   Sparkles,
-  Cpu,
+  Search,
   Layers,
   FileText,
   Clock,
-  User,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
   RefreshCw,
-  ExternalLink,
   ShieldCheck,
+  ShieldAlert,
   UserCheck,
+  UserX,
   Ruler,
   Clapperboard,
   Link2,
   Pencil,
+  History,
+  Braces,
+  Bot,
+  User,
 } from "lucide-react";
+import { VERDICT_LABELS } from "./TrustBadge";
+import { IconChip, SectionHeader, ErrorNote, cx, type Tone } from "./ui";
 
 export interface AuditLogItem {
   id: string;
@@ -35,11 +38,35 @@ interface TraceabilityTimelineProps {
   assetId: string;
 }
 
+type IconType = ComponentType<{ className?: string }>;
+
+function sentenceCase(s: string) {
+  const t = s.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** "3 hours ago" for the last week, a plain date after that. */
+function relativeTime(value: string): string {
+  const d = new Date(value);
+  const ms = d.getTime();
+  if (Number.isNaN(ms)) return "";
+  const diff = (ms - Date.now()) / 1000;
+  const abs = Math.abs(diff);
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  if (abs < 60) return "Just now";
+  if (abs < 3600) return cap(rtf.format(Math.round(diff / 60), "minute"));
+  if (abs < 86400) return cap(rtf.format(Math.round(diff / 3600), "hour"));
+  if (abs < 86400 * 7) return cap(rtf.format(Math.round(diff / 86400), "day"));
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 export function TraceabilityTimeline({ assetId }: TraceabilityTimelineProps) {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ledger, setLedger] = useState<{ chainIntact: boolean; entries: number } | null>(null);
+  const [showTech, setShowTech] = useState(false);
 
   const fetchLogs = async () => {
     if (!assetId) return;
@@ -65,363 +92,283 @@ export function TraceabilityTimeline({ assetId }: TraceabilityTimelineProps) {
     fetchLogs();
   }, [assetId]);
 
-  const getEventConfig = (eventType: string) => {
-    switch (eventType) {
+  const getEventConfig = (log: AuditLogItem): { icon: IconType; tone: Tone; title: string } => {
+    const detail = log.eventDetail || {};
+    switch (log.eventType) {
       case "uploaded":
-        return {
-          icon: <Upload className="w-3.5 h-3.5 text-emerald-400" />,
-          title: "Asset Uploaded & Registered",
-          badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-          nodeBg: "bg-emerald-950 border-emerald-500/40",
-        };
+        return { icon: Upload, tone: "emerald", title: "Uploaded" };
       case "ai_tagged":
-        return {
-          icon: <Sparkles className="w-3.5 h-3.5 text-violet-400" />,
-          title: "AI Visual Tagging & Categorization",
-          badgeColor: "bg-violet-500/10 text-violet-400 border-violet-500/30",
-          nodeBg: "bg-violet-950 border-violet-500/40",
-        };
+        return { icon: Sparkles, tone: "violet", title: "Labelled by AI" };
       case "embedded":
-        return {
-          icon: <Cpu className="w-3.5 h-3.5 text-cyan-400" />,
-          title: "Vector Embedding Generated",
-          badgeColor: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
-          nodeBg: "bg-cyan-950 border-cyan-500/40",
-        };
+        return { icon: Search, tone: "violet", title: "Made searchable" };
       case "used_in_comparison":
-        return {
-          icon: <Layers className="w-3.5 h-3.5 text-amber-400" />,
-          title: "Linked in Before/After Comparison",
-          badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/30",
-          nodeBg: "bg-amber-950 border-amber-500/40",
-        };
+        return { icon: Layers, tone: "sky", title: "Used in a before/after comparison" };
       case "used_in_report":
+        return { icon: FileText, tone: "emerald", title: "Included in a report" };
+      case "integrity_checked": {
+        const v = String(detail.verdict);
         return {
-          icon: <FileText className="w-3.5 h-3.5 text-rose-400" />,
-          title: "Included in Stakeholder Impact Report",
-          badgeColor: "bg-rose-500/10 text-rose-400 border-rose-500/30",
-          nodeBg: "bg-rose-950 border-rose-500/40",
+          icon: v === "VERIFIED" ? ShieldCheck : ShieldAlert,
+          tone: v === "VERIFIED" ? "emerald" : v === "FLAGGED" ? "red" : v === "REVIEW" ? "amber" : "zinc",
+          title: "Verification run",
         };
-      case "integrity_checked":
-        return {
-          icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />,
-          title: "Integrity Engine Verification",
-          badgeColor: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
-          nodeBg: "bg-emerald-950 border-emerald-400/50",
-        };
-      case "review_decision":
-        return {
-          icon: <UserCheck className="w-3.5 h-3.5 text-amber-300" />,
-          title: "Human Review Decision",
-          badgeColor: "bg-amber-500/10 text-amber-300 border-amber-500/30",
-          nodeBg: "bg-amber-950 border-amber-400/50",
-        };
+      }
+      case "review_decision": {
+        const rejected = String(detail.decision).toUpperCase() === "REJECTED";
+        return { icon: rejected ? UserX : UserCheck, tone: rejected ? "red" : "emerald", title: "Reviewed" };
+      }
       case "derivative_issued":
         return {
-          icon: <Link2 className="w-3.5 h-3.5 text-sky-300" />,
-          title: "Cloudinary Derivative Issued",
-          badgeColor: "bg-sky-500/10 text-sky-300 border-sky-500/30",
-          nodeBg: "bg-sky-950 border-sky-400/50",
+          icon: Link2,
+          tone: detail.class === "TRANSCODED" ? "zinc" : "amber",
+          title: "New version created",
         };
       case "metric_measured":
-        return {
-          icon: <Ruler className="w-3.5 h-3.5 text-teal-300" />,
-          title: "Change Measured From Pixels",
-          badgeColor: "bg-teal-500/10 text-teal-300 border-teal-500/30",
-          nodeBg: "bg-teal-950 border-teal-400/50",
-        };
+        return { icon: Ruler, tone: "sky", title: "Change measured" };
       case "reel_rendered":
-        return {
-          icon: <Clapperboard className="w-3.5 h-3.5 text-cyan-300" />,
-          title: "Used in Donor Reel (edited content)",
-          badgeColor: "bg-cyan-500/10 text-cyan-300 border-cyan-500/30",
-          nodeBg: "bg-cyan-950 border-cyan-400/50",
-        };
+        return { icon: Clapperboard, tone: "violet", title: "Used in a video reel" };
       case "metadata_edited":
-        return {
-          icon: <Pencil className="w-3.5 h-3.5 text-slate-300" />,
-          title: "Metadata Edited",
-          badgeColor: "bg-slate-500/10 text-slate-300 border-slate-500/30",
-          nodeBg: "bg-slate-900 border-slate-500",
-        };
+        return { icon: Pencil, tone: "zinc", title: "Details edited" };
       default:
-        return {
-          icon: <Clock className="w-3.5 h-3.5 text-slate-400" />,
-          title: eventType.replace(/_/g, " "),
-          badgeColor: "bg-slate-500/10 text-slate-400 border-slate-500/30",
-          nodeBg: "bg-slate-900 border-slate-600",
-        };
+        return { icon: Clock, tone: "zinc", title: sentenceCase(log.eventType) };
     }
   };
 
-  const renderEventDetails = (log: AuditLogItem) => {
+  /** Main plain-language line(s) for an event. */
+  const renderEventDetails = (log: AuditLogItem): ReactNode => {
     const detail = log.eventDetail || {};
 
-    const ledgerLine = detail.ledgerSeq ? (
-      <p className="mt-1 font-mono text-[9px] text-slate-500" title={detail.entryHash}>
-        ledger #{detail.ledgerSeq} · {String(detail.entryHash).slice(0, 12)}…
-      </p>
-    ) : null;
-
     if (log.eventType === "integrity_checked") {
+      const verdict =
+        VERDICT_LABELS[String(detail.verdict) as keyof typeof VERDICT_LABELS] ?? String(detail.verdict).toLowerCase();
       return (
-        <div className="mt-1.5 text-[11px] text-slate-300">
-          Trust Score <strong className="text-white">{detail.trustScore}</strong> · {String(detail.verdict).toLowerCase()}
-          {ledgerLine}
-        </div>
+        <>
+          {verdict} · trust score <span className="tabular-nums">{detail.trustScore}/100</span>
+        </>
       );
     }
     if (log.eventType === "review_decision") {
+      const decision = String(detail.decision).toLowerCase();
       return (
-        <div className="mt-1.5 text-[11px] text-slate-300">
-          {String(detail.decision).toLowerCase()}
-          {detail.note ? ` — “${detail.note}”` : ""}
-          {ledgerLine}
-        </div>
+        <>
+          {sentenceCase(decision)}
+          {detail.note ? `: “${detail.note}”` : ""}
+        </>
       );
     }
     if (log.eventType === "derivative_issued") {
-      return (
-        <div className="mt-1.5 text-[11px] text-slate-300 break-all">
-          <span className={detail.class === "TRANSCODED" ? "text-emerald-300" : "text-amber-300"}>
-            {detail.class === "TRANSCODED" ? "transcoded (evidence)" : "edited (illustrative)"}
-          </span>{" "}
-          · <span className="font-mono text-[10px]">{detail.transformation}</span>
-          {ledgerLine}
-        </div>
+      return detail.class === "TRANSCODED" ? (
+        "Format change only, still valid as evidence"
+      ) : (
+        <span className="text-amber-700">Edited version, for illustration only</span>
       );
     }
     if (log.eventType === "metric_measured") {
       return (
-        <div className="mt-1.5 text-[11px] text-slate-300">
+        <span className="tabular-nums">
           {detail.metric === "GREEN_COVER" ? "Green cover" : "Water area"} {detail.beforePct}% → {detail.afterPct}% (
           {detail.deltaPp > 0 ? "+" : ""}
-          {detail.deltaPp} pp)
-          {ledgerLine}
-        </div>
+          {detail.deltaPp} points)
+        </span>
       );
     }
-    if (log.eventType === "reel_rendered" || log.eventType === "metadata_edited" || log.eventType === "cloudinary_notification") {
-      return (
-        <div className="mt-1.5 text-[11px] text-slate-400">
-          {log.eventType === "metadata_edited" ? `Changed: ${Object.keys(detail.changes ?? {}).join(", ")}` : null}
-          {log.eventType === "reel_rendered" ? `${detail.aspect} reel` : null}
-          {ledgerLine}
-        </div>
-      );
+    if (log.eventType === "metadata_edited") {
+      return `Changed: ${Object.keys(detail.changes ?? {}).join(", ")}`;
     }
-
+    if (log.eventType === "reel_rendered") {
+      return `${detail.aspect} reel`;
+    }
     if (log.eventType === "uploaded") {
-      return (
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {detail.format && (
-            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-mono">
-              .{detail.format}
-            </span>
-          )}
-          {detail.bytes && (
-            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">
-              {(detail.bytes / 1024).toFixed(0)} KB
-            </span>
-          )}
-          {detail.resourceType && (
-            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 capitalize">
-              {detail.resourceType}
-            </span>
-          )}
-        </div>
-      );
+      const parts = [
+        detail.format ? String(detail.format).toUpperCase() : null,
+        detail.bytes ? `${(detail.bytes / 1024).toFixed(0)} KB` : null,
+        detail.resourceType ? sentenceCase(String(detail.resourceType)) : null,
+      ].filter(Boolean);
+      return parts.length ? parts.join(" · ") : null;
     }
-
     if (log.eventType === "ai_tagged") {
       const tags: string[] = detail.tags || [];
       const primaryCat = detail.primaryCategory;
+      if (!primaryCat && tags.length === 0) return null;
       return (
-        <div className="space-y-1.5 mt-2">
-          {primaryCat && (
-            <div className="text-[11px] text-violet-300 flex items-center gap-1 font-medium">
-              <span className="text-slate-400">Primary Domain:</span>
-              <span className="px-1.5 py-0.2 rounded bg-violet-500/20 text-violet-200">
-                {primaryCat}
-              </span>
-            </div>
-          )}
+        <div className="space-y-1.5">
+          {primaryCat && <p>Category: {primaryCat}</p>}
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {tags.slice(0, 6).map((t: string, i: number) => (
-                <span
-                  key={i}
-                  className="px-1.5 py-0.5 rounded text-[10px] bg-violet-950/60 text-violet-300 border border-violet-800/40"
-                >
+              {tags.slice(0, 6).map((t, i) => (
+                <span key={`${i}-${t}`} className="badge badge-violet font-normal">
                   {t}
                 </span>
               ))}
-              {tags.length > 6 && (
-                <span className="text-[10px] text-slate-500 self-center">
-                  +{tags.length - 6} more
-                </span>
-              )}
+              {tags.length > 6 && <span className="badge badge-neutral font-normal">+{tags.length - 6} more</span>}
             </div>
           )}
         </div>
       );
     }
-
-    if (log.eventType === "embedded") {
-      return (
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-950/60 text-cyan-300 border border-cyan-800/40 font-mono">
-            {detail.model || "text-embedding-3-small"}
-          </span>
-          <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400">
-            {detail.dimensions || 1536}-dim pgvector
-          </span>
-        </div>
-      );
-    }
-
     if (log.eventType === "used_in_comparison") {
       return (
-        <div className="space-y-1 mt-2 text-[11px]">
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">Role in Pair:</span>
-            <span className="font-semibold text-amber-300 uppercase text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20">
-              {detail.role || "participant"}
-            </span>
-            {detail.verified !== undefined && (
-              <span
-                className={`text-[10px] px-1.5 py-0.2 rounded ${
-                  detail.verified
-                    ? "bg-emerald-500/20 text-emerald-300"
-                    : "bg-slate-800 text-slate-400"
-                }`}
-              >
-                {detail.verified ? "✓ Verified Match" : "Unverified"}
-              </span>
-            )}
-          </div>
-          {detail.comparisonId && (
-            <div className="text-[10px] text-slate-500 font-mono truncate">
-              ID: {detail.comparisonId}
-            </div>
-          )}
-        </div>
+        <>
+          As the {detail.role || "participant"} photo
+          {detail.verified !== undefined && (detail.verified ? " · match verified" : " · match not verified")}
+        </>
       );
     }
-
     if (log.eventType === "used_in_report") {
-      return (
-        <div className="space-y-1 mt-2 text-[11px]">
-          <div className="text-rose-200 font-medium">
-            {detail.reportTitle || "Sustainability Impact Report"}
-          </div>
-          {detail.reportId && (
-            <div className="text-[10px] text-slate-500 font-mono truncate">
-              Report ID: {detail.reportId}
-            </div>
-          )}
-        </div>
-      );
+      return detail.reportTitle || "Sustainability Impact Report";
     }
-
     return null;
   };
 
+  /** Technical extras (hashes, IDs, model names), shown only on request. */
+  const renderTechDetails = (log: AuditLogItem): string[] => {
+    const detail = log.eventDetail || {};
+    const lines: string[] = [];
+    if (log.eventType === "derivative_issued" && detail.transformation) lines.push(`Transformation: ${detail.transformation}`);
+    if (log.eventType === "embedded") {
+      lines.push(`Model: ${detail.model || "text-embedding-3-small"}`);
+      lines.push(`${detail.dimensions || 1536} dimensions`);
+    }
+    if (log.eventType === "used_in_comparison" && detail.comparisonId) lines.push(`Comparison ID: ${detail.comparisonId}`);
+    if (log.eventType === "used_in_report" && detail.reportId) lines.push(`Report ID: ${detail.reportId}`);
+    if (detail.ledgerSeq) lines.push(`Ledger #${detail.ledgerSeq} · ${String(detail.entryHash).slice(0, 12)}…`);
+    lines.push(`Event #${log.id.slice(-6)}`);
+    return lines;
+  };
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between pb-2 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-emerald-400" />
-          <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-            Traceability Audit Timeline
-          </h4>
-          {ledger && (
-            <span
-              className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                ledger.chainIntact ? "text-emerald-300 border-emerald-500/30" : "text-rose-300 border-rose-500/40"
-              }`}
-              title="Every event is also written to the SHA-256 hash-chained ledger"
-            >
-              hash chain {ledger.chainIntact ? "intact" : "BROKEN"}
-            </span>
+    <section className="space-y-5">
+      <SectionHeader
+        title="History"
+        description={
+          logs.length > 0
+            ? `${logs.length} ${logs.length === 1 ? "event" : "events"} recorded for this file`
+            : "Everything that has happened to this file."
+        }
+        icon={History}
+        tone="sky"
+        actions={
+          <button
+            type="button"
+            onClick={fetchLogs}
+            disabled={loading}
+            className="btn btn-ghost btn-sm btn-icon shrink-0"
+            title="Refresh history"
+            aria-label="Refresh history"
+          >
+            <RefreshCw className={cx("h-3.5 w-3.5", loading && "animate-spin")} />
+          </button>
+        }
+      />
+
+      {ledger && (
+        <div
+          className={cx(
+            "flex items-center gap-3 rounded-xl bg-gradient-to-br px-3.5 py-3 ring-1 ring-inset",
+            ledger.chainIntact
+              ? "from-emerald-50 via-white to-white ring-emerald-100"
+              : "from-red-50 via-white to-white ring-red-100",
           )}
-        </div>
-        <button
-          onClick={fetchLogs}
-          disabled={loading}
-          className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition"
-          title="Refresh audit trail"
+          title="Every event is written to a tamper-evident log, so later changes can be detected."
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-        </button>
-      </div>
-
-      {loading && logs.length === 0 ? (
-        <div className="py-6 flex items-center justify-center gap-2 text-xs text-slate-400">
-          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-          <span>Loading immutable audit trail...</span>
-        </div>
-      ) : error ? (
-        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      ) : logs.length === 0 ? (
-        <div className="py-6 text-center text-xs text-slate-500">
-          No audit entries recorded for this asset yet.
-        </div>
-      ) : (
-        <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-[2px] before:bg-gradient-to-b before:from-emerald-500/40 before:via-violet-500/40 before:to-rose-500/40">
-          {logs.map((log) => {
-            const config = getEventConfig(log.eventType);
-            const dateStr = new Date(log.createdAt).toLocaleString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-
-            return (
-              <div key={log.id} className="relative group">
-                {/* Node icon */}
-                <div
-                  className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full border flex items-center justify-center shadow-lg ${config.nodeBg}`}
-                >
-                  {config.icon}
-                </div>
-
-                {/* Event body */}
-                <div className="bg-slate-900/60 rounded-xl p-3 border border-white/5 hover:border-white/15 transition">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-200">
-                      {config.title}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {dateStr}
-                    </span>
-                  </div>
-
-                  {renderEventDetails(log)}
-
-                  <div className="mt-2.5 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <User className="w-3 h-3 text-slate-400" />
-                      <span>Actor:</span>
-                      <strong className="text-slate-300 font-medium font-mono">
-                        {log.actor}
-                      </strong>
-                    </span>
-                    <span className="font-mono text-[9px] text-slate-600">
-                      #{log.id.slice(-6)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          <IconChip icon={ledger.chainIntact ? ShieldCheck : ShieldAlert} tone={ledger.chainIntact ? "emerald" : "red"} />
+          <div className="min-w-0">
+            <p className={cx("text-sm font-semibold", ledger.chainIntact ? "text-emerald-800" : "text-red-800")}>
+              {ledger.chainIntact ? "Record intact" : "Record altered"}
+            </p>
+            <p className="text-xs text-zinc-500">
+              {ledger.chainIntact
+                ? "Every event is written to a tamper-evident log, and none has been changed since."
+                : "Some logged events no longer match what was written. Treat this history with care."}
+              {ledger.entries > 0 && (
+                <span className="tabular-nums">
+                  {" "}
+                  {ledger.entries} {ledger.entries === 1 ? "entry" : "entries"} for this file.
+                </span>
+              )}
+            </p>
+          </div>
         </div>
       )}
-    </div>
+
+      {loading && logs.length === 0 ? (
+        <div className="space-y-5" aria-label="Loading history">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex gap-3">
+              <div className="skeleton h-7 w-7 shrink-0 rounded-md" />
+              <div className="flex-1 space-y-2 pt-1">
+                <div className="skeleton h-3.5 w-2/5 rounded" />
+                <div className="skeleton h-3 w-3/4 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <ErrorNote>{error}</ErrorNote>
+      ) : logs.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-zinc-300 px-4 py-10 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm ring-1 ring-zinc-200">
+            <History className="h-5 w-5" />
+          </span>
+          <p className="text-sm text-zinc-500">No history recorded for this file yet.</p>
+        </div>
+      ) : (
+        <>
+          <ol className="relative space-y-1 before:absolute before:bottom-6 before:left-[13.5px] before:top-4 before:w-px before:bg-zinc-200">
+            {logs.map((log) => {
+              const config = getEventConfig(log);
+              const body = renderEventDetails(log);
+              const dateStr = new Date(log.createdAt).toLocaleString("en-GB", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              const automatic = !log.actor || log.actor === "system";
+
+              return (
+                <li key={log.id} className="relative flex gap-3 pb-4">
+                  <span className="relative z-[1] rounded-md ring-4 ring-white">
+                    <IconChip icon={config.icon} tone={config.tone} size="sm" />
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="text-sm font-medium text-zinc-900">{config.title}</p>
+                      <time
+                        dateTime={log.createdAt}
+                        title={dateStr}
+                        className="shrink-0 text-xs tabular-nums text-zinc-400"
+                      >
+                        {relativeTime(log.createdAt)}
+                      </time>
+                    </div>
+                    {body && <div className="mt-0.5 break-words text-[13px] leading-relaxed text-zinc-600">{body}</div>}
+                    <p className="mt-1 inline-flex items-center gap-1 text-xs text-zinc-400">
+                      {automatic ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}
+                      {automatic ? "Automatic" : log.actor}
+                    </p>
+                    {showTech && (
+                      <div className="mt-2 space-y-0.5 rounded-lg bg-zinc-50 px-2.5 py-2 font-mono text-[11px] text-zinc-500 ring-1 ring-inset ring-zinc-200/70">
+                        <p className="break-all">{dateStr}</p>
+                        {renderTechDetails(log).map((line) => (
+                          <p key={line} className="break-all" title={line.startsWith("Ledger") ? log.eventDetail?.entryHash : undefined}>
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+          <button type="button" onClick={() => setShowTech((v) => !v)} className="btn btn-ghost btn-sm -ml-2 text-zinc-500">
+            <Braces className="h-3.5 w-3.5" />
+            {showTech ? "Hide technical details" : "Show technical details"}
+          </button>
+        </>
+      )}
+    </section>
   );
 }

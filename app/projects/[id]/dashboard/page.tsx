@@ -4,26 +4,32 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  ArrowRight,
   BarChart3,
-  Layers,
-  Search,
-  FileText,
-  ArrowLeft,
-  Calendar,
-  MapPin,
-  ShieldCheck,
-  Image as ImageIcon,
-  Video,
-  Sparkles,
-  Loader2,
-  RefreshCw,
-  ExternalLink,
+  CalendarRange,
+  CheckCircle2,
   ChevronRight,
-  TrendingUp,
+  Columns2,
+  FileText,
+  Images,
+  MapPin,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Tags,
 } from "lucide-react";
 import { ImpactCharts } from "@/components/ImpactCharts";
 import { IntegritySummaryCards } from "@/components/IntegritySummaryCards";
 import { ImpactMap } from "@/components/ImpactMap";
+import { PageHeader, ErrorNote, Stat, SectionHeader, IconChip, EmptyState } from "@/components/ui";
+
+/** "2025-03-14" -> "Mar 14, 2025" (dates arrive as plain calendar days). */
+function dayLabel(d: string | null) {
+  if (!d) return "Unknown date";
+  const date = new Date(`${d.slice(0, 10)}T00:00:00Z`);
+  if (isNaN(date.getTime())) return d;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
 
 export default function ProjectDashboardPage() {
   const params = useParams();
@@ -57,39 +63,47 @@ export default function ProjectDashboardPage() {
     fetchStats();
   }, [projectId]);
 
+  const back = { href: `/projects/${projectId}`, label: "Back to project" };
+
   if (loading && !stats) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
-        <p className="text-sm text-slate-400">Assembling structured project analytics...</p>
+      <div className="space-y-8" aria-busy="true">
+        <span className="sr-only">Loading insights</span>
+        <div className="flex items-center gap-4">
+          <div className="skeleton hidden h-12 w-12 rounded-2xl sm:block" />
+          <div className="space-y-2">
+            <div className="skeleton h-3.5 w-32 rounded" />
+            <div className="skeleton h-7 w-48 rounded-lg" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((n) => (
+            <div key={n} className="skeleton h-[118px] rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="skeleton h-80 rounded-2xl" />
+          <div className="skeleton h-80 rounded-2xl" />
+        </div>
       </div>
     );
   }
 
   if (error || !stats) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 p-8 flex flex-col items-center justify-center">
-        <div className="max-w-md w-full glass-panel rounded-2xl p-6 text-center space-y-4 border border-red-500/20">
-          <p className="text-sm text-red-300">{error || "Project data unavailable"}</p>
-          <div className="flex justify-center gap-3">
-            <Link
-              href={`/projects/${projectId}`}
-              className="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold hover:bg-slate-700"
-            >
-              Back to Project
-            </Link>
-            <button
-              onClick={fetchStats}
-              className="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 text-xs font-semibold hover:bg-emerald-400"
-            >
-              Retry
-            </button>
-          </div>
+      <div className="space-y-6">
+        <PageHeader back={back} title="Insights" icon={BarChart3} />
+        <div className="card max-w-md space-y-4 p-5">
+          <ErrorNote>{error || "Project data is not available."}</ErrorNote>
+          <button type="button" onClick={fetchStats} className="btn btn-secondary btn-sm">
+            <RefreshCw className="h-3.5 w-3.5" /> Try again
+          </button>
         </div>
       </div>
     );
   }
 
+  const shortDate = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", year: "numeric" });
   const dateSpanFormatted = stats.dateRange
     ? `${new Date(stats.dateRange.from).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} — ${new Date(stats.dateRange.to).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
     : "Timeline open";
@@ -99,255 +113,220 @@ export default function ProjectDashboardPage() {
       ? Math.round((stats.verifiedComparisonsCount / stats.totalComparisons) * 100)
       : 0;
 
+  const categories = Object.keys(stats.categoryBreakdown);
+  const avgTrust: number | null = stats.integrity?.averageTrustScore ?? null;
+
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Breadcrumb Navigation */}
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <Link
-          href={`/projects/${projectId}`}
-          className="inline-flex items-center gap-1.5 hover:text-white transition group"
-        >
-          <ArrowLeft className="w-4 h-4 text-emerald-400 group-hover:-translate-x-1 transition-transform" />
-          <span>Back to {stats.projectName}</span>
-        </Link>
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/projects/${projectId}/report`}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-md shadow-emerald-500/20 transition"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Generate Impact Report</span>
+    <div className="space-y-10">
+      <PageHeader
+        back={back}
+        eyebrow={stats.projectName}
+        icon={BarChart3}
+        title="Insights"
+        description="Key numbers and evidence for this project, in one place."
+        actions={
+          <Link href={`/projects/${projectId}/report`} className="btn btn-primary">
+            <FileText className="h-4 w-4" />
+            Create report
           </Link>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-6">
-        <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-2">
-            <BarChart3 className="w-3.5 h-3.5" />
-            Analytics & Verification Intelligence
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Impact Dashboard
-          </h1>
-          <p className="text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Verifiable evidence analytics, observational timeline metrics, and spatial distribution for {stats.projectName}.
-          </p>
-        </div>
-      </div>
-
-      {/* KPI Metrics Ribbon */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {/* Card 1: Total Assets */}
-          <div className="glass-panel rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Catalogued Media</span>
-              <ImageIcon className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-2xl font-bold text-white">{stats.totalAssets}</div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2">
-              <span>{stats.imageCount} images</span>
-              <span>•</span>
-              <span>{stats.videoCount} videos</span>
-            </div>
-          </div>
-
-          {/* Card 2: Comparisons */}
-          <div className="glass-panel rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Observation Pairs</span>
-              <Layers className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-bold text-white">{stats.totalComparisons}</div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-              <span className="font-semibold text-emerald-400">{stats.verifiedComparisonsCount}</span>
-              <span>AI-verified same scene</span>
-            </div>
-          </div>
-
-          {/* Card 3: Verification Rate */}
-          <div className="glass-panel rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Verification Rate</span>
-              <ShieldCheck className="w-4 h-4 text-violet-400" />
-            </div>
-            <div className="text-2xl font-bold text-white">{verifiedPercent}%</div>
-            <div className="text-[11px] text-slate-400 mt-1">
-              {stats.totalComparisons > 0 ? "Multi-factor scene audit" : "No pairs linked yet"}
-            </div>
-          </div>
-
-          {/* Card 4: Categories */}
-          <div className="glass-panel rounded-2xl p-4 border border-white/10">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Active Pillars</span>
-              <Sparkles className="w-4 h-4 text-amber-400" />
-            </div>
-            <div className="text-2xl font-bold text-white">
-              {Object.keys(stats.categoryBreakdown).length}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1 truncate">
-              {Object.keys(stats.categoryBreakdown).slice(0, 2).join(", ")}
-            </div>
-          </div>
-
-          {/* Card 5: Timeline Horizon */}
-          <div className="glass-panel rounded-2xl p-4 border border-white/10 col-span-2 md:col-span-4 lg:col-span-1">
-            <div className="flex items-center justify-between text-slate-400 mb-2">
-              <span className="text-xs font-medium uppercase tracking-wider">Time Horizon</span>
-              <Calendar className="w-4 h-4 text-rose-400" />
-            </div>
-            <div className="text-xs font-semibold text-white truncate" title={dateSpanFormatted}>
-              {dateSpanFormatted}
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1">Grounded capture range</div>
-          </div>
-        </div>
-
-        {/* Recharts Analytics Section */}
-        <ImpactCharts
-          categoryBreakdown={stats.categoryBreakdown}
-          totalAssets={stats.totalAssets}
-          totalComparisons={stats.totalComparisons}
-          verifiedComparisonsCount={stats.verifiedComparisonsCount}
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat
+          label="Photos and videos"
+          value={stats.totalAssets}
+          icon={Images}
+          tone="emerald"
+          hint={`${stats.imageCount} photos · ${stats.videoCount} videos`}
         />
+        <Stat
+          label="Before-and-after pairs"
+          value={stats.totalComparisons}
+          icon={Columns2}
+          tone="violet"
+          progress={stats.totalComparisons > 0 ? verifiedPercent : undefined}
+          hint={
+            stats.totalComparisons > 0
+              ? `${stats.verifiedComparisonsCount} confirmed same place (${verifiedPercent}%)`
+              : "No pairs yet"
+          }
+        />
+        {avgTrust != null ? (
+          <Stat
+            label="Average trust score"
+            value={
+              <>
+                {avgTrust}
+                <span className="ml-0.5 text-base font-medium text-zinc-400">/100</span>
+              </>
+            }
+            icon={ShieldCheck}
+            tone="emerald"
+            progress={avgTrust}
+            hint={`${stats.integrity.verified} of ${stats.totalAssets} items verified`}
+          />
+        ) : (
+          <Stat
+            label="Categories"
+            value={categories.length}
+            icon={Tags}
+            tone="zinc"
+            hint={<span className="block truncate">{categories.slice(0, 2).join(", ") || "None yet"}</span>}
+          />
+        )}
+        <Stat
+          label="Time span"
+          icon={CalendarRange}
+          tone="sky"
+          value={
+            stats.dateRange ? (
+              <span className="block truncate text-lg" title={dateSpanFormatted}>
+                {shortDate(stats.dateRange.from)} – {shortDate(stats.dateRange.to)}
+              </span>
+            ) : (
+              <span className="text-lg text-zinc-400">No dates</span>
+            )
+          }
+          hint="When photos were taken"
+        />
+      </div>
 
-        {/* Proof-of-Impact integrity, ledger and measured change */}
-        <IntegritySummaryCards facts={stats} projectId={projectId} />
+      <ImpactCharts
+        categoryBreakdown={stats.categoryBreakdown}
+        totalAssets={stats.totalAssets}
+        totalComparisons={stats.totalComparisons}
+        verifiedComparisonsCount={stats.verifiedComparisonsCount}
+      />
 
-        {/* Map of verified evidence for this project */}
-        <div className="space-y-2">
-          <h3 className="text-sm font-bold text-white">Where the verified evidence was captured</h3>
+      <IntegritySummaryCards facts={stats} projectId={projectId} />
+
+      <section className="card overflow-hidden">
+        <div className="p-5 pb-4">
+          <SectionHeader
+            icon={MapPin}
+            tone="sky"
+            title="Map"
+            description="Where the verified photos were taken."
+            actions={
+              stats.locations.length > 0 ? (
+                <span className="badge badge-blue tabular-nums">
+                  {stats.locations.length} location{stats.locations.length === 1 ? "" : "s"}
+                </span>
+              ) : undefined
+            }
+          />
+        </div>
+        <div className="px-2 pb-2">
           <ImpactMap projectId={projectId} height={380} />
         </div>
+      </section>
 
-        {/* Detailed Sections Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Observation Pairs Health & Audit Summary (7 cols) */}
-          <div className="lg:col-span-7 glass-panel rounded-2xl p-5 border border-white/10 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-cyan-400" />
-                  <span>Observation Pairs & Verification Status</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Chronological proof tracking for longitudinal project milestones
-                </p>
-              </div>
-              <Link
-                href={`/projects/${projectId}?tab=comparisons`}
-                className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
-              >
-                <span>View Pairs</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <section className="card flex flex-col lg:col-span-7">
+          <div className="p-5">
+            <SectionHeader
+              icon={Columns2}
+              tone="violet"
+              title="Before-and-after pairs"
+              description="Photos of the same place, taken at different times."
+              actions={
+                <Link href={`/projects/${projectId}?tab=comparisons`} className="btn btn-ghost btn-sm">
+                  View all <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              }
+            />
+          </div>
+
+          {stats.comparisons.length === 0 ? (
+            <div className="px-5 pb-5">
+              <EmptyState
+                icon={Columns2}
+                title="No pairs yet"
+                description="No before-and-after pairs yet. Save one from the project's Comparisons tab."
+              />
             </div>
-
-            {stats.comparisons.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500">
-                No before/after comparisons saved for this project yet. Use the Comparisons tab to link photo evidence.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {stats.comparisons.map((c: any) => (
-                  <div
-                    key={c.id}
-                    className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 space-y-2"
+          ) : (
+            <ul className="divide-y divide-zinc-100 border-t border-zinc-100">
+              {stats.comparisons.map((c: any) => (
+                <li key={c.id} className="last:overflow-hidden last:rounded-b-2xl">
+                  <Link
+                    href={`/projects/${projectId}/compare/${c.id}`}
+                    className="group flex items-start gap-3 px-5 py-4 transition-colors hover:bg-zinc-50"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-200">
-                        {c.location ? `Observation at ${c.location}` : "Pair Observation"}
-                      </span>
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                          c.verified
-                            ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
-                            : "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                        }`}
-                      >
-                        {c.verified ? "✓ AI-Verified Same Scene" : "Unverified"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-[11px] text-slate-400">
-                      <span>Before: <strong className="text-slate-300">{c.beforeDate || "N/A"}</strong></span>
-                      <span>After: <strong className="text-slate-300">{c.afterDate || "N/A"}</strong></span>
-                      {c.matchConfidence !== null && (
-                        <span>Confidence: <strong className="text-slate-300">{Math.round(c.matchConfidence * 100)}%</strong></span>
+                    <IconChip icon={c.verified ? CheckCircle2 : Columns2} tone={c.verified ? "emerald" : "zinc"} />
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                        <span className="min-w-0 truncate text-sm font-medium capitalize text-zinc-900">
+                          {c.location || "Before and after"}
+                        </span>
+                        <span
+                          className={`badge shrink-0 ${c.verified ? "badge-green" : "badge-neutral"}`}
+                          title="Whether both photos were confirmed to show the same place"
+                        >
+                          {c.verified ? "Same place confirmed" : "Not confirmed"}
+                        </span>
+                      </div>
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-zinc-500">
+                        <span>{dayLabel(c.beforeDate)}</span>
+                        <ArrowRight className="h-3 w-3 text-zinc-400" />
+                        <span>{dayLabel(c.afterDate)}</span>
+                        {c.matchConfidence !== null && (
+                          <span className="ml-1 rounded-md bg-zinc-100 px-1.5 py-0.5 font-medium text-zinc-600">
+                            Match {Math.round(c.matchConfidence * 100)}%
+                          </span>
+                        )}
+                      </p>
+                      {c.changeSummary && (
+                        <p className="flex gap-1.5 text-sm leading-relaxed text-zinc-600">
+                          <Sparkles className="mt-1 h-3.5 w-3.5 shrink-0 text-violet-500" />
+                          <span className="line-clamp-2">{c.changeSummary}</span>
+                        </p>
                       )}
                     </div>
+                    <ChevronRight className="mt-2.5 h-4 w-4 shrink-0 text-zinc-300 transition group-hover:translate-x-0.5 group-hover:text-zinc-500" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-                    {c.changeSummary && (
-                      <p className="text-xs text-slate-300 bg-white/5 p-2 rounded-lg">
-                        <strong>Change:</strong> {c.changeSummary}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+        <section className="card flex flex-col lg:col-span-5">
+          <div className="p-5">
+            <SectionHeader
+              icon={MapPin}
+              tone="sky"
+              title="Locations"
+              description="Places named on this project's media."
+              actions={
+                stats.locations.length > 0 ? (
+                  <span className="badge badge-neutral tabular-nums">{stats.locations.length}</span>
+                ) : undefined
+              }
+            />
           </div>
-
-          {/* Locations & Project Site Distribution (5 cols) */}
-          <div className="lg:col-span-5 glass-panel rounded-2xl p-5 border border-white/10 space-y-4">
-            <div>
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-rose-400" />
-                <span>Documented Field Locations</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Physical monitoring locations captured in metadata
-              </p>
+          {stats.locations.length === 0 ? (
+            <div className="px-5 pb-5">
+              <EmptyState
+                icon={MapPin}
+                title="No locations yet"
+                description="No locations added to this project's media yet."
+              />
             </div>
-
-            {stats.locations.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500">
-                No location tags specified in current assets.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {stats.locations.map((loc: string, i: number) => (
-                  <div
-                    key={i}
-                    className="p-3 rounded-xl bg-slate-900/60 border border-white/5 flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-xs font-semibold text-slate-200 capitalize">
-                        {loc}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-mono bg-white/5 px-2 py-0.5 rounded">
-                      Documented Site
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Direct Call to Action */}
-            <div className="pt-4 border-t border-white/10">
-              <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 to-slate-900 border border-emerald-500/20 space-y-2">
-                <div className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-emerald-400" />
-                  <span>Stakeholder Impact Intelligence</span>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Export an executive sustainability report grounded strictly in this project&apos;s verified timeline, empirical metrics, and before/after evidence.
-                </p>
-                <Link
-                  href={`/projects/${projectId}/report`}
-                  className="mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-md shadow-emerald-500/20 transition"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Open Report Builder</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+          ) : (
+            <ul className="max-h-[440px] divide-y divide-zinc-100 overflow-y-auto rounded-b-2xl border-t border-zinc-100">
+              {stats.locations.map((loc: string, i: number) => (
+                <li key={i} className="flex items-center gap-3 px-5 py-3">
+                  <IconChip icon={MapPin} tone="sky" size="sm" />
+                  <span className="min-w-0 truncate text-sm font-medium capitalize text-zinc-800">{loc}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { 
-  FolderPlus, 
-  MapPin, 
-  Calendar, 
-  Layers, 
-  ArrowRight, 
-  Search, 
-  ShieldCheck, 
-  Sparkles, 
-  X,
-  Loader2,
+import {
+  CalendarDays,
+  FolderKanban,
   FolderOpen,
+  Images,
+  Inbox,
+  Loader2,
+  MapPin,
+  Plus,
+  Search,
+  ShieldCheck,
   Trash2,
-  AlertTriangle
 } from "lucide-react";
+import { ConfirmDialog, EmptyState, ErrorNote, Modal, PageHeader, Stat, cx } from "@/components/ui";
+import { effectiveVerdict, type IntegritySummary } from "@/components/TrustBadge";
+import { withTransformation } from "@/lib/cloudinary-url";
 
 interface ProjectItem {
   id: string;
@@ -31,12 +32,29 @@ interface ProjectItem {
   };
 }
 
+interface AssetLite {
+  id: string;
+  projectId: string;
+  secureUrl: string;
+  resourceType: string;
+  integrity?: IntegritySummary | null;
+}
+
+function coverUrl(a: AssetLite, w: number, h: number) {
+  return withTransformation(
+    a.secureUrl,
+    `c_fill,w_${w},h_${h},g_auto,q_auto,f_auto`,
+    a.resourceType === "video" ? "jpg" : undefined,
+  );
+}
+
 function ProjectsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isNewModalOpenFromUrl = searchParams.get("new") === "true";
 
   const [projects, setProjects] = useState<ProjectItem[]>([]);
+  const [assets, setAssets] = useState<AssetLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(isNewModalOpenFromUrl);
@@ -71,8 +89,20 @@ function ProjectsPageContent() {
     }
   };
 
+  // Covers and verification counts; the page still works if this fails.
+  const fetchAssets = async () => {
+    try {
+      const res = await fetch("/api/assets");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.assets)) setAssets(data.assets);
+    } catch (err) {
+      console.error("Failed to load media overview", err);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchAssets();
   }, []);
 
   useEffect(() => {
@@ -154,372 +184,369 @@ function ProjectsPageContent() {
   });
 
   const totalAssets = projects.reduce((acc, p) => acc + (p._count?.assets || 0), 0);
-  const totalLocations = new Set(projects.map((p) => p.location).filter(Boolean)).size;
+  const totalLocations = new Set(projects.map((p) => p.location?.trim().toLowerCase()).filter(Boolean)).size;
+
+  const overview = useMemo(() => {
+    const byProject: Record<string, { covers: AssetLite[]; verified: number; review: number; total: number }> = {};
+    let verified = 0;
+    let review = 0;
+    let videos = 0;
+    for (const a of assets) {
+      const entry = (byProject[a.projectId] ??= { covers: [], verified: 0, review: 0, total: 0 });
+      entry.total++;
+      if (entry.covers.length < 3) entry.covers.push(a);
+      const v = effectiveVerdict(a.integrity);
+      if (v === "VERIFIED") {
+        entry.verified++;
+        verified++;
+      }
+      if (v === "REVIEW") {
+        entry.review++;
+        review++;
+      }
+      if (a.resourceType === "video") videos++;
+    }
+    return { byProject, verified, review, videos };
+  }, [assets]);
+
+  const verifiedPct = assets.length ? Math.round((overview.verified / assets.length) * 100) : 0;
+
+  const closeCreateModal = () => {
+    setIsModalOpen(false);
+    setFormError("");
+    if (isNewModalOpenFromUrl) router.replace("/projects");
+  };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/10 pb-6">
-        <div>
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium mb-3">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Field Evidence Repository
-            <span className="text-emerald-500/40">•</span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 tracking-wider">
-              AI MEDIA
-            </span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-            Impact & Sustainability Projects
-          </h1>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-emerald-400/90">
-            Sustainability Impact Intelligence
-          </p>
-          <p className="mt-2 text-sm text-slate-400 max-w-2xl">
-            Centralized hub for field initiatives, environmental restoration, community infrastructure, and visual evidence timelines.
-          </p>
-        </div>
-
-        <button
-          id="create-project-btn"
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <FolderPlus className="w-4 h-4" />
-          <span>New Project</span>
-        </button>
-      </div>
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-panel p-4 rounded-2xl">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Active Projects</p>
-          <p className="text-2xl font-bold text-white mt-1">{projects.length}</p>
-          <span className="text-[11px] text-emerald-400">All field initiatives</span>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Total Visual Assets</p>
-          <p className="text-2xl font-bold text-emerald-300 mt-1">{totalAssets}</p>
-          <span className="text-[11px] text-slate-400">Cloudinary CDN secured</span>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Field Locations</p>
-          <p className="text-2xl font-bold text-teal-300 mt-1">{totalLocations}</p>
-          <span className="text-[11px] text-slate-400">Geographic points</span>
-        </div>
-        <div className="glass-panel p-4 rounded-2xl">
-          <p className="text-xs text-slate-400 uppercase tracking-wider font-semibold">AI Intelligence</p>
-          <p className="text-2xl font-bold text-cyan-400 mt-1">Active</p>
-          <span className="text-[11px] text-slate-400">Automated Vision Analysis</span>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="relative w-full sm:w-96">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            id="search-projects-input"
-            type="text"
-            placeholder="Search by project name, location, or notes..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/80 border border-white/10 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition"
-          />
-        </div>
-        <div className="text-xs text-slate-400 self-end sm:self-center">
-          Showing <span className="font-semibold text-slate-200">{filteredProjects.length}</span> of {projects.length} projects
-        </div>
-      </div>
-
-      {/* Projects Grid */}
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
-          <p className="text-sm">Loading field projects...</p>
-        </div>
-      ) : filteredProjects.length === 0 ? (
-        <div className="glass-panel rounded-2xl p-12 text-center max-w-md mx-auto">
-          <div className="w-12 h-12 rounded-2xl bg-white/5 mx-auto flex items-center justify-center text-slate-400 mb-4">
-            <FolderOpen className="w-6 h-6" />
-          </div>
-          <h3 className="text-lg font-semibold text-white">No projects found</h3>
-          <p className="text-sm text-slate-400 mt-1 mb-6">
-            {searchQuery
-              ? "No projects match your search criteria. Try a different query."
-              : "Get started by creating your first environmental or sustainability field project."}
-          </p>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 transition"
-          >
-            <FolderPlus className="w-4 h-4" />
-            Create First Project
+    <div className="animate-fade-in space-y-8">
+      <PageHeader
+        icon={FolderKanban}
+        eyebrow="Workspace"
+        title="Projects"
+        description="Collect, verify and share photo evidence from every site you work on."
+        actions={
+          <button id="create-project-btn" onClick={() => setIsModalOpen(true)} className="btn btn-primary">
+            <Plus className="h-4 w-4" />
+            New project
           </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <Link
-              key={project.id}
-              href={`/projects/${project.id}`}
-              id={`project-card-${project.id}`}
-              className="glass-card rounded-2xl p-6 flex flex-col justify-between group border border-white/5 hover:border-emerald-500/30 transition-all duration-300 relative"
-            >
-              <div>
-                {/* Header tags & delete icon */}
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                    <Layers className="w-3 h-3" />
-                    {project._count?.assets ?? 0} Evidence Assets
-                  </span>
+        }
+      />
 
-                  <div className="flex items-center gap-2">
-                    {project.startDate && (
-                      <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(project.startDate).toLocaleDateString(undefined, {
-                          month: "short",
-                          year: "numeric",
-                        })}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <Stat
+          label="Projects"
+          value={loading ? "–" : projects.length}
+          icon={FolderKanban}
+          tone="emerald"
+          hint={`${totalLocations} ${totalLocations === 1 ? "location" : "locations"}`}
+        />
+        <Stat
+          label="Photos & videos"
+          value={loading ? "–" : totalAssets}
+          icon={Images}
+          tone="sky"
+          hint={`${Math.max(0, totalAssets - overview.videos)} photos · ${overview.videos} videos`}
+        />
+        <Stat
+          label="Verified"
+          value={overview.verified}
+          icon={ShieldCheck}
+          tone="emerald"
+          progress={verifiedPct}
+          hint={`${verifiedPct}% of all media`}
+        />
+        <Stat
+          label="Needs review"
+          value={overview.review}
+          icon={Inbox}
+          tone="amber"
+          href="/review"
+          hint={overview.review ? "Waiting for a person to decide" : "All caught up"}
+        />
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight text-zinc-900">All projects</h2>
+            <p className="text-[13px] text-zinc-500">
+              {searchQuery
+                ? `${filteredProjects.length} of ${projects.length} match "${searchQuery}"`
+                : "Newest first"}
+            </p>
+          </div>
+          {projects.length > 0 && (
+            <div className="relative w-full sm:w-80">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <input
+                id="search-projects-input"
+                type="text"
+                placeholder="Search by name, place or description"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input pl-9"
+              />
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="card overflow-hidden">
+                <div className="skeleton aspect-[16/9]" />
+                <div className="space-y-2.5 p-5">
+                  <div className="skeleton h-4 w-2/3 rounded" />
+                  <div className="skeleton h-3 w-full rounded" />
+                  <div className="skeleton h-3 w-1/2 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredProjects.length === 0 ? (
+          <EmptyState
+            icon={FolderOpen}
+            title={searchQuery ? "No matching projects" : "Start your first project"}
+            description={
+              searchQuery
+                ? "Try a different name, place or keyword."
+                : "A project groups the photos and videos from one site. Upload media and EcoEvidence dates, tags and verifies every file."
+            }
+            action={
+              !searchQuery && (
+                <button onClick={() => setIsModalOpen(true)} className="btn btn-primary">
+                  <Plus className="h-4 w-4" />
+                  New project
+                </button>
+              )
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {filteredProjects.map((project) => {
+              const count = project._count?.assets ?? 0;
+              const info = overview.byProject[project.id];
+              const covers = info?.covers ?? [];
+              const verified = info?.verified ?? 0;
+              const pct = count ? Math.round((verified / count) * 100) : 0;
+
+              return (
+                <Link
+                  key={project.id}
+                  href={`/projects/${project.id}`}
+                  id={`project-card-${project.id}`}
+                  className="card-interactive group relative flex flex-col overflow-hidden"
+                >
+                  {/* Cover */}
+                  <div className="relative aspect-[16/9] overflow-hidden bg-zinc-100">
+                    {covers.length === 0 ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-emerald-50 via-white to-sky-50 text-zinc-400">
+                        <div className="absolute inset-0 bg-[radial-gradient(rgba(16,185,129,0.14)_1px,transparent_1px)] [background-size:16px_16px]" />
+                        <Images className="relative h-7 w-7 text-emerald-500/70" />
+                        <span className="relative text-xs font-medium">No photos yet</span>
+                      </div>
+                    ) : covers.length < 3 ? (
+                      <img
+                        src={coverUrl(covers[0], 720, 405)}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                      />
+                    ) : (
+                      <div className="grid h-full grid-cols-3 grid-rows-2 gap-0.5">
+                        <img
+                          src={coverUrl(covers[0], 480, 405)}
+                          alt=""
+                          loading="lazy"
+                          className="col-span-2 row-span-2 h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                        />
+                        <img src={coverUrl(covers[1], 240, 200)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                        <img src={coverUrl(covers[2], 240, 200)} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      </div>
+                    )}
+
+                    {project.location && (
+                      <span className="photo-chip absolute left-3 top-3 max-w-[70%]">
+                        <MapPin className="h-3 w-3 shrink-0 text-sky-600" />
+                        <span className="truncate">{project.location}</span>
                       </span>
                     )}
 
-                    {/* Delete button on card */}
                     <button
                       type="button"
                       id={`delete-project-card-btn-${project.id}`}
                       title="Delete project"
+                      aria-label={`Delete ${project.name}`}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        setDeleteError("");
                         setProjectToDelete(project);
                       }}
-                      className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition opacity-60 hover:opacity-100"
+                      className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-lg bg-white/90 text-zinc-500 opacity-0 shadow-sm ring-1 ring-black/5 transition hover:bg-red-50 hover:text-red-600 focus-visible:opacity-100 group-hover:opacity-100"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                </div>
 
-                {/* Project Title */}
-                <h3 className="text-lg font-bold text-white group-hover:text-emerald-300 transition-colors line-clamp-1">
-                  {project.name}
-                </h3>
+                  {/* Body */}
+                  <div className="flex flex-1 flex-col p-5">
+                    <h3 className="line-clamp-1 text-[15px] font-semibold tracking-tight text-zinc-900 transition group-hover:text-emerald-700">
+                      {project.name}
+                    </h3>
+                    <p
+                      className={cx(
+                        "mt-1.5 line-clamp-2 flex-1 text-sm leading-relaxed",
+                        project.description ? "text-zinc-500" : "text-zinc-400",
+                      )}
+                    >
+                      {project.description || "No description yet."}
+                    </p>
 
-                {/* Location */}
-                {project.location && (
-                  <div className="flex items-center gap-1.5 text-xs text-teal-400/90 mt-2 font-medium">
-                    <MapPin className="w-3.5 h-3.5 shrink-0 text-teal-400" />
-                    <span className="truncate">{project.location}</span>
+                    <div className="mt-5 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-zinc-700">
+                          {verified} of {count} verified
+                        </span>
+                        <span className="tabular-nums text-zinc-400">{pct}%</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+                        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3.5 text-[13px] text-zinc-500">
+                      <span className="flex items-center gap-1.5">
+                        <Images className="h-3.5 w-3.5 text-zinc-400" />
+                        {count} {count === 1 ? "file" : "files"}
+                        {info?.review ? <span className="badge badge-amber ml-1">{info.review} to review</span> : null}
+                      </span>
+                      {project.startDate && (
+                        <span className="flex items-center gap-1.5">
+                          <CalendarDays className="h-3.5 w-3.5 text-zinc-400" />
+                          {new Date(project.startDate).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
+                </Link>
+              );
+            })}
 
-                {/* Description */}
-                <p className="text-xs text-slate-400 mt-3 line-clamp-2 leading-relaxed">
-                  {project.description || "No project description provided."}
-                </p>
-              </div>
-
-              {/* Card Footer */}
-              <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between text-xs font-semibold text-emerald-400 group-hover:text-emerald-300">
-                <span>Open Evidence Gallery</span>
-                <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* New Project Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div 
-            className="glass-dropdown w-full max-w-lg rounded-2xl p-6 sm:p-8 shadow-2xl relative border border-white/10"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close Button */}
-            <button
-              id="close-project-modal-btn"
-              onClick={() => setIsModalOpen(false)}
-              className="absolute right-4 top-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Modal Title */}
-            <div className="mb-6">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3">
-                <FolderPlus className="w-5 h-5" />
-              </div>
-              <h2 className="text-xl font-bold text-white">Create New Project</h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Establish an environmental, infrastructure, or community initiative to collect and verify field media.
-              </p>
-            </div>
-
-            {formError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
-                {formError}
-              </div>
-            )}
-
-            {/* Form */}
-            <form onSubmit={handleCreateProject} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Project Name <span className="text-emerald-400">*</span>
-                </label>
-                <input
-                  id="project-name-input"
-                  type="text"
-                  required
-                  placeholder="e.g. Madre de Dios Rainforest Canopy Monitoring"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Location Text
-                </label>
-                <input
-                  id="project-location-input"
-                  type="text"
-                  placeholder="e.g. Madre de Dios, Peru (GPS / Region)"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Start Date
-                </label>
-                <input
-                  id="project-date-input"
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Project Description & Goals
-                </label>
-                <textarea
-                  id="project-desc-input"
-                  rows={3}
-                  placeholder="Describe the mission, monitoring scope, baseline conditions, and expected outcomes..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10 mt-6">
-                <button
-                  type="button"
-                  id="cancel-project-modal-btn"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  id="project-submit-btn"
-                  disabled={submitting}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20 disabled:opacity-50 transition"
-                >
-                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{submitting ? "Creating..." : "Create Project"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Project Confirmation Modal */}
-      {projectToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div 
-            className="glass-dropdown w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl relative border border-red-500/20"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setProjectToDelete(null)}
-              className="absolute right-4 top-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-xl font-bold text-white">Delete Project?</h3>
-            <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-              Are you sure you want to permanently delete <strong className="text-white">&ldquo;{projectToDelete.name}&rdquo;</strong>?
-            </p>
-            <p className="text-xs text-red-400 mt-2 bg-red-950/40 p-3 rounded-xl border border-red-500/20">
-              Warning: This will permanently erase the project record and destroy all associated visual evidence assets from Cloudinary CDN and the database.
-            </p>
-
-            {deleteError && (
-              <div className="mt-3 p-2.5 rounded-xl bg-red-500/20 text-red-200 text-xs">
-                {deleteError}
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
+            {!searchQuery && (
               <button
                 type="button"
-                onClick={() => setProjectToDelete(null)}
-                disabled={!!deletingId}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white transition"
+                onClick={() => setIsModalOpen(true)}
+                className="group flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-zinc-200 text-zinc-500 transition hover:border-emerald-300 hover:bg-emerald-50/40 hover:text-emerald-700"
               >
-                Cancel
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-zinc-200 transition group-hover:ring-emerald-200">
+                  <Plus className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-medium">New project</span>
               </button>
-              <button
-                type="button"
-                id="confirm-delete-project-from-list-btn"
-                onClick={handleConfirmDelete}
-                disabled={!!deletingId}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/20 disabled:opacity-50 transition"
-              >
-                {deletingId ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-                <span>{deletingId ? "Deleting Project..." : "Permanently Delete"}</span>
-              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* New project */}
+      <Modal
+        open={isModalOpen}
+        onClose={closeCreateModal}
+        icon={FolderKanban}
+        title="New project"
+        description="A project groups the photos and videos from one site or initiative."
+      >
+        <form id="new-project-form" onSubmit={handleCreateProject} className="space-y-4">
+          <ErrorNote>{formError}</ErrorNote>
+
+          <div>
+            <label className="label" htmlFor="project-name-input">
+              Name
+            </label>
+            <input
+              id="project-name-input"
+              type="text"
+              required
+              autoFocus
+              placeholder="e.g. Aravalli check dams"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label" htmlFor="project-location-input">
+                Location <span className="font-normal text-zinc-400">(optional)</span>
+              </label>
+              <input
+                id="project-location-input"
+                type="text"
+                placeholder="e.g. Udaipur, Rajasthan"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="project-date-input">
+                Start date
+              </label>
+              <input
+                id="project-date-input"
+                type="date"
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="input"
+              />
             </div>
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="label" htmlFor="project-desc-input">
+              Description <span className="font-normal text-zinc-400">(optional)</span>
+            </label>
+            <textarea
+              id="project-desc-input"
+              rows={3}
+              placeholder="What is this project doing, and what should the photos show?"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="input"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button type="button" id="cancel-project-modal-btn" onClick={closeCreateModal} className="btn btn-ghost">
+              Cancel
+            </button>
+            <button type="submit" id="project-submit-btn" disabled={submitting} className="btn btn-primary">
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting ? "Creating" : "Create project"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!projectToDelete}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        busy={!!deletingId}
+        error={deleteError}
+        title={`Delete "${projectToDelete?.name ?? ""}"?`}
+        description="This permanently deletes the project and all of its photos and videos. This can't be undone."
+        confirmLabel="Delete project"
+      />
     </div>
   );
 }
 
 export default function ProjectsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="py-24 flex flex-col items-center justify-center gap-3 text-slate-400">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
-          <p className="text-sm">Loading field initiatives...</p>
-        </div>
-      }
-    >
+    <Suspense fallback={null}>
       <ProjectsPageContent />
     </Suspense>
   );

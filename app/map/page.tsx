@@ -1,26 +1,74 @@
-import { Map as MapIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { LocateFixed, Map as MapIcon, MapPin, MousePointerClick, ShieldCheck } from "lucide-react";
 import { ImpactMap } from "@/components/ImpactMap";
 
 export const metadata: Metadata = {
-  title: "Impact map | EcoEvidence",
+  title: "Map | EcoEvidence",
   description: "Every verified photo of field impact, on a map, each linked to its independent verification.",
 };
 
+// Server component: icons are rendered here directly (component props can't cross into client components).
+const NOTES = [
+  {
+    icon: ShieldCheck,
+    chip: "bg-emerald-50 text-emerald-600 ring-emerald-600/10",
+    title: "Verified photos only",
+    text: "Photos that passed the checks or were approved by a reviewer.",
+  },
+  {
+    icon: LocateFixed,
+    chip: "bg-sky-50 text-sky-600 ring-sky-600/10",
+    title: "Placed where they were taken",
+    text: "At the photo's own GPS location when it has one.",
+  },
+  {
+    icon: MapPin,
+    chip: "bg-sky-50 text-sky-600 ring-sky-600/10",
+    title: "Otherwise at the project site",
+    text: "Shown as a lighter circle, so you can tell the two apart.",
+  },
+  {
+    icon: MousePointerClick,
+    chip: "bg-zinc-100 text-zinc-600 ring-zinc-900/5",
+    title: "Select a point",
+    text: "See the photo and open its full verification page.",
+  },
+];
+
 export default function ImpactMapPage() {
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-          <MapIcon className="w-4 h-4" /> Living impact map
-        </p>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">Verified evidence, where it happened</h1>
-        <p className="text-sm text-slate-400 mt-1 max-w-3xl">
-          Only photos that passed the Integrity Engine (or a human reviewer) appear here. Click a point to open its public
-          verification page: Trust Score, weather, satellite and tamper-evident history.
-        </p>
+    <div className="space-y-8">
+      {/* Same layout as PageHeader, with a sky tile for places */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-[0_8px_20px_-8px_rgba(2,132,199,0.6)] sm:inline-flex">
+            <MapIcon className="h-6 w-6" />
+          </span>
+          <div className="min-w-0 space-y-1.5">
+            <p className="text-[13px] font-medium text-sky-700">Evidence on the ground</p>
+            <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-zinc-900">Map</h1>
+            <div className="max-w-2xl text-[15px] leading-relaxed text-zinc-500">
+              Verified photos, shown where they were taken. Select a point to open its verification.
+            </div>
+          </div>
+        </div>
       </div>
+
       <ImpactMap height={620} />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {NOTES.map(({ icon: Icon, chip, title, text }) => (
+          <div key={title} className="card flex gap-3 p-4">
+            <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ${chip}`}>
+              <Icon className="h-[18px] w-[18px]" />
+            </span>
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-sm font-semibold text-zinc-900">{title}</p>
+              <p className="text-[13px] leading-relaxed text-zinc-500">{text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

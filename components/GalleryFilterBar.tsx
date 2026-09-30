@@ -1,6 +1,7 @@
 "use client";
 
-import { Filter, Calendar, RotateCcw } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
+import { cx } from "./ui";
 
 export const CATEGORY_OPTIONS = [
   "All",
@@ -15,6 +16,14 @@ export type CategoryFilter = (typeof CATEGORY_OPTIONS)[number];
 
 // Backward-compatibility export
 export const CATEGORIES = CATEGORY_OPTIONS;
+
+const DOTS: Record<string, string> = {
+  Environmental: "bg-emerald-500",
+  Infrastructure: "bg-sky-500",
+  Community: "bg-amber-500",
+  "Disaster Response": "bg-red-500",
+  Uncategorized: "bg-zinc-400",
+};
 
 interface GalleryFilterBarProps {
   selectedCategory: string;
@@ -45,80 +54,63 @@ export function GalleryFilterBar({
     toDate;
 
   return (
-    <div className="glass-panel rounded-2xl p-4 flex flex-col gap-3.5 border border-white/5">
-      {/* Row 1: Single Category Filter */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1.5 mr-1">
-            <Filter className="w-3.5 h-3.5 text-emerald-400" />
-            Category:
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {CATEGORY_OPTIONS.map((cat) => {
-              const isActive =
-                selectedCategory.toLowerCase() === cat.toLowerCase() ||
-                (!selectedCategory && cat === "All");
-              return (
-                <button
-                  key={cat}
-                  id={`filter-category-${cat.toLowerCase().replace(/\s+/g, "-")}`}
-                  onClick={() => onSelectCategory(cat)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold shadow-md shadow-emerald-500/20"
-                      : "bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800 border border-white/5"
-                  }`}
-                >
-                  {cat}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="text-xs text-slate-400 font-medium">
-          Showing <span className="font-bold text-emerald-400">{filteredCount}</span> of {totalCount} assets
-        </div>
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1 lg:pb-0">
+        {CATEGORY_OPTIONS.map((cat) => {
+          const isActive =
+            selectedCategory.toLowerCase() === cat.toLowerCase() || (!selectedCategory && cat === "All");
+          return (
+            <button
+              key={cat}
+              id={`filter-category-${cat.toLowerCase().replace(/\s+/g, "-")}`}
+              onClick={() => onSelectCategory(cat)}
+              aria-pressed={isActive}
+              className={cx(
+                "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition",
+                isActive
+                  ? "bg-zinc-900 text-white shadow-sm"
+                  : "bg-white text-zinc-600 ring-1 ring-inset ring-zinc-200 hover:text-zinc-900 hover:ring-zinc-300",
+              )}
+            >
+              {cat !== "All" && <span className={cx("h-1.5 w-1.5 rounded-full", DOTS[cat])} />}
+              {cat === "All" ? "All media" : cat}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Row 2: Date Filters & Reset */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-slate-900/80 border border-white/10 px-3 py-1.5 rounded-xl text-xs">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-400">From:</span>
-            <input
-              id="filter-date-from"
-              type="date"
-              value={fromDate}
-              onChange={(e) => onSelectFromDate(e.target.value)}
-              className="bg-transparent text-slate-200 focus:outline-none text-xs"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 bg-slate-900/80 border border-white/10 px-3 py-1.5 rounded-xl text-xs">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-400">To:</span>
-            <input
-              id="filter-date-to"
-              type="date"
-              value={toDate}
-              onChange={(e) => onSelectToDate(e.target.value)}
-              className="bg-transparent text-slate-200 focus:outline-none text-xs"
-            />
-          </div>
-
-          {hasActiveFilters && (
-            <button
-              id="reset-filters-btn"
-              onClick={onReset}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition"
-            >
-              <RotateCcw className="w-3 h-3 text-emerald-400" />
-              <span>Reset</span>
-            </button>
-          )}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+          <CalendarDays className="h-4 w-4 shrink-0 text-zinc-400" />
+          <input
+            id="filter-date-from"
+            type="date"
+            aria-label="From date"
+            value={fromDate}
+            onChange={(e) => onSelectFromDate(e.target.value)}
+            className="h-8 bg-transparent text-[13px] text-zinc-700 focus:outline-none"
+          />
+          <span className="text-[13px] text-zinc-400">to</span>
+          <input
+            id="filter-date-to"
+            type="date"
+            aria-label="To date"
+            value={toDate}
+            onChange={(e) => onSelectToDate(e.target.value)}
+            className="h-8 bg-transparent text-[13px] text-zinc-700 focus:outline-none"
+          />
         </div>
+
+        {hasActiveFilters && (
+          <button id="reset-filters-btn" onClick={onReset} className="btn btn-ghost btn-sm">
+            <X className="h-3.5 w-3.5" />
+            Clear
+          </button>
+        )}
+
+        <span className="rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium tabular-nums text-zinc-600">
+          {hasActiveFilters ? `${filteredCount} of ${totalCount}` : `${totalCount} ${totalCount === 1 ? "file" : "files"}`}
+        </span>
       </div>
     </div>
   );

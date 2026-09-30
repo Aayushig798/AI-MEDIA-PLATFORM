@@ -1,23 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import {
-  FileText,
   Download,
-  Save,
   Trash2,
-  Sparkles,
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Layers,
-  Image as ImageIcon,
-  Calendar,
-  MapPin,
   RefreshCw,
-  Plus,
-  ExternalLink,
+  ChevronDown,
+  FileText,
+  Check,
+  Columns2,
+  Eye,
+  FileDown,
+  ImageIcon,
+  Pencil,
+  QrCode,
+  Sparkles,
+  Video,
+  ArrowRight,
+  CalendarRange,
+  Images,
+  Tags,
 } from "lucide-react";
+import { getThumbnailUrl } from "@/lib/cloudinary-url";
+import { effectiveVerdict, VERDICT_LABELS } from "@/components/TrustBadge";
+import { IconChip, Tabs, cx } from "@/components/ui";
 
 export interface ReportItem {
   id: string;
@@ -35,6 +44,71 @@ interface ReportBuilderProps {
   projectName: string;
 }
 
+type StepState = "done" | "active" | "upcoming";
+
+function StepMarker({ n, state, size = "md" }: { n: number; state: StepState; size?: "sm" | "md" }) {
+  return (
+    <span
+      className={cx(
+        "relative z-[1] flex shrink-0 items-center justify-center rounded-full font-semibold tabular-nums transition",
+        size === "md" ? "h-8 w-8 text-sm" : "h-7 w-7 text-xs",
+        state === "upcoming"
+          ? "bg-white text-zinc-400 ring-1 ring-inset ring-zinc-200"
+          : "bg-emerald-600 text-white shadow-[0_4px_12px_-4px_rgba(5,150,105,0.6)]",
+        state === "active" && "ring-4 ring-emerald-100",
+      )}
+    >
+      {state === "done" ? <Check className="h-4 w-4" strokeWidth={3} /> : n}
+    </span>
+  );
+}
+
+function Step({
+  n,
+  title,
+  description,
+  state,
+  last,
+  children,
+}: {
+  n: number;
+  title: string;
+  description?: ReactNode;
+  state: StepState;
+  last?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="relative flex gap-3 sm:gap-4">
+      {!last && (
+        <span
+          aria-hidden
+          className={cx("absolute -bottom-8 left-4 top-10 w-px", state === "upcoming" ? "bg-zinc-200" : "bg-emerald-200")}
+        />
+      )}
+      <StepMarker n={n} state={state} />
+      <div className="min-w-0 flex-1 space-y-4">
+        <div className="space-y-0.5 pt-1">
+          <h2 className={cx("text-base font-semibold tracking-tight", state === "upcoming" ? "text-zinc-400" : "text-zinc-900")}>
+            {title}
+          </h2>
+          {description && <p className="text-sm text-zinc-500">{description}</p>}
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+const formatDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+const VERDICT_DOT = {
+  VERIFIED: "bg-emerald-500",
+  REVIEW: "bg-amber-500",
+  FLAGGED: "bg-red-500",
+} as const;
+
 export function ReportBuilder({ projectId, projectName }: ReportBuilderProps) {
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null);
@@ -50,6 +124,9 @@ export function ReportBuilder({ projectId, projectName }: ReportBuilderProps) {
   const [projectFacts, setProjectFacts] = useState<any>(null);
   const [projectAssets, setProjectAssets] = useState<any[]>([]);
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+
+  // Presentational: edit form or document preview
+  const [view, setView] = useState<"edit" | "preview">("edit");
 
   const fetchReportsAndFacts = async () => {
     try {
@@ -117,7 +194,7 @@ export function ReportBuilder({ projectId, projectName }: ReportBuilderProps) {
         selectReport(data.report);
         setMessage({
           type: "success",
-          text: "Report generated successfully using grounded project facts & audit logs!",
+          text: "Report created from the project's verified facts. Review it below.",
         });
       } else {
         setMessage({ type: "error", text: data.error || "Failed to generate report" });
@@ -148,7 +225,7 @@ export function ReportBuilder({ projectId, projectName }: ReportBuilderProps) {
       if (data.success && data.report) {
         setReports(reports.map((r) => (r.id === data.report.id ? data.report : r)));
         setSelectedReport(data.report);
-        setMessage({ type: "success", text: "Report draft saved successfully." });
+        setMessage({ type: "success", text: "Changes saved." });
       } else {
         setMessage({ type: "error", text: data.error || "Failed to save draft" });
       }
@@ -182,7 +259,7 @@ export function ReportBuilder({ projectId, projectName }: ReportBuilderProps) {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      setMessage({ type: "success", text: "PDF downloaded successfully!" });
+      setMessage({ type: "success", text: "PDF downloaded." });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Failed to export PDF" });
     } finally {
@@ -219,373 +296,573 @@ export function ReportBuilder({ projectId, projectName }: ReportBuilderProps) {
   };
 
   const wordCount = draftSummary.trim() ? draftSummary.trim().split(/\s+/).length : 0;
+  const comparisons: any[] = projectFacts?.comparisons ?? [];
+
+  const stepStates: StepState[] = selectedReport ? ["done", "active", "active"] : ["active", "upcoming", "upcoming"];
+  const STEPS = ["Choose content", "Review and edit", "Export and share"];
+  const photoScope =
+    selectedAssetIds.length > 0
+      ? `${selectedAssetIds.length} selected photo${selectedAssetIds.length === 1 ? "" : "s"}`
+      : "All verified photos";
 
   return (
     <div className="space-y-6">
-      {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 glass-panel rounded-2xl p-4 border border-white/10">
-        <div>
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <FileText className="w-5 h-5 text-emerald-400" />
-            <span>Impact Intelligence Report Studio</span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Strictly fact-grounded synthesis with editable narratives and PDF export
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            id="generate-impact-report-btn"
-            onClick={handleGenerateReport}
-            disabled={generating}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-md shadow-emerald-500/20 disabled:opacity-50 transition"
-          >
-            {generating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
-            <span>{generating ? "Synthesizing Facts..." : "Generate AI Impact Report"}</span>
-          </button>
-        </div>
-      </div>
-
       {message && (
         <div
-          className={`p-3.5 rounded-xl border text-xs flex items-center gap-2 ${
+          role="status"
+          className={`animate-fade-in flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm ring-1 ring-inset print:hidden ${
             message.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-              : "bg-red-500/10 border-red-500/30 text-red-300"
+              ? "bg-emerald-50 text-emerald-800 ring-emerald-600/15"
+              : "bg-red-50 text-red-700 ring-red-600/15"
           }`}
         >
           {message.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
           ) : (
-            <AlertCircle className="w-4 h-4 shrink-0" />
+            <AlertCircle className="h-4 w-4 shrink-0" />
           )}
           <span>{message.text}</span>
         </div>
       )}
 
-      {/* Main Grid: Left Reports List / Right Editor */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Saved Reports list (4 cols) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="glass-panel rounded-2xl p-4 border border-white/10 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-              <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
-                Saved Reports ({reports.length})
+      {/* Progress */}
+      <ol className="card flex items-center gap-2 px-3 py-3 print:hidden sm:gap-3 sm:px-5 sm:py-4">
+        {STEPS.map((title, idx) => {
+          const state = stepStates[idx];
+          return (
+            <li key={title} className={cx("flex min-w-0 items-center gap-2 sm:gap-3", idx < STEPS.length - 1 && "flex-1")}>
+              <StepMarker n={idx + 1} state={state} size="sm" />
+              <span
+                className={cx(
+                  "min-w-0 truncate text-xs font-medium sm:text-sm",
+                  state === "upcoming" ? "text-zinc-400" : "text-zinc-900",
+                )}
+              >
+                {title}
               </span>
+              {idx < STEPS.length - 1 && (
+                <span
+                  aria-hidden
+                  className={cx(
+                    "hidden h-px min-w-[16px] flex-1 sm:block",
+                    stepStates[idx + 1] === "upcoming" ? "bg-zinc-200" : "bg-emerald-300",
+                  )}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="grid grid-cols-1 gap-8 print:hidden lg:grid-cols-[minmax(0,1fr)_320px]">
+        {/* Steps */}
+        <div className="min-w-0 space-y-10">
+          <Step
+            n={1}
+            state={stepStates[0]}
+            title="Choose content"
+            description="Pick the photos to feature. If you pick none, every verified photo is included."
+          >
+            <div className="card overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+                  <ImageIcon className="h-4 w-4 text-zinc-400" />
+                  Photos
+                </span>
+                <span
+                  className={cx(
+                    "badge tabular-nums",
+                    selectedAssetIds.length > 0 ? "badge-green" : "badge-neutral",
+                  )}
+                >
+                  {selectedAssetIds.length} of {projectAssets.length} selected
+                </span>
+              </div>
+
+              <div className="border-t border-zinc-100 bg-zinc-50/50">
+                {projectAssets.length === 0 ? (
+                  loading ? (
+                    <div className="grid grid-cols-3 gap-2.5 p-3 sm:grid-cols-4 md:grid-cols-5">
+                      {Array.from({ length: 10 }).map((_, n) => (
+                        <div key={n} className="skeleton aspect-square rounded-xl" />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="px-4 py-10 text-center text-sm text-zinc-500">This project has no photos yet.</p>
+                  )
+                ) : (
+                  <div className="grid max-h-[420px] grid-cols-3 gap-2.5 overflow-y-auto p-3 sm:grid-cols-4 md:grid-cols-5">
+                    {projectAssets.map((asset) => {
+                      const isChecked = selectedAssetIds.includes(asset.id);
+                      const verdict = effectiveVerdict(asset.integrity);
+                      return (
+                        <button
+                          key={asset.id}
+                          type="button"
+                          onClick={() => toggleAssetSelection(asset.id)}
+                          aria-pressed={isChecked}
+                          aria-label="Include in report"
+                          className={cx(
+                            "group relative aspect-square overflow-hidden rounded-xl bg-zinc-100 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2",
+                            isChecked
+                              ? "ring-2 ring-emerald-500 ring-offset-2 ring-offset-zinc-50"
+                              : "ring-1 ring-zinc-200 hover:ring-zinc-300",
+                          )}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={getThumbnailUrl(asset.secureUrl, asset.resourceType)}
+                            alt=""
+                            loading="lazy"
+                            className={cx(
+                              "h-full w-full object-cover transition duration-500 group-hover:scale-[1.05]",
+                              isChecked && "scale-[1.02]",
+                            )}
+                          />
+                          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
+                          {isChecked && <div className="absolute inset-0 bg-emerald-500/10" />}
+
+                          <span
+                            className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-md bg-white/90 px-1 py-0.5 shadow-sm ring-1 ring-black/5"
+                            title={verdict ? VERDICT_LABELS[verdict] : VERDICT_LABELS.UNVERIFIED}
+                          >
+                            <span className={cx("h-1.5 w-1.5 rounded-full", verdict ? VERDICT_DOT[verdict] : "bg-zinc-400")} />
+                            {asset.resourceType === "video" && <Video className="h-3 w-3 text-zinc-700" />}
+                          </span>
+
+                          <span
+                            className={cx(
+                              "absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full transition",
+                              isChecked
+                                ? "bg-emerald-500 text-white shadow-[0_2px_6px_rgba(5,150,105,0.5)]"
+                                : "bg-black/20 ring-1 ring-inset ring-white/80 backdrop-blur-sm",
+                            )}
+                          >
+                            {isChecked && <Check className="h-3 w-3" strokeWidth={3} />}
+                          </span>
+
+                          <span className="absolute bottom-1.5 left-2 right-2 truncate text-[11px] font-medium text-white">
+                            {asset.manualCategory || "Uncategorized"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-zinc-100 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="flex items-start gap-2 text-xs leading-relaxed text-zinc-500">
+                  <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500" />
+                  The text is drafted automatically from this project&apos;s verified facts. You can edit it next.
+                </p>
+                <button
+                  id="generate-impact-report-btn"
+                  onClick={handleGenerateReport}
+                  disabled={generating}
+                  className="btn btn-primary shrink-0"
+                >
+                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {generating ? "Writing report…" : selectedReport ? "Generate new report" : "Generate report"}
+                </button>
+              </div>
+            </div>
+          </Step>
+
+          <Step
+            n={2}
+            state={stepStates[1]}
+            title="Review and edit"
+            description={selectedReport ? "Edit anything you like. The PDF uses this text exactly as written." : undefined}
+          >
+            {selectedReport ? (
+              <div className="card overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+                  <Tabs
+                    value={view}
+                    onChange={setView}
+                    items={[
+                      { value: "edit", label: "Edit", icon: Pencil },
+                      { value: "preview", label: "Preview", icon: Eye },
+                    ]}
+                  />
+                  <span className="text-xs tabular-nums text-zinc-400">
+                    {wordCount} words · {draftSummary.length} characters
+                  </span>
+                </div>
+
+                {/* Edit form stays mounted so its fields keep their ids */}
+                <div className={cx("space-y-5 p-5 sm:p-6", view !== "edit" && "hidden")}>
+                  <div>
+                    <label htmlFor="report-title-input" className="label">
+                      Title
+                    </label>
+                    <input
+                      id="report-title-input"
+                      type="text"
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      className="input h-10 text-[15px] font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="report-narrative-textarea" className="label">
+                      Summary
+                    </label>
+                    <textarea
+                      id="report-narrative-textarea"
+                      rows={12}
+                      value={draftSummary}
+                      onChange={(e) => setDraftSummary(e.target.value)}
+                      placeholder="Write the report summary…"
+                      className="input text-sm leading-relaxed"
+                    />
+                  </div>
+
+                  {comparisons.length > 0 && (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+                          <Columns2 className="h-4 w-4 text-zinc-400" />
+                          Before-and-after pairs in the PDF
+                        </h3>
+                        <span className="badge badge-neutral tabular-nums">{comparisons.length}</span>
+                      </div>
+                      <ul className="divide-y divide-zinc-100 overflow-hidden rounded-xl ring-1 ring-inset ring-zinc-200">
+                        {comparisons.map((c: any) => (
+                          <li key={c.id} className="flex items-start gap-3 px-3.5 py-3">
+                            <IconChip icon={c.verified ? CheckCircle2 : Columns2} tone={c.verified ? "emerald" : "zinc"} size="sm" />
+                            <div className="min-w-0 flex-1 space-y-0.5">
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="truncate text-sm font-medium capitalize text-zinc-900">
+                                  {c.location || "Before and after"}
+                                </span>
+                                <span className={`badge shrink-0 ${c.verified ? "badge-green" : "badge-neutral"}`}>
+                                  {c.verified ? "Same place confirmed" : "Not confirmed"}
+                                </span>
+                              </div>
+                              <p className="flex flex-wrap items-center gap-1.5 text-xs tabular-nums text-zinc-500">
+                                Before {c.beforeDate || "unknown date"}
+                                <ArrowRight className="h-3 w-3 text-zinc-400" />
+                                After {c.afterDate || "unknown date"}
+                              </p>
+                              {c.changeSummary && <p className="truncate text-xs text-zinc-500">{c.changeSummary}</p>}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {view === "preview" && (
+                  <div className="bg-zinc-100/80 px-3 py-6 sm:px-8 sm:py-10">
+                    <article className="mx-auto max-w-2xl rounded-md bg-white px-6 py-8 shadow-[0_1px_3px_rgba(16,24,40,0.08),0_28px_56px_-28px_rgba(16,24,40,0.35)] ring-1 ring-zinc-200/70 sm:px-12 sm:py-12">
+                      <div className="h-1 w-12 rounded-full bg-emerald-500" />
+                      <p className="mt-6 text-[13px] font-medium text-emerald-700">{projectName}</p>
+                      <h1 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-zinc-900 sm:text-[28px]">
+                        {draftTitle || "Impact report"}
+                      </h1>
+                      <p className="mt-2 text-xs tabular-nums text-zinc-500">
+                        {formatDate(selectedReport.createdAt)} · {photoScope}
+                      </p>
+
+                      <div className="mt-6 whitespace-pre-wrap border-t border-zinc-100 pt-6 text-[15px] leading-7 text-zinc-700">
+                        {draftSummary || <span className="text-zinc-400">No summary yet.</span>}
+                      </div>
+
+                      {comparisons.length > 0 && (
+                        <section className="mt-10">
+                          <h2 className="text-sm font-semibold text-zinc-900">Before-and-after pairs</h2>
+                          <div className="mt-3 overflow-x-auto">
+                            <table className="w-full min-w-[420px] border-collapse text-left text-xs">
+                              <thead>
+                                <tr className="border-b border-zinc-200 text-zinc-500">
+                                  <th className="py-2 pr-3 font-medium">Location</th>
+                                  <th className="py-2 pr-3 font-medium">Before</th>
+                                  <th className="py-2 pr-3 font-medium">After</th>
+                                  <th className="py-2 font-medium">Same place</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {comparisons.map((c: any) => (
+                                  <tr key={c.id} className="border-b border-zinc-100 align-top text-zinc-700">
+                                    <td className="py-2 pr-3 capitalize">{c.location || "—"}</td>
+                                    <td className="py-2 pr-3 tabular-nums">{c.beforeDate || "—"}</td>
+                                    <td className="py-2 pr-3 tabular-nums">{c.afterDate || "—"}</td>
+                                    <td className="py-2">
+                                      {c.verified ? (
+                                        <span className="inline-flex items-center gap-1 text-emerald-700">
+                                          <Check className="h-3 w-3" /> Confirmed
+                                        </span>
+                                      ) : (
+                                        "Not confirmed"
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      )}
+
+                      <footer className="mt-10 flex items-center gap-2 border-t border-zinc-100 pt-4 text-xs text-zinc-400">
+                        <QrCode className="h-3.5 w-3.5 shrink-0" />
+                        The PDF adds QR codes that link to each photo&apos;s public verification page.
+                      </footer>
+                    </article>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-300 bg-white/60 px-6 py-10 text-center">
+                <Pencil className="h-5 w-5 text-zinc-300" />
+                <p className="mt-2 text-sm text-zinc-500">Generate a report in step 1 to review it here.</p>
+              </div>
+            )}
+          </Step>
+
+          <Step
+            n={3}
+            state={stepStates[2]}
+            last
+            title="Export and share"
+            description={
+              selectedReport
+                ? "Download a PDF to share. It includes QR codes that link to each photo's public verification page."
+                : undefined
+            }
+          >
+            {selectedReport ? (
+              <div className="card overflow-hidden">
+                <div className="flex flex-col gap-4 bg-gradient-to-br from-emerald-50/80 via-white to-white p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <IconChip icon={FileDown} tone="emerald" size="lg" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-zinc-900">PDF report</p>
+                      <p className="text-xs text-zinc-500">Downloading also saves your latest changes.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      id="save-report-draft-btn"
+                      onClick={handleSaveDraft}
+                      disabled={saving}
+                      className="btn btn-secondary"
+                    >
+                      {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {saving ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      id="export-report-pdf-btn"
+                      onClick={handleExportPdf}
+                      disabled={exporting}
+                      className="btn btn-primary"
+                    >
+                      {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      {exporting ? "Preparing PDF…" : "Download PDF"}
+                    </button>
+                  </div>
+                </div>
+                <ul className="grid grid-cols-1 gap-px border-t border-zinc-100 bg-zinc-100 sm:grid-cols-3">
+                  {[
+                    { icon: Pencil, text: "Your edited text" },
+                    { icon: Columns2, text: "Before-and-after pairs" },
+                    { icon: QrCode, text: "QR codes to verification pages" },
+                  ].map(({ icon: Icon, text }) => (
+                    <li key={text} className="flex items-center gap-2 bg-white px-4 py-3 text-xs text-zinc-600">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                      {text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-400">Available once you have a report.</p>
+            )}
+          </Step>
+        </div>
+
+        {/* Sidebar: saved reports and source facts */}
+        <aside className="space-y-5">
+          <section className="card overflow-hidden">
+            <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+              <h2 className="flex items-center gap-2.5 text-sm font-semibold text-zinc-900">
+                <IconChip icon={FileText} tone="emerald" size="sm" />
+                Saved reports
+                <span className="badge badge-neutral tabular-nums">{reports.length}</span>
+              </h2>
               <button
                 onClick={fetchReportsAndFacts}
                 disabled={loading}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition"
-                title="Refresh reports"
+                className="btn btn-ghost btn-sm btn-icon"
+                title="Refresh"
+                aria-label="Refresh reports"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               </button>
             </div>
 
             {loading && reports.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                <span>Loading reports...</span>
+              <div className="space-y-2 border-t border-zinc-100 p-3">
+                {[0, 1, 2].map((n) => (
+                  <div key={n} className="skeleton h-12 rounded-lg" />
+                ))}
               </div>
             ) : reports.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500 space-y-2">
-                <p>No reports generated yet.</p>
-                <p className="text-[11px] text-slate-600">
-                  Click &quot;Generate AI Impact Report&quot; to synthesize project evidence into an executive draft.
-                </p>
+              <div className="flex flex-col items-center gap-2 border-t border-zinc-100 px-4 py-10 text-center">
+                <FileText className="h-5 w-5 text-zinc-300" />
+                <p className="text-sm text-zinc-500">No reports yet.</p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
+              <div className="max-h-[480px] divide-y divide-zinc-100 overflow-y-auto border-t border-zinc-100">
                 {reports.map((report) => {
                   const isSelected = selectedReport?.id === report.id;
-                  const dateStr = new Date(report.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  });
-
                   return (
                     <div
                       key={report.id}
                       onClick={() => selectReport(report)}
-                      className={`p-3 rounded-xl border cursor-pointer transition flex items-start justify-between gap-2 ${
-                        isSelected
-                          ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-200"
-                          : "bg-slate-900/50 border-white/5 text-slate-300 hover:bg-slate-900 hover:border-white/15"
-                      }`}
+                      className={cx(
+                        "group relative flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors",
+                        isSelected ? "bg-emerald-50/60" : "hover:bg-zinc-50",
+                      )}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold truncate">
+                      {isSelected && <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-emerald-500" />}
+                      <IconChip icon={FileText} tone={isSelected ? "emerald" : "zinc"} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <div className={cx("truncate text-sm", isSelected ? "font-medium text-zinc-900" : "text-zinc-700")}>
                           {report.title || "Impact Report"}
                         </div>
-                        <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-2">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {dateStr}
-                          </span>
-                          <span>•</span>
-                          <span>{report.selectedAssetIds?.length || 0} assets</span>
+                        <div className="mt-0.5 text-xs tabular-nums text-zinc-500">
+                          {formatDate(report.createdAt)} · {report.selectedAssetIds?.length || 0} photos
                         </div>
                       </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteReport(report.id);
-                        }}
-                        className="text-slate-500 hover:text-red-400 p-1 rounded transition"
-                        title="Delete report"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex shrink-0 items-center">
+                        {isSelected && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportPdf();
+                            }}
+                            disabled={exporting}
+                            className="btn btn-ghost btn-sm btn-icon text-emerald-700 hover:bg-emerald-100/70 hover:text-emerald-800"
+                            title="Download PDF"
+                            aria-label="Download PDF"
+                          >
+                            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteReport(report.id);
+                          }}
+                          className="btn btn-ghost btn-sm btn-icon text-zinc-400 hover:text-red-600"
+                          title="Delete report"
+                          aria-label="Delete report"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
+          </section>
 
-          {/* Structured Facts Grounding Panel */}
           {projectFacts && (
-            <div className="glass-panel rounded-2xl p-4 border border-white/10 space-y-3">
-              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider block pb-2 border-b border-white/10">
-                Ground Truth Reference Metrics
-              </span>
-              <div className="space-y-2 text-xs text-slate-300">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Total Catalogued Assets:</span>
-                  <strong className="text-white">{projectFacts.totalAssets}</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Observation Pairs:</span>
-                  <strong className="text-white">
-                    {projectFacts.totalComparisons} ({projectFacts.verifiedComparisonsCount} verified)
-                  </strong>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Timeline Window:</span>
-                  <span className="text-right text-[11px] text-slate-300 font-mono">
-                    {projectFacts.dateRange
-                      ? `${new Date(projectFacts.dateRange.from).toLocaleDateString()} — ${new Date(projectFacts.dateRange.to).toLocaleDateString()}`
-                      : "Open"}
-                  </span>
-                </div>
-                <div className="pt-2 border-t border-white/5">
-                  <span className="text-[11px] text-slate-400 block mb-1.5">Categories:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {Object.entries(projectFacts.categoryBreakdown).map(([cat, count]: any) => (
-                      <span
-                        key={cat}
-                        className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300"
-                      >
-                        {cat}: {count}
-                      </span>
-                    ))}
+            <details className="group card overflow-hidden" open>
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 [&::-webkit-details-marker]:hidden">
+                What the report is based on
+                <ChevronDown className="h-4 w-4 text-zinc-400 transition group-open:rotate-180" />
+              </summary>
+              <div className="space-y-3 border-t border-zinc-100 px-4 py-3.5">
+                <dl className="space-y-2.5 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="flex items-center gap-2 text-zinc-500">
+                      <Images className="h-3.5 w-3.5 text-zinc-400" /> Photos and videos
+                    </dt>
+                    <dd className="font-medium tabular-nums text-zinc-900">{projectFacts.totalAssets}</dd>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column: Editor & PDF Export (8 cols) */}
-        <div className="lg:col-span-8 space-y-5">
-          {selectedReport ? (
-            <div className="glass-panel rounded-2xl p-5 border border-white/10 space-y-5">
-              {/* Header with Title Input & Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
-                <div className="flex-1 w-full">
-                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-                    Report Title
-                  </label>
-                  <input
-                    id="report-title-input"
-                    type="text"
-                    value={draftTitle}
-                    onChange={(e) => setDraftTitle(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-sm font-bold text-white focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                  <button
-                    id="save-report-draft-btn"
-                    onClick={handleSaveDraft}
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold disabled:opacity-50 transition"
-                  >
-                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    <span>{saving ? "Saving..." : "Save Draft"}</span>
-                  </button>
-
-                  <button
-                    id="export-report-pdf-btn"
-                    onClick={handleExportPdf}
-                    disabled={exporting}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-md shadow-emerald-500/20 disabled:opacity-50 transition"
-                  >
-                    {exporting ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Download className="w-3.5 h-3.5" />
-                    )}
-                    <span>{exporting ? "Rendering PDF..." : "Export as PDF"}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Narrative Textarea */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Executive Impact Narrative (Editable Draft)</span>
-                  </label>
-                  <span className="text-[11px] font-mono text-slate-500">
-                    {wordCount} words • {draftSummary.length} characters
-                  </span>
-                </div>
-                <textarea
-                  id="report-narrative-textarea"
-                  rows={9}
-                  value={draftSummary}
-                  onChange={(e) => setDraftSummary(e.target.value)}
-                  placeholder="Grounded executive impact narrative..."
-                  className="w-full p-4 rounded-xl bg-slate-900/90 border border-white/10 text-xs text-slate-200 leading-relaxed font-sans placeholder-slate-600 focus:outline-none focus:border-emerald-500"
-                />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Tip: You can freely edit this narrative prior to PDF export. It will be printed directly in the final document.
-                </p>
-              </div>
-
-              {/* Included Visual Evidence Comparisons Preview */}
-              {projectFacts?.comparisons && projectFacts.comparisons.length > 0 && (
-                <div className="space-y-3 pt-3 border-t border-white/10">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Included Observation Pairs in PDF</span>
-                    </h3>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {projectFacts.comparisons.length} pairs catalogued
-                    </span>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="flex items-center gap-2 text-zinc-500">
+                      <Columns2 className="h-3.5 w-3.5 text-zinc-400" /> Before-and-after pairs
+                    </dt>
+                    <dd className="text-right font-medium tabular-nums text-zinc-900">
+                      {projectFacts.totalComparisons}{" "}
+                      <span className="font-normal text-zinc-500">({projectFacts.verifiedComparisonsCount} confirmed)</span>
+                    </dd>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {projectFacts.comparisons.map((c: any) => (
-                      <div
-                        key={c.id}
-                        className="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-1.5"
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-slate-300 truncate">
-                            {c.location || "Observation Pair"}
-                          </span>
-                          <span
-                            className={`text-[9px] px-1.5 py-0.2 rounded font-semibold ${
-                              c.verified
-                                ? "bg-emerald-500/20 text-emerald-300"
-                                : "bg-amber-500/20 text-amber-300"
-                            }`}
-                          >
-                            {c.verified ? "✓ Verified" : "Unverified"}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-400 flex items-center justify-between">
-                          <span>Before: {c.beforeDate || "N/A"}</span>
-                          <span>After: {c.afterDate || "N/A"}</span>
-                        </div>
-                        {c.changeSummary && (
-                          <div className="text-[10px] text-slate-400 truncate">
-                            {c.changeSummary}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="flex items-center gap-2 text-zinc-500">
+                      <CalendarRange className="h-3.5 w-3.5 text-zinc-400" /> Dates
+                    </dt>
+                    <dd className="text-right text-xs tabular-nums text-zinc-900">
+                      {projectFacts.dateRange
+                        ? `${new Date(projectFacts.dateRange.from).toLocaleDateString()} – ${new Date(projectFacts.dateRange.to).toLocaleDateString()}`
+                        : "Open"}
+                    </dd>
                   </div>
-                </div>
-              )}
-
-              {/* Asset Selection Matrix for Audit & Gallery Section */}
-              <div className="space-y-3 pt-3 border-t border-white/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <ImageIcon className="w-3.5 h-3.5 text-violet-400" />
-                      <span>Select Assets to Associate with this Report</span>
-                    </h3>
-                    <p className="text-[11px] text-slate-400">
-                      Selected assets will be logged as &quot;used_in_report&quot; in the audit trail and highlighted in the PDF.
+                </dl>
+                {Object.keys(projectFacts.categoryBreakdown).length > 0 && (
+                  <div className="space-y-2 border-t border-zinc-100 pt-3">
+                    <p className="flex items-center gap-2 text-xs text-zinc-500">
+                      <Tags className="h-3.5 w-3.5 text-zinc-400" /> Categories
                     </p>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(projectFacts.categoryBreakdown).map(([cat, count]: any) => (
+                        <span key={cat} className="badge badge-neutral">
+                          {cat} <span className="tabular-nums text-zinc-400">{count}</span>
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    {selectedAssetIds.length} of {projectAssets.length} selected
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-56 overflow-y-auto p-1">
-                  {projectAssets.map((asset) => {
-                    const isChecked = selectedAssetIds.includes(asset.id);
-                    return (
-                      <div
-                        key={asset.id}
-                        onClick={() => toggleAssetSelection(asset.id)}
-                        className={`relative rounded-xl overflow-hidden border cursor-pointer transition ${
-                          isChecked
-                            ? "border-emerald-500 ring-2 ring-emerald-500/30"
-                            : "border-white/10 opacity-60 hover:opacity-100"
-                        }`}
-                      >
-                        <div className="h-20 bg-black">
-                          <img
-                            src={asset.secureUrl}
-                            alt=""
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="p-1.5 bg-slate-900/90 text-[10px] flex items-center justify-between">
-                          <span className="truncate max-w-[80px] text-slate-300">
-                            {asset.manualCategory || "Uncategorized"}
-                          </span>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}}
-                            className="w-3 h-3 rounded accent-emerald-500"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                )}
               </div>
-            </div>
-          ) : (
-            <div className="glass-panel rounded-2xl p-12 text-center space-y-4 border border-white/10">
-              <FileText className="w-12 h-12 text-slate-600 mx-auto" />
-              <div className="max-w-sm mx-auto space-y-1">
-                <h3 className="text-sm font-bold text-slate-200">No Report Selected</h3>
-                <p className="text-xs text-slate-400">
-                  Select an existing report from the left panel, or click the button below to generate a new executive synthesis.
-                </p>
-              </div>
-              <button
-                onClick={handleGenerateReport}
-                disabled={generating}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold shadow-md shadow-emerald-500/20 disabled:opacity-50 transition"
-              >
-                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                <span>Generate First Impact Report</span>
-              </button>
-            </div>
+            </details>
           )}
-        </div>
+        </aside>
       </div>
+
+      {/* Print view: a plain black-on-white copy of the current report */}
+      {selectedReport && (
+        <article className="hidden bg-white text-black print:block">
+          <header className="border-b border-black pb-4">
+            <p className="text-sm">{projectName}</p>
+            <h1 className="mt-1 text-2xl font-semibold">{draftTitle || "Impact report"}</h1>
+            <p className="mt-1 text-xs">{formatDate(selectedReport.createdAt)}</p>
+          </header>
+          <div className="mt-6 whitespace-pre-wrap text-sm leading-relaxed">{draftSummary}</div>
+          {comparisons.length > 0 && (
+            <section className="mt-8 break-inside-avoid">
+              <h2 className="text-base font-semibold">Before-and-after pairs</h2>
+              <table className="mt-2 w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr className="border-b border-black">
+                    <th className="py-1.5 pr-3 font-semibold">Location</th>
+                    <th className="py-1.5 pr-3 font-semibold">Before</th>
+                    <th className="py-1.5 pr-3 font-semibold">After</th>
+                    <th className="py-1.5 font-semibold">Same place</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisons.map((c: any) => (
+                    <tr key={c.id} className="border-b border-zinc-300 align-top">
+                      <td className="py-1.5 pr-3">{c.location || "—"}</td>
+                      <td className="py-1.5 pr-3">{c.beforeDate || "—"}</td>
+                      <td className="py-1.5 pr-3">{c.afterDate || "—"}</td>
+                      <td className="py-1.5">{c.verified ? "Confirmed" : "Not confirmed"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+        </article>
+      )}
     </div>
   );
 }

@@ -1,26 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { 
-  Sparkles, 
-  Layers, 
-  Calendar, 
-  MapPin, 
-  ArrowRight, 
-  BookmarkPlus, 
-  Check, 
-  X, 
-  Loader2, 
-  SlidersHorizontal,
+import { useState, useEffect, type ReactNode } from "react";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BookmarkCheck,
+  Calendar,
+  CalendarClock,
+  Check,
+  ChevronDown,
   Clock,
-  CheckCircle2,
-  AlertTriangle,
+  Columns2,
+  Eye,
+  Image as ImageIcon,
+  Images,
+  Loader2,
+  MapPin,
   Plus,
-  ChevronDown
+  ShieldCheck,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { CompareSlider } from "./CompareSlider";
 import { ComparisonSuggestion } from "@/lib/search/pairing";
 import { ComparisonWarningModal } from "./ComparisonWarningModal";
+import { EmptyState, ErrorNote, IconChip, Modal, SectionHeader, cx } from "@/components/ui";
+import { getThumbnailUrl, withTransformation } from "@/lib/cloudinary-url";
 
 interface SuggestedComparisonsProps {
   projectId: string;
@@ -33,6 +38,135 @@ interface MissingDateAsset {
   secureUrl: string;
   manualLocation?: string | null;
   createdAt: string;
+}
+
+function formatDate(value: string | Date | null | undefined, fallback: string) {
+  if (!value) return fallback;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return fallback;
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+const PAIR_CROP = "c_fill,w_600,h_450,g_auto,q_auto,f_auto";
+
+/** A ~600px crop of the photo, sharp enough for the side-by-side pair cards. */
+function pairImageUrl(asset: any): string {
+  const src = asset?.secureUrl || asset?.normalizedUrl || "";
+  return withTransformation(src, PAIR_CROP, asset?.resourceType === "video" ? "jpg" : undefined);
+}
+
+/** Two tilted photo frames, used as the empty-state illustration. */
+function PhotoPairIcon() {
+  return (
+    <span className="relative block h-8 w-10" aria-hidden>
+      <span className="absolute left-0 top-1.5 flex h-6 w-6 -rotate-[10deg] items-center justify-center rounded-md bg-zinc-100 text-zinc-400 ring-1 ring-zinc-300">
+        <ImageIcon className="h-3.5 w-3.5" />
+      </span>
+      <span className="absolute right-0 top-0 flex h-6 w-6 rotate-[8deg] items-center justify-center rounded-md bg-emerald-50 text-emerald-600 shadow-sm ring-1 ring-emerald-300">
+        <ImageIcon className="h-3.5 w-3.5" />
+      </span>
+    </span>
+  );
+}
+
+/** Two large photos side by side, earlier on the left, joined by a round arrow at the seam. */
+function PairImages({
+  beforeUrl,
+  afterUrl,
+  beforeDate,
+  afterDate,
+  corner,
+}: {
+  beforeUrl: string;
+  afterUrl: string;
+  beforeDate?: string | Date | null;
+  afterDate?: string | Date | null;
+  corner?: ReactNode;
+}) {
+  return (
+    <div className="relative grid grid-cols-2 gap-[3px] bg-white">
+      {[
+        { url: beforeUrl, label: "Before", date: beforeDate, dot: "bg-zinc-400" },
+        { url: afterUrl, label: "After", date: afterDate, dot: "bg-emerald-500" },
+      ].map((img) => (
+        <div key={img.label} className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
+          <img
+            src={img.url}
+            alt={`${img.label} photo`}
+            loading="lazy"
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+          <span className="photo-chip absolute left-2.5 top-2.5">
+            <span className={cx("h-1.5 w-1.5 rounded-full", img.dot)} />
+            {img.label}
+          </span>
+          <span className="absolute bottom-2.5 left-2.5 right-2.5 truncate text-xs font-medium tabular-nums text-white drop-shadow-sm">
+            {formatDate(img.date, "No date")}
+          </span>
+        </div>
+      ))}
+      <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-emerald-600 shadow-[0_6px_16px_-6px_rgba(16,24,40,0.45)] ring-4 ring-white/40">
+        <ArrowRight className="h-4 w-4" />
+      </span>
+      {corner && <div className="absolute right-2.5 top-2.5">{corner}</div>}
+    </div>
+  );
+}
+
+/** Placeholder card while pairs load. */
+function PairCardSkeleton() {
+  return (
+    <div className="card overflow-hidden">
+      <div className="grid grid-cols-2 gap-[3px]">
+        <div className="skeleton aspect-[4/3]" />
+        <div className="skeleton aspect-[4/3]" />
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="flex items-center gap-2.5">
+          <div className="skeleton h-7 w-7 rounded-md" />
+          <div className="skeleton h-4 w-1/2 rounded" />
+        </div>
+        <div className="flex gap-1.5">
+          <div className="skeleton h-5 w-28 rounded-md" />
+          <div className="skeleton h-5 w-16 rounded-md" />
+        </div>
+        <div className="flex items-center justify-between border-t border-zinc-100 pt-3">
+          <div className="skeleton h-4 w-14 rounded" />
+          <div className="skeleton h-8 w-32 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Match score and reason for a pair (the visible change is shown next to the photos). */
+function PairDetails({ confidence, reason }: { confidence: number; reason?: string | null }) {
+  const pct = Math.round(confidence * 100);
+  return (
+    <div className="space-y-3 rounded-xl bg-zinc-50 px-3.5 py-3 text-xs ring-1 ring-inset ring-zinc-900/5">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-zinc-500" title="How confident the check is that both photos show the same place">
+            Match score
+          </span>
+          <span className="font-medium tabular-nums text-zinc-900">{pct}%</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/70">
+          <div
+            className="h-full rounded-full bg-violet-500"
+            style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+          />
+        </div>
+      </div>
+      {reason && (
+        <div className="space-y-0.5">
+          <p className="text-zinc-500">Why it&apos;s the same place</p>
+          <p className="leading-relaxed text-zinc-700">{reason}</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SuggestedComparisons({
@@ -166,6 +300,13 @@ export function SuggestedComparisons({
         setSelectedAssetIds([selectedAssetIds[0], assetId]);
       }
     }
+  };
+
+  const openPreview = (pair: ComparisonSuggestion) => {
+    setActiveComparePair(pair);
+    setPairNotes("");
+    setSaveSuccess(false);
+    setSaveError("");
   };
 
   const handleSaveComparison = async (pair: ComparisonSuggestion) => {
@@ -322,20 +463,45 @@ export function SuggestedComparisons({
     }
   };
 
+  const renderHeader = (action?: ReactNode) => (
+    <SectionHeader
+      icon={Sparkles}
+      tone="violet"
+      title={
+        <span className="flex items-center gap-2">
+          Suggested pairs
+          {suggestions.length > 0 && !loading && !error && (
+            <span className="badge badge-violet tabular-nums">{suggestions.length}</span>
+          )}
+        </span>
+      }
+      description="Earlier and later photos of the same place, matched for you."
+      actions={action}
+    />
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8 text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
-        <span className="text-xs">Analyzing spatial & temporal metadata for pairs...</span>
-      </div>
+      <section className="space-y-4">
+        {renderHeader()}
+        <p className="flex items-center gap-2 text-[13px] text-zinc-500">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-500" />
+          Looking for matching photos. This can take a few seconds.
+        </p>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <PairCardSkeleton />
+          <PairCardSkeleton />
+        </div>
+      </section>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
-        {error}
-      </div>
+      <section className="space-y-4">
+        {renderHeader()}
+        <ErrorNote>{error}</ErrorNote>
+      </section>
     );
   }
 
@@ -363,567 +529,482 @@ export function SuggestedComparisons({
   const isMissingDatesReason = totalImagesCount >= 2 && missingDateCount > 0;
 
   return (
-    <div className="space-y-4">
-      {suggestions.length === 0 ? (
-        <div className="rounded-2xl border border-white/5 bg-slate-900/30 p-8 text-center space-y-4">
-          {isMissingDatesReason ? (
-            <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-white">
-                  {missingDateCount} photo{missingDateCount === 1 ? "" : "s"} missing a capture date
-                </h4>
-                <p className="text-xs text-amber-300/90 font-medium max-w-lg mx-auto">
-                  {missingDateCount} photo{missingDateCount === 1 ? " is" : "s are"} missing a capture date. Add dates to enable comparison suggestions.
-                </p>
-              </div>
-
-              {/* List of assets missing capture date with one-click inline date setter */}
-              {missingDateAssets.length > 0 && (
-                <div className="max-w-xl mx-auto mt-4 text-left">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
-                    <span>Photos needing capture date ({missingDateAssets.length}):</span>
-                    <span className="text-[10px] text-slate-500">Add dates to compare</span>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {missingDateAssets.map((asset) => (
-                      <div
-                        key={asset.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-950/70 border border-white/5 hover:border-amber-500/30 transition"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <img
-                            src={asset.secureUrl}
-                            alt="asset preview"
-                            className="w-12 h-12 rounded-lg object-cover border border-white/10 shrink-0"
-                          />
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold text-slate-200 truncate">
-                              {asset.manualLocation || "Project Field Photo"}
-                            </p>
-                            <p className="text-[10px] text-slate-500">
-                              Uploaded {new Date(asset.createdAt).toLocaleDateString()}
-                            </p>
-                            <span className="inline-block mt-0.5 text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-medium">
-                              No capture date
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Inline date picker */}
-                        <div className="shrink-0 flex items-center gap-2">
-                          {settingDateAssetId === asset.id ? (
-                            <div className="flex items-center gap-1.5 bg-slate-900 p-1.5 rounded-lg border border-amber-500/30">
-                              <input
-                                type="datetime-local"
-                                value={inlineDateVal}
-                                onChange={(e) => setInlineDateVal(e.target.value)}
-                                className="px-2 py-1 text-xs rounded bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-amber-400"
-                              />
-                              <button
-                                type="button"
-                                disabled={savingInlineDate || !inlineDateVal}
-                                onClick={() => handleSaveInlineDate(asset.id)}
-                                className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-400 hover:bg-amber-300 text-slate-950 disabled:opacity-50 transition"
-                              >
-                                {savingInlineDate ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setSettingDateAssetId(null)}
-                                className="p-1 text-slate-400 hover:text-white"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSettingDateAssetId(asset.id);
-                                setInlineDateVal(new Date().toISOString().slice(0, 16));
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-400/15 hover:bg-amber-400/25 text-amber-300 border border-amber-400/30 transition"
-                            >
-                              <Calendar className="w-3 h-3 text-amber-400" />
-                              <span>Set Date</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <Layers className="w-10 h-10 text-slate-600 mx-auto" />
-              <h4 className="text-sm font-semibold text-slate-200">
-                {totalImagesCount < 2
-                  ? "Upload at least 2 photos to this project to enable before/after comparison suggestions."
-                  : "No valid before/after pairs found. Upload photos of the same location taken at different times."}
-              </h4>
-            </div>
-          )}
-
-          <div className="pt-2 flex justify-center">
-            <button
-              type="button"
-              id="open-manual-picker-btn"
-              onClick={handleOpenManualPicker}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Select Custom Pair to Compare</span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <h3 className="text-sm font-bold text-white tracking-tight">
-                AI Suggested Before / After Pairs ({suggestions.length})
-              </h3>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleOpenManualPicker}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition"
-              >
-                <Plus className="w-3 h-3 text-emerald-400" />
-                <span>Custom Pair</span>
-              </button>
-              <span className="text-xs text-slate-400 hidden sm:inline">
-                Matched by geographic proximity & date progression
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {suggestions.map((pair) => {
-          const pct = Math.round(pair.confidence * 100);
-
-          return (
-            <div
-              key={pair.id}
-              className="glass-card rounded-2xl p-4 border border-white/10 hover:border-emerald-500/30 transition-all flex flex-col justify-between group"
-            >
-              <div>
-                {/* 1. Header: Location and Time Span */}
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-                    <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                    {pair.locationLabel}
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                    <Clock className="w-3 h-3" />
-                    {pair.timeSpanLabel}
-                  </span>
-                </div>
-
-                {/* Photo capture dates */}
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2.5 px-0.5">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-slate-500" />
-                    <span className="text-slate-500">Before:</span>
-                    <strong className="text-slate-300">
-                      {pair.before.capturedAt ? new Date(pair.before.capturedAt).toLocaleDateString() : "Earlier"}
-                    </strong>
-                  </span>
-                  <span className="text-slate-600">&rarr;</span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-slate-500" />
-                    <span className="text-slate-500">After:</span>
-                    <strong className="text-slate-300">
-                      {pair.after.capturedAt ? new Date(pair.after.capturedAt).toLocaleDateString() : "Recent"}
-                    </strong>
-                  </span>
-                </div>
-
-                {/* 2. Side-by-side previews */}
-                <div className="grid grid-cols-2 gap-2 relative rounded-xl overflow-hidden mb-3 bg-slate-950 p-1 border border-white/5">
-                  {/* Before Thumbnail */}
-                  <div className="relative aspect-[4/3] rounded-lg overflow-hidden group/thumb">
-                    <img
-                      src={pair.before.normalizedUrl || pair.before.secureUrl}
-                      alt="Before evidence"
-                      className="w-full h-full object-cover group-hover/thumb:scale-105 transition"
-                    />
-                    <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/80 text-[10px] font-bold text-amber-400 border border-amber-500/30 backdrop-blur-sm">
-                      BEFORE
-                    </div>
-                    <div className="absolute bottom-1 left-1 right-1 text-[10px] text-slate-200 bg-black/70 px-1.5 py-0.5 rounded backdrop-blur-sm truncate">
-                      {pair.before.capturedAt ? new Date(pair.before.capturedAt).toLocaleDateString() : "Earlier"}
-                    </div>
-                  </div>
-
-                  {/* After Thumbnail */}
-                  <div className="relative aspect-[4/3] rounded-lg overflow-hidden group/thumb">
-                    <img
-                      src={pair.after.normalizedUrl || pair.after.secureUrl}
-                      alt="After evidence"
-                      className="w-full h-full object-cover group-hover/thumb:scale-105 transition"
-                    />
-                    <div className="absolute top-1.5 right-1.5 px-2 py-0.5 rounded-full bg-black/80 text-[10px] font-bold text-emerald-400 border border-emerald-500/30 backdrop-blur-sm">
-                      AFTER
-                    </div>
-                    <div className="absolute bottom-1 left-1 right-1 text-[10px] text-slate-200 bg-black/70 px-1.5 py-0.5 rounded backdrop-blur-sm truncate">
-                      {pair.after.capturedAt ? new Date(pair.after.capturedAt).toLocaleDateString() : "Recent"}
-                    </div>
-                  </div>
-
-                  {/* Center Transition Icon */}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg pointer-events-none z-10 border-2 border-slate-950">
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-
-                {/* 3. Collapsed AI Verification Section with Show details toggle */}
-                <div className="border-t border-white/5 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleDetails(pair.id)}
-                    className="w-full flex items-center justify-between text-[11px] font-semibold text-slate-400 hover:text-slate-200 py-1 transition group/btn"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-medium">
-                        <CheckCircle2 className="w-3 h-3" />
-                        AI Verified ({pct}%)
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-emerald-400 group-hover/btn:underline flex items-center gap-1">
-                      {expandedPairs[pair.id] ? "Hide details" : "Show details"}
-                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedPairs[pair.id] ? "rotate-180" : ""}`} />
-                    </span>
-                  </button>
-
-                  {expandedPairs[pair.id] && (
-                    <div className="mt-2 space-y-1.5 p-3 rounded-xl bg-slate-950/70 border border-white/5 text-xs animate-fade-in">
-                      <div className="flex items-center gap-1.5 text-emerald-400 pb-1 border-b border-white/5">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span className="font-semibold text-[11px]">AI-verified same scene ({pct}% confidence)</span>
-                      </div>
-                      {pair.reason && (
-                        <div className="flex items-start gap-1.5 text-slate-300 pt-1">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider block">
-                              AI Verification
-                            </span>
-                            <span className="leading-relaxed">{pair.reason}</span>
-                          </div>
-                        </div>
-                      )}
-                      {pair.visibleChange && (
-                        <div className="flex items-start gap-1.5 text-emerald-300/90 pt-1 border-t border-white/5">
-                          <Layers className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold text-teal-400 text-[10px] uppercase tracking-wider block">
-                              Visible Change
-                            </span>
-                            <span className="leading-relaxed">{pair.visibleChange}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
-                <button
-                  type="button"
-                  id={`open-compare-${pair.id}`}
-                  onClick={() => {
-                    setActiveComparePair(pair);
-                    setPairNotes("");
-                    setSaveSuccess(false);
-                    setSaveError("");
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Interactive Slider</span>
-                </button>
-
-                <button
-                  type="button"
-                  id={`save-pair-${pair.id}`}
-                  onClick={() => handleSaveComparison(pair)}
-                  disabled={pair.alreadySaved || savingId === pair.id}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                    pair.alreadySaved
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                      : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/20"
-                  }`}
-                >
-                  {savingId === pair.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : pair.alreadySaved ? (
-                    <Check className="w-3.5 h-3.5" />
-                  ) : (
-                    <BookmarkPlus className="w-3.5 h-3.5" />
-                  )}
-                  <span>{pair.alreadySaved ? "Saved Pair" : "Save Pair"}</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-        </>
+    <section className="space-y-4">
+      {renderHeader(
+        <button
+          type="button"
+          id="open-manual-picker-btn"
+          onClick={handleOpenManualPicker}
+          className="btn btn-secondary btn-sm shrink-0"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Choose two photos
+        </button>,
       )}
 
-      {/* Interactive Modal Slider */}
-      {activeComparePair && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in">
-          <div
-            className="glass-dropdown w-full max-w-4xl max-h-[92vh] rounded-3xl p-6 sm:p-8 shadow-2xl relative border border-white/10 overflow-y-auto flex flex-col gap-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                  <SlidersHorizontal className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-white tracking-tight">
-                      Evidence Comparison Slider
-                    </h3>
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      AI-verified ({Math.round(activeComparePair.confidence * 100)}%)
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-emerald-400" />
-                      {activeComparePair.locationLabel}
-                    </span>
-                    <span>&bull;</span>
-                    <span className="text-amber-400">{activeComparePair.timeSpanLabel}</span>
-                  </p>
-                </div>
+      {suggestions.length === 0 ? (
+        isMissingDatesReason ? (
+          <div className="card overflow-hidden">
+            <div className="flex items-start gap-3 border-b border-amber-100 bg-gradient-to-br from-amber-50 via-amber-50/40 to-white px-4 py-4 sm:px-5">
+              <IconChip icon={CalendarClock} tone="amber" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-zinc-900">Add dates to get suggestions</p>
+                <p className="mt-0.5 text-[13px] leading-relaxed text-zinc-600">
+                  {missingDateCount} photo{missingDateCount === 1 ? " is" : "s are"} missing the date it was taken. Add
+                  dates so we can suggest pairs.
+                </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setActiveComparePair(null)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
-            {/* Slider View */}
+            {/* Photos missing a capture date, each with an inline date setter */}
+            {missingDateAssets.length > 0 && (
+              <div className="max-h-80 divide-y divide-zinc-100 overflow-y-auto">
+                {missingDateAssets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="flex flex-col gap-3 px-4 py-3 transition hover:bg-zinc-50/70 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img
+                        src={getThumbnailUrl(asset.secureUrl, "image")}
+                        alt="Photo preview"
+                        loading="lazy"
+                        className="h-12 w-12 shrink-0 rounded-lg bg-zinc-100 object-cover ring-1 ring-zinc-900/5"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-zinc-900">
+                          {asset.manualLocation || "Untitled photo"}
+                        </p>
+                        <p className="text-xs text-zinc-500">
+                          Uploaded {formatDate(asset.createdAt, "recently")} ·{" "}
+                          <span className="text-amber-700">No date taken</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      {settingDateAssetId === asset.id ? (
+                        <>
+                          <input
+                            type="datetime-local"
+                            value={inlineDateVal}
+                            onChange={(e) => setInlineDateVal(e.target.value)}
+                            aria-label="Date taken"
+                            className="input h-8 min-w-0 flex-1 text-[13px] sm:w-auto sm:flex-none"
+                          />
+                          <button
+                            type="button"
+                            disabled={savingInlineDate || !inlineDateVal}
+                            onClick={() => handleSaveInlineDate(asset.id)}
+                            className="btn btn-primary btn-sm"
+                          >
+                            {savingInlineDate && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSettingDateAssetId(null)}
+                            aria-label="Cancel"
+                            className="btn btn-ghost btn-sm btn-icon"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSettingDateAssetId(asset.id);
+                            setInlineDateVal(new Date().toISOString().slice(0, 16));
+                          }}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          <Calendar className="h-3.5 w-3.5 text-sky-600" />
+                          Add date
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <EmptyState
+            icon={PhotoPairIcon}
+            title={totalImagesCount < 2 ? "Not enough photos yet" : "No matching pairs found"}
+            description={
+              totalImagesCount < 2
+                ? "A before and after pair shows the same place at two different times. Upload at least two photos to get suggestions."
+                : "A before and after pair shows the same place at two different times. Upload photos of the same place taken at different times, or choose two photos yourself."
+            }
+            action={
+              totalImagesCount >= 2 ? (
+                <button type="button" onClick={handleOpenManualPicker} className="btn btn-primary">
+                  <Plus className="h-4 w-4" />
+                  Choose two photos
+                </button>
+              ) : undefined
+            }
+          />
+        )
+      ) : (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          {suggestions.map((pair) => {
+            const detailsOpen = Boolean(expandedPairs[pair.id]);
+            const savedHref = pair.savedComparisonId
+              ? `/projects/${projectId}/compare/${pair.savedComparisonId}`
+              : null;
+
+            return (
+              <article key={pair.id} className="group card-interactive flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => openPreview(pair)}
+                  aria-label={`Preview ${pair.locationLabel}`}
+                  className="block w-full overflow-hidden rounded-t-[15px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                >
+                  <PairImages
+                    beforeUrl={pairImageUrl(pair.before)}
+                    afterUrl={pairImageUrl(pair.after)}
+                    beforeDate={pair.before.capturedAt}
+                    afterDate={pair.after.capturedAt}
+                    corner={
+                      pair.alreadySaved ? (
+                        <span className="photo-chip text-emerald-700">
+                          <BookmarkCheck className="h-3 w-3" />
+                          Saved
+                        </span>
+                      ) : undefined
+                    }
+                  />
+                </button>
+
+                <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <IconChip icon={MapPin} tone="sky" size="sm" />
+                    <p className="truncate text-[15px] font-semibold tracking-tight text-zinc-900">
+                      {pair.locationLabel}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="badge badge-blue">
+                      <Clock className="h-3 w-3" />
+                      {pair.timeSpanLabel}
+                    </span>
+                    {pair.verified && (
+                      <span className="badge badge-green" title="Checked to show the same place">
+                        <ShieldCheck className="h-3 w-3" />
+                        Verified
+                      </span>
+                    )}
+                  </div>
+
+                  {pair.visibleChange && (
+                    <p className="flex gap-2 text-[13px] leading-relaxed text-zinc-600">
+                      <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500" aria-hidden />
+                      <span className="line-clamp-2" title={pair.visibleChange}>
+                        {pair.visibleChange}
+                      </span>
+                    </p>
+                  )}
+
+                  {detailsOpen && (
+                    <div className="animate-fade-in">
+                      <PairDetails confidence={pair.confidence} reason={pair.reason} />
+                    </div>
+                  )}
+
+                  <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleDetails(pair.id)}
+                      aria-expanded={detailsOpen}
+                      className="inline-flex items-center gap-1 rounded text-[13px] text-zinc-500 transition hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                    >
+                      Details
+                      <ChevronDown className={cx("h-3.5 w-3.5 transition", detailsOpen && "rotate-180")} />
+                    </button>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        id={`open-compare-${pair.id}`}
+                        onClick={() => openPreview(pair)}
+                        className="btn btn-ghost btn-sm"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Preview
+                      </button>
+
+                      <button
+                        type="button"
+                        id={`save-pair-${pair.id}`}
+                        onClick={() => handleSaveComparison(pair)}
+                        disabled={pair.alreadySaved || savingId === pair.id}
+                        className={cx(
+                          "btn btn-sm",
+                          pair.alreadySaved ? "btn-ghost text-emerald-700 disabled:opacity-100" : "btn-primary",
+                        )}
+                      >
+                        {savingId === pair.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : pair.alreadySaved ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <BookmarkCheck className="h-3.5 w-3.5" />
+                        )}
+                        {pair.alreadySaved ? "Saved" : "Save comparison"}
+                      </button>
+
+                      {pair.alreadySaved && savedHref && (
+                        <Link
+                          href={savedHref}
+                          title="Measure the change and make a short video"
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Open
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Preview a suggested pair with the slider */}
+      <Modal
+        open={Boolean(activeComparePair)}
+        onClose={() => setActiveComparePair(null)}
+        size="xl"
+        icon={Columns2}
+        title={activeComparePair?.locationLabel}
+        description={
+          activeComparePair
+            ? `${formatDate(activeComparePair.before.capturedAt, "Earlier")} → ${formatDate(
+                activeComparePair.after.capturedAt,
+                "Later",
+              )} · ${activeComparePair.timeSpanLabel}`
+            : undefined
+        }
+        footer={
+          activeComparePair && (
+            <>
+              <button type="button" onClick={() => setActiveComparePair(null)} className="btn btn-ghost btn-sm">
+                Close
+              </button>
+              <button
+                type="button"
+                id="modal-confirm-save-pair-btn"
+                onClick={() => handleSaveComparison(activeComparePair)}
+                disabled={activeComparePair.alreadySaved || savingId === activeComparePair.id}
+                className={cx(
+                  "btn btn-sm",
+                  activeComparePair.alreadySaved ? "btn-secondary text-emerald-700 disabled:opacity-100" : "btn-primary",
+                )}
+              >
+                {savingId === activeComparePair.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : activeComparePair.alreadySaved ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <BookmarkCheck className="h-3.5 w-3.5" />
+                )}
+                {activeComparePair.alreadySaved ? "Saved" : "Save comparison"}
+              </button>
+            </>
+          )
+        }
+      >
+        {activeComparePair && (
+          <div className="space-y-4">
             <CompareSlider
               beforeUrl={activeComparePair.before.normalizedUrl || activeComparePair.before.secureUrl}
               afterUrl={activeComparePair.after.normalizedUrl || activeComparePair.after.secureUrl}
               beforeDate={activeComparePair.before.capturedAt}
               afterDate={activeComparePair.after.capturedAt}
-              beforeLabel="BEFORE"
-              afterLabel="AFTER"
+              beforeLabel="Before"
+              afterLabel="After"
             />
 
-            {/* AI Verification notes in modal */}
-            {(activeComparePair.reason || activeComparePair.visibleChange) && (
-              <div className="space-y-1.5 p-3 rounded-2xl bg-slate-900/60 border border-white/5 text-xs">
-                {activeComparePair.reason && (
-                  <div className="flex items-start gap-1.5 text-slate-300">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>{activeComparePair.reason}</span>
-                  </div>
-                )}
-                {activeComparePair.visibleChange && (
-                  <div className="flex items-start gap-1.5 text-emerald-300 pt-1 border-t border-white/5">
-                    <Layers className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
-                    <span>{activeComparePair.visibleChange}</span>
-                  </div>
-                )}
+            {activeComparePair.visibleChange && (
+              <div className="flex gap-3 rounded-xl bg-violet-50/60 px-4 py-3 ring-1 ring-inset ring-violet-600/10">
+                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-violet-600" aria-hidden />
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-violet-900">What changed</p>
+                  <p className="mt-0.5 text-sm leading-relaxed text-zinc-700">{activeComparePair.visibleChange}</p>
+                </div>
               </div>
             )}
 
-            {/* Save Form & Notes */}
-            <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-300">
-                  Evidence Observation Notes
-                </label>
-                {saveSuccess && (
-                  <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5" /> Comparison saved to project!
-                  </span>
-                )}
-                {saveError && (
-                  <span className="text-xs text-red-400">{saveError}</span>
-                )}
+            <details className="group rounded-xl border border-zinc-200">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 text-sm font-medium text-zinc-700 [&::-webkit-details-marker]:hidden">
+                Details
+                <ChevronDown className="h-4 w-4 text-zinc-400 transition group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-zinc-100 p-3">
+                <PairDetails confidence={activeComparePair.confidence} reason={activeComparePair.reason} />
               </div>
+            </details>
 
+            <div>
+              <label htmlFor="suggested-pair-notes" className="label">
+                Notes <span className="font-normal text-zinc-400">(optional)</span>
+              </label>
               <textarea
+                id="suggested-pair-notes"
                 value={pairNotes}
                 onChange={(e) => setPairNotes(e.target.value)}
-                placeholder="E.g. Visible riverbank stabilization and vegetation recovery observed across 3 months..."
+                placeholder="What changed between the two photos?"
                 rows={2}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-white/10 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500/50"
+                className="input"
               />
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveComparePair(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white transition"
-                >
-                  Close
-                </button>
-
-                <button
-                  type="button"
-                  id="modal-confirm-save-pair-btn"
-                  onClick={() => handleSaveComparison(activeComparePair)}
-                  disabled={activeComparePair.alreadySaved || savingId === activeComparePair.id}
-                  className={`inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-semibold transition ${
-                    activeComparePair.alreadySaved
-                      ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30"
-                      : "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20"
-                  }`}
-                >
-                  {savingId === activeComparePair.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : activeComparePair.alreadySaved ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    <BookmarkPlus className="w-4 h-4" />
-                  )}
-                  <span>{activeComparePair.alreadySaved ? "Saved" : "Save Comparison Record"}</span>
-                </button>
-              </div>
             </div>
+
+            {saveSuccess && (
+              <p className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
+                <Check className="h-4 w-4" /> Comparison saved
+              </p>
+            )}
+            {saveError && <ErrorNote>{saveError}</ErrorNote>}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {/* Manual Picker Modal */}
-      {showManualPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-          <div
-            className="glass-dropdown w-full max-w-3xl max-h-[92vh] rounded-3xl p-6 shadow-2xl relative border border-white/10 overflow-y-auto flex flex-col gap-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
-                  Select Two Photos to Compare
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Pick 2 images ({selectedAssetIds.length}/2 selected). Photos will be ordered chronologically.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowManualPicker(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
+      {/* Manually pick two photos */}
+      <Modal
+        open={showManualPicker}
+        onClose={() => setShowManualPicker(false)}
+        size="lg"
+        icon={Images}
+        title="Choose two photos"
+        description={
+          <>
+            Pick an earlier and a later photo of the same place. We&apos;ll put them in date order.{" "}
+            <span className="tabular-nums text-zinc-700">{selectedAssetIds.length} of 2 selected.</span>
+          </>
+        }
+        footer={
+          <>
+            <button type="button" onClick={() => setShowManualPicker(false)} className="btn btn-ghost btn-sm">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveManualPair}
+              disabled={selectedAssetIds.length !== 2 || manualSaving}
+              className="btn btn-primary btn-sm"
+            >
+              {manualSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Save comparison
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          {loadingAssets ? (
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4" aria-label="Loading photos">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <div className="skeleton aspect-square rounded-lg" />
+                  <div className="skeleton h-3 w-3/4 rounded" />
+                </div>
+              ))}
             </div>
-
-            {loadingAssets ? (
-              <div className="py-12 flex justify-center items-center text-xs text-slate-400 gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                Loading project images...
-              </div>
-            ) : projectAssets.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
-                No image assets found in this project.
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-[45vh] overflow-y-auto pr-1">
-                {projectAssets.map((asset) => {
-                  const isSelected = selectedAssetIds.includes(asset.id);
-                  return (
+          ) : projectAssets.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <IconChip icon={ImageIcon} tone="zinc" size="lg" />
+              <p className="text-sm text-zinc-500">This project has no photos yet.</p>
+            </div>
+          ) : (
+            <div className="grid max-h-[45vh] grid-cols-3 gap-3 overflow-y-auto p-1 sm:grid-cols-4">
+              {projectAssets.map((asset) => {
+                const isSelected = selectedAssetIds.includes(asset.id);
+                const role =
+                  manualBefore && manualAfter
+                    ? asset.id === manualBefore.id
+                      ? "Before"
+                      : asset.id === manualAfter.id
+                        ? "After"
+                        : null
+                    : null;
+                return (
+                  <button
+                    type="button"
+                    key={asset.id}
+                    onClick={() => toggleAssetSelection(asset.id)}
+                    aria-pressed={isSelected}
+                    className="group min-w-0 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                  >
                     <div
-                      key={asset.id}
-                      onClick={() => toggleAssetSelection(asset.id)}
-                      className={`group relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition ${
-                        isSelected
-                          ? "border-emerald-500 shadow-lg shadow-emerald-500/30 scale-[0.98]"
-                          : "border-white/5 hover:border-white/20"
-                      }`}
+                      className={cx(
+                        "relative aspect-square overflow-hidden rounded-lg bg-zinc-100 ring-offset-2 transition",
+                        isSelected ? "ring-2 ring-emerald-500" : "ring-1 ring-zinc-200 group-hover:ring-zinc-300",
+                      )}
                     >
                       <img
-                        src={asset.secureUrl}
-                        alt="asset"
-                        className="w-full h-full object-cover"
+                        src={getThumbnailUrl(asset.secureUrl, asset.resourceType)}
+                        alt="Project photo"
+                        loading="lazy"
+                        className={cx(
+                          "h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]",
+                          isSelected && "scale-[1.02]",
+                        )}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-2 text-[10px] text-slate-200">
-                        <span className="truncate font-semibold">{asset.manualLocation || "Project Location"}</span>
-                        <span className="text-slate-400">
-                          {asset.capturedAt ? new Date(asset.capturedAt).toLocaleDateString() : "No Date taken"}
-                        </span>
-                      </div>
                       {isSelected && (
-                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-bold text-[10px] shadow">
-                          ✓
-                        </div>
+                        <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm ring-2 ring-white">
+                          <Check className="h-3 w-3" />
+                        </span>
+                      )}
+                      {role && (
+                        <span className="photo-chip absolute bottom-1.5 left-1.5">
+                          <span
+                            className={cx(
+                              "h-1.5 w-1.5 rounded-full",
+                              role === "Before" ? "bg-zinc-400" : "bg-emerald-500",
+                            )}
+                          />
+                          {role}
+                        </span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Slider Preview if 2 selected */}
-            {manualBefore && manualAfter && (
-              <div className="border-t border-white/10 pt-4">
-                <h4 className="text-xs font-semibold text-slate-300 mb-2">Live Alignment Preview:</h4>
-                <CompareSlider
-                  beforeUrl={manualBefore.secureUrl}
-                  afterUrl={manualAfter.secureUrl}
-                  beforeDate={manualBefore.capturedAt}
-                  afterDate={manualAfter.capturedAt}
-                  beforeLabel="BEFORE"
-                  afterLabel="AFTER"
-                  location={manualBefore.manualLocation || manualAfter.manualLocation}
-                />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between pt-2 border-t border-white/10">
-              <span className="text-xs text-slate-400">
-                {selectedAssetIds.length === 2 ? "Ready to verify and save" : "Select exactly 2 photos"}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowManualPicker(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveManualPair}
-                  disabled={selectedAssetIds.length !== 2 || manualSaving}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-50 transition shadow-lg shadow-emerald-500/20"
-                >
-                  {manualSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
-                  <span>Save Comparison</span>
-                </button>
-              </div>
+                    <p className="mt-1.5 truncate text-xs font-medium text-zinc-700">
+                      {asset.manualLocation || "Untitled photo"}
+                    </p>
+                    <p className="truncate text-xs tabular-nums text-zinc-500">
+                      {formatDate(asset.capturedAt, "No date taken")}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
-          </div>
+          )}
+
+          {/* Slider preview once two photos are selected */}
+          {manualBefore && manualAfter && (
+            <div className="space-y-2.5 border-t border-zinc-100 pt-4">
+              <p className="flex items-center gap-2 text-sm font-medium text-zinc-900">
+                <Columns2 className="h-4 w-4 text-emerald-600" />
+                Preview
+              </p>
+              <CompareSlider
+                beforeUrl={manualBefore.secureUrl}
+                afterUrl={manualAfter.secureUrl}
+                beforeDate={manualBefore.capturedAt}
+                afterDate={manualAfter.capturedAt}
+                beforeLabel="Before"
+                afterLabel="After"
+                location={manualBefore.manualLocation || manualAfter.manualLocation}
+              />
+            </div>
+          )}
         </div>
-      )}
+      </Modal>
 
       {/* Warning Modal */}
       <ComparisonWarningModal
@@ -936,6 +1017,6 @@ export function SuggestedComparisons({
         }}
         saving={savingAnyway}
       />
-    </div>
+    </section>
   );
 }
