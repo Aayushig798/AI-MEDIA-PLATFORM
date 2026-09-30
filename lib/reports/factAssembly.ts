@@ -1,4 +1,5 @@
-import { db } from "@/lib/db";
+import { db, prisma } from "@/lib/db";
+import { verifyFullChain } from "@/lib/ledger";
 
 export interface EnrichedComparisonFact {
   id: string;
@@ -29,6 +30,70 @@ export interface ProjectFacts {
   comparisons: EnrichedComparisonFact[];
   locations: string[];
   notes: string[];
+  /** Proof-of-Impact Integrity Engine results (null in file-store mode). */
+  integrity: IntegrityFacts | null;
+  /** Pixel-measured change on confirmed before/after pairs. */
+  measuredChanges: MeasuredChangeFact[];
+  ledger: { projectEntries: number; chainIntact: boolean } | null;
+}
+
+export interface IntegrityFacts {
+  verified: number;
+  awaitingReview: number;
+  flagged: number;
+  unverified: number;
+  humanApproved: number;
+  humanRejected: number;
+  averageTrustScore: number | null;
+}
+
+export interface MeasuredChangeFact {
+  comparisonId: string;
+  metric: "GREEN_COVER" | "WATER_AREA";
+  beforePct: number;
+  afterPct: number;
+  deltaPp: number;
+  method: string;
+  beforeDate: string | null;
+  afterDate: string | null;
+  location: string | null;
+  satellite: { index: string; before: number; after: number; agrees: boolean | null } | null;
+}
+
+type Effective = "VERIFIED" | "REVIEW" | "FLAGGED" | "UNVERIFIED";
+
+/** Machine verdict, overridden by a human reviewer's decision. */
+export function effectiveVerdict(
+  i: { status: string; verdict: string | null; reviewDecision: string | null } | null | undefined
+): Effective {
+  if (!i || i.status !== "DONE") return "UNVERIFIED";
+  if (i.reviewDecision === "APPROVED") return "VERIFIED";
+  if (i.reviewDecision === "REJECTED") return "FLAGGED";
+  return (i.verdict as Effective) ?? "UNVERIFIED";
+}
+
+async function integrityFacts(projectId: string): Promise<IntegrityFacts | null> {
+  try {
+    const rows = await prisma.assetIntegrity.findMany({
+      where: { asset: { projectId } },
+      select: { status: true, verdict: true, reviewDecision: true, trustScore: true },
+    });
+    const total = await prisma.mediaAsset.count({ where: { projectId } });
+    const counts = { VERIFIED: 0, REVIEW: 0, FLAGGED: 0, UNVERIFIED: total - rows.length };
+    for (const r of rows) counts[effectiveVerdict(r)]++;
+    const scores = rows.filter((r) => r.status === "DONE" && r.trustScore != null).map((r) => r.trustScore!);
+    return {
+      verified: counts.VERIFIED,
+      awaitingReview: counts.REVIEW,
+      flagged: counts.FLAGGED,
+      unverified: counts.UNVERIFIED,
+      humanApproved: rows.filter((r) => r.reviewDecision === "APPROVED").length,
+      humanRejected: rows.filter((r) => r.reviewDecision === "REJECTED").length,
+      averageTrustScore: scores.length ? Math.round(scores.reduce((s, n) => s + n, 0) / scores.length) : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -117,6 +182,50 @@ export async function assembleProjectFacts(projectId: string): Promise<ProjectFa
     .map((a: any) => a.manualNotes?.trim())
     .filter((n): n is string => Boolean(n));
 
+  // Latest measured change per comparison (change meter)
+  let measuredChanges: MeasuredChangeFact[] = [];
+  try {
+    const metrics = await prisma.changeMetric.findMany({
+      where: { comparison: { projectId } },
+      orderBy: { createdAt: "desc" },
+    });
+    const seen = new Set<string>();
+    measuredChanges = metrics
+      .filter((m) => (seen.has(m.comparisonId) ? false : (seen.add(m.comparisonId), true)))
+      .map((m) => {
+        const c = enrichedComparisons.find((x) => x.id === m.comparisonId);
+        const sat = (m.satDelta ?? null) as { index?: string; before?: number; after?: number; agrees?: boolean } | null;
+        return {
+          comparisonId: m.comparisonId,
+          metric: m.metric,
+          beforePct: m.beforePct,
+          afterPct: m.afterPct,
+          deltaPp: m.deltaPp,
+          method: m.method,
+          beforeDate: c?.beforeDate ?? null,
+          afterDate: c?.afterDate ?? null,
+          location: c?.location ?? null,
+          satellite:
+            sat?.before != null && sat?.after != null
+              ? { index: String(sat.index), before: sat.before, after: sat.after, agrees: sat.agrees ?? null }
+              : null,
+        };
+      });
+  } catch {
+    measuredChanges = [];
+  }
+
+  let ledger: ProjectFacts["ledger"] = null;
+  try {
+    const [projectEntries, chain] = await Promise.all([
+      prisma.ledgerEntry.count({ where: { projectId } }),
+      verifyFullChain(),
+    ]);
+    ledger = { projectEntries, chainIntact: chain.ok };
+  } catch {
+    ledger = null;
+  }
+
   return {
     projectId,
     projectName: project?.name || "Impact Evidence Project",
@@ -132,5 +241,8 @@ export async function assembleProjectFacts(projectId: string): Promise<ProjectFa
     comparisons: enrichedComparisons,
     locations,
     notes,
+    integrity: await integrityFacts(projectId),
+    measuredChanges,
+    ledger,
   };
 }

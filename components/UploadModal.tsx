@@ -16,6 +16,7 @@ import {
   Calendar,
   Layers
 } from "lucide-react";
+import { TrustBadge, IntegritySummary } from "./TrustBadge";
 import { extractExifCaptureDate } from "@/lib/exif";
 const CATEGORY_OPTIONS = [
   "Environmental",
@@ -36,7 +37,8 @@ interface StagedFile {
   capturedAt: string;
   hasExifDate?: boolean;
   exifChecking?: boolean;
-  status: "idle" | "uploading" | "success" | "error";
+  status: "idle" | "uploading" | "verifying" | "success" | "error";
+  integrity?: IntegritySummary | null;
   progress: number;
   errorMessage?: string;
 }
@@ -60,6 +62,8 @@ export function UploadModal({
   const [isDragging, setIsDragging] = useState(false);
   const [batchUploading, setBatchUploading] = useState(false);
   const [batchCategory, setBatchCategory] = useState("");
+  // Run the Integrity Engine as each file lands (uses free-tier quotas; can be switched off)
+  const [autoVerify, setAutoVerify] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -186,7 +190,7 @@ export function UploadModal({
       const signRes = await fetch("/api/cloudinary/sign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, resourceType: staged.resourceType }),
       });
 
       if (!signRes.ok) {
@@ -232,6 +236,10 @@ export function UploadModal({
           uploadFormData.append("categorization", signData.categorization || "google_tagging");
           uploadFormData.append("auto_tagging", (signData.auto_tagging ?? signData.autoTagging ?? 0.6).toString());
           uploadFormData.append("image_metadata", (signData.image_metadata ?? signData.imageMetadata ?? true).toString());
+          // Signed too: perceptual hash for the Integrity Engine, optional webhook
+          if (signData.phash) uploadFormData.append("phash", "true");
+          if (signData.notification_url) uploadFormData.append("notification_url", signData.notification_url);
+          if (signData.auto_transcription) uploadFormData.append("auto_transcription", "true");
 
           updateStagedField(staged.id, "progress", 50);
 
@@ -303,12 +311,25 @@ export function UploadModal({
         body: JSON.stringify(assetPayload),
       });
 
+      const dbJson = await dbRes.json();
       if (!dbRes.ok) {
-        const errJson = await dbRes.json();
-        throw new Error(errJson.error || "Failed to persist media asset to database");
+        throw new Error(dbJson.error || "Failed to persist media asset to database");
       }
 
       updateStagedField(staged.id, "progress", 100);
+
+      // Proof-of-Impact Integrity Engine: duplicates, pHash, web, EXIF, weather, AI auditor...
+      if (autoVerify && dbJson.asset?.id) {
+        updateStagedField(staged.id, "status", "verifying");
+        try {
+          const vRes = await fetch(`/api/assets/${dbJson.asset.id}/verify`, { method: "POST" });
+          const vJson = await vRes.json();
+          if (vJson.integrity) updateStagedField(staged.id, "integrity", vJson.integrity);
+        } catch (verifyErr) {
+          console.warn("Verification after upload failed:", verifyErr);
+        }
+      }
+
       updateStagedField(staged.id, "status", "success");
       return true;
     } catch (err: any) {
@@ -421,6 +442,16 @@ export function UploadModal({
                   </button>
                 </div>
 
+                <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoVerify}
+                    onChange={(e) => setAutoVerify(e.target.checked)}
+                    className="accent-emerald-500"
+                  />
+                  Verify automatically after upload
+                </label>
+
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">Apply Category to All:</span>
                   <select
@@ -478,9 +509,15 @@ export function UploadModal({
                               <Loader2 className="w-3 h-3 animate-spin" /> Uploading ({item.progress}%)
                             </span>
                           )}
+                          {item.status === "verifying" && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-cyan-300 font-medium mt-1">
+                              <Loader2 className="w-3 h-3 animate-spin" /> Running integrity checks
+                            </span>
+                          )}
                           {item.status === "success" && (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium mt-1">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium mt-1">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Uploaded
+                              {item.integrity && <TrustBadge integrity={item.integrity} />}
                             </span>
                           )}
                           {item.status === "error" && (

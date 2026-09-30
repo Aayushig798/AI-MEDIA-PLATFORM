@@ -5,6 +5,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 
+# PDF export uses the system Chromium installed in the runner stage
+ENV PUPPETEER_SKIP_DOWNLOAD=true
+
 RUN npm install --include=optional
 
 FROM node:24-alpine AS builder
@@ -23,6 +26,10 @@ FROM node:24-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+
+# Chromium for Puppeteer PDF export (the bundled download doesn't run on Alpine)
+RUN apk add --no-cache chromium nss freetype harfbuzz ttf-freefont
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

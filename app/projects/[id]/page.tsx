@@ -30,6 +30,7 @@ import { UploadModal } from "@/components/UploadModal";
 import { AssetDetailModal } from "@/components/AssetDetailModal";
 import { SuggestedComparisons } from "@/components/SuggestedComparisons";
 import { SavedComparisons } from "@/components/SavedComparisons";
+import { ProjectIntegrityBar, ProjectIntegrityFields } from "@/components/ProjectIntegrityBar";
 
 interface ProjectDetail {
   id: string;
@@ -41,6 +42,11 @@ interface ProjectDetail {
   _count?: {
     assets: number;
   };
+  latitude: number | null;
+  longitude: number | null;
+  geofenceRadiusM: number;
+  impactType: ProjectIntegrityFields["impactType"];
+  claim: string | null;
 }
 
 export default function ProjectGalleryPage() {
@@ -57,6 +63,9 @@ export default function ProjectGalleryPage() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [verdictFilter, setVerdictFilter] = useState("ALL");
+  // Unfiltered list for the integrity counts and "verify all"
+  const [allAssets, setAllAssets] = useState<MediaAssetItem[]>([]);
 
   // Modals
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -103,18 +112,28 @@ export default function ProjectGalleryPage() {
       if (toDate) {
         queryParams.append("to", toDate);
       }
+      if (verdictFilter !== "ALL") {
+        queryParams.append("verdict", verdictFilter);
+      }
 
-      const res = await fetch(`/api/assets?${queryParams.toString()}`);
+      const [res, allRes] = await Promise.all([
+        fetch(`/api/assets?${queryParams.toString()}`),
+        fetch(`/api/assets?projectId=${projectId}`),
+      ]);
       const data = await res.json();
+      const allData = await allRes.json();
       if (data.success && Array.isArray(data.assets)) {
         setAssets(data.assets);
+      }
+      if (allData.success && Array.isArray(allData.assets)) {
+        setAllAssets(allData.assets);
       }
     } catch (err) {
       console.error("Failed to load assets", err);
     } finally {
       setLoadingAssets(false);
     }
-  }, [projectId, selectedCategory, fromDate, toDate]);
+  }, [projectId, selectedCategory, fromDate, toDate, verdictFilter]);
 
   useEffect(() => {
     fetchProjectInfo();
@@ -128,6 +147,7 @@ export default function ProjectGalleryPage() {
     setSelectedCategory("All");
     setFromDate("");
     setToDate("");
+    setVerdictFilter("ALL");
   };
 
   const handleUploadComplete = () => {
@@ -384,6 +404,16 @@ export default function ProjectGalleryPage() {
 
       {activeTab === "gallery" ? (
         <>
+          {/* Proof-of-Impact integrity: verdict counts, verify-all, site & claim */}
+          <ProjectIntegrityBar
+            project={project}
+            assets={allAssets}
+            verdictFilter={verdictFilter}
+            onVerdictFilter={setVerdictFilter}
+            onAssetsVerified={fetchAssets}
+            onProjectUpdated={(p) => setProject((prev) => (prev ? { ...prev, ...p } : prev))}
+          />
+
           {/* Filter Bar */}
           <GalleryFilterBar
             selectedCategory={selectedCategory}

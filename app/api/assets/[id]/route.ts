@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { destroyCloudinaryAsset } from "@/lib/cloudinary";
 import { determinePrimaryCategory } from "@/lib/ai/categoryMapping";
+import { getActor } from "@/lib/auth";
+import { recordMetadataEdit, recordAssetDeletion } from "@/lib/asset-history";
 
 export async function GET(
   req: NextRequest,
@@ -81,6 +83,7 @@ export async function PATCH(
         },
       });
 
+      await recordMetadataEdit(existing, updated, (await getActor()).label);
       return NextResponse.json({ success: true, asset: updated });
     }
 
@@ -107,6 +110,7 @@ export async function PATCH(
       },
     });
 
+    await recordMetadataEdit(existing, updated, (await getActor()).label);
     return NextResponse.json({ success: true, asset: updated });
   } catch (error: any) {
     console.error(`PATCH /api/assets/${params.id} error:`, error);
@@ -153,6 +157,8 @@ export async function DELETE(
     }
 
     // Step 2: Now that Cloudinary deletion succeeded, remove from DB
+    // (the hash-chained ledger keeps the asset's history)
+    await recordAssetDeletion(asset, (await getActor()).label);
     await db.mediaAsset.delete({
       where: { id },
     });

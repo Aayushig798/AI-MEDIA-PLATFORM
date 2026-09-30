@@ -14,6 +14,12 @@ import {
   Loader2,
   RefreshCw,
   ExternalLink,
+  ShieldCheck,
+  UserCheck,
+  Ruler,
+  Clapperboard,
+  Link2,
+  Pencil,
 } from "lucide-react";
 
 export interface AuditLogItem {
@@ -33,6 +39,7 @@ export function TraceabilityTimeline({ assetId }: TraceabilityTimelineProps) {
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ledger, setLedger] = useState<{ chainIntact: boolean; entries: number } | null>(null);
 
   const fetchLogs = async () => {
     if (!assetId) return;
@@ -43,6 +50,7 @@ export function TraceabilityTimeline({ assetId }: TraceabilityTimelineProps) {
       const data = await res.json();
       if (data.success) {
         setLogs(data.logs || []);
+        setLedger(data.ledger ?? null);
       } else {
         setError(data.error || "Failed to load audit history");
       }
@@ -94,6 +102,48 @@ export function TraceabilityTimeline({ assetId }: TraceabilityTimelineProps) {
           badgeColor: "bg-rose-500/10 text-rose-400 border-rose-500/30",
           nodeBg: "bg-rose-950 border-rose-500/40",
         };
+      case "integrity_checked":
+        return {
+          icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />,
+          title: "Integrity Engine Verification",
+          badgeColor: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+          nodeBg: "bg-emerald-950 border-emerald-400/50",
+        };
+      case "review_decision":
+        return {
+          icon: <UserCheck className="w-3.5 h-3.5 text-amber-300" />,
+          title: "Human Review Decision",
+          badgeColor: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+          nodeBg: "bg-amber-950 border-amber-400/50",
+        };
+      case "derivative_issued":
+        return {
+          icon: <Link2 className="w-3.5 h-3.5 text-sky-300" />,
+          title: "Cloudinary Derivative Issued",
+          badgeColor: "bg-sky-500/10 text-sky-300 border-sky-500/30",
+          nodeBg: "bg-sky-950 border-sky-400/50",
+        };
+      case "metric_measured":
+        return {
+          icon: <Ruler className="w-3.5 h-3.5 text-teal-300" />,
+          title: "Change Measured From Pixels",
+          badgeColor: "bg-teal-500/10 text-teal-300 border-teal-500/30",
+          nodeBg: "bg-teal-950 border-teal-400/50",
+        };
+      case "reel_rendered":
+        return {
+          icon: <Clapperboard className="w-3.5 h-3.5 text-cyan-300" />,
+          title: "Used in Donor Reel (edited content)",
+          badgeColor: "bg-cyan-500/10 text-cyan-300 border-cyan-500/30",
+          nodeBg: "bg-cyan-950 border-cyan-400/50",
+        };
+      case "metadata_edited":
+        return {
+          icon: <Pencil className="w-3.5 h-3.5 text-slate-300" />,
+          title: "Metadata Edited",
+          badgeColor: "bg-slate-500/10 text-slate-300 border-slate-500/30",
+          nodeBg: "bg-slate-900 border-slate-500",
+        };
       default:
         return {
           icon: <Clock className="w-3.5 h-3.5 text-slate-400" />,
@@ -106,6 +156,60 @@ export function TraceabilityTimeline({ assetId }: TraceabilityTimelineProps) {
 
   const renderEventDetails = (log: AuditLogItem) => {
     const detail = log.eventDetail || {};
+
+    const ledgerLine = detail.ledgerSeq ? (
+      <p className="mt-1 font-mono text-[9px] text-slate-500" title={detail.entryHash}>
+        ledger #{detail.ledgerSeq} · {String(detail.entryHash).slice(0, 12)}…
+      </p>
+    ) : null;
+
+    if (log.eventType === "integrity_checked") {
+      return (
+        <div className="mt-1.5 text-[11px] text-slate-300">
+          Trust Score <strong className="text-white">{detail.trustScore}</strong> · {String(detail.verdict).toLowerCase()}
+          {ledgerLine}
+        </div>
+      );
+    }
+    if (log.eventType === "review_decision") {
+      return (
+        <div className="mt-1.5 text-[11px] text-slate-300">
+          {String(detail.decision).toLowerCase()}
+          {detail.note ? ` — “${detail.note}”` : ""}
+          {ledgerLine}
+        </div>
+      );
+    }
+    if (log.eventType === "derivative_issued") {
+      return (
+        <div className="mt-1.5 text-[11px] text-slate-300 break-all">
+          <span className={detail.class === "TRANSCODED" ? "text-emerald-300" : "text-amber-300"}>
+            {detail.class === "TRANSCODED" ? "transcoded (evidence)" : "edited (illustrative)"}
+          </span>{" "}
+          · <span className="font-mono text-[10px]">{detail.transformation}</span>
+          {ledgerLine}
+        </div>
+      );
+    }
+    if (log.eventType === "metric_measured") {
+      return (
+        <div className="mt-1.5 text-[11px] text-slate-300">
+          {detail.metric === "GREEN_COVER" ? "Green cover" : "Water area"} {detail.beforePct}% → {detail.afterPct}% (
+          {detail.deltaPp > 0 ? "+" : ""}
+          {detail.deltaPp} pp)
+          {ledgerLine}
+        </div>
+      );
+    }
+    if (log.eventType === "reel_rendered" || log.eventType === "metadata_edited" || log.eventType === "cloudinary_notification") {
+      return (
+        <div className="mt-1.5 text-[11px] text-slate-400">
+          {log.eventType === "metadata_edited" ? `Changed: ${Object.keys(detail.changes ?? {}).join(", ")}` : null}
+          {log.eventType === "reel_rendered" ? `${detail.aspect} reel` : null}
+          {ledgerLine}
+        </div>
+      );
+    }
 
     if (log.eventType === "uploaded") {
       return (
@@ -231,6 +335,16 @@ export function TraceabilityTimeline({ assetId }: TraceabilityTimelineProps) {
           <h4 className="text-xs font-semibold text-slate-200 uppercase tracking-wider">
             Traceability Audit Timeline
           </h4>
+          {ledger && (
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                ledger.chainIntact ? "text-emerald-300 border-emerald-500/30" : "text-rose-300 border-rose-500/40"
+              }`}
+              title="Every event is also written to the SHA-256 hash-chained ledger"
+            >
+              hash chain {ledger.chainIntact ? "intact" : "BROKEN"}
+            </span>
+          )}
         </div>
         <button
           onClick={fetchLogs}

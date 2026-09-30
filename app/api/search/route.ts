@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchAssets } from "@/lib/search/vectorSearch";
+import { prisma } from "@/lib/db";
+import { effectiveVerdict } from "@/lib/reports/factAssembly";
+import { INTEGRITY_SUMMARY } from "@/lib/integrity/summary";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { query, projectId, category, aiCategory, manualCategory, from, to, limit, minSimilarity } = body;
+    const { query, projectId, category, aiCategory, manualCategory, from, to, limit, minSimilarity, excludeFlagged } = body;
 
     const trimmedQuery = typeof query === "string" ? query.trim() : "";
     const hasFilters = Boolean(
@@ -34,11 +37,21 @@ export async function POST(req: NextRequest) {
       minSimilarity: typeof minSimilarity === "number" ? minSimilarity : undefined,
     });
 
+    // Integrity Engine: attach each result's Trust Score; optionally hide flagged/rejected evidence
+    const integrityRows = await prisma.assetIntegrity
+      .findMany({ where: { assetId: { in: results.map((r) => r.id) } }, select: { assetId: true, ...INTEGRITY_SUMMARY } })
+      .catch(() => []);
+    const byId = new Map(integrityRows.map((r) => [r.assetId, r]));
+    const withIntegrity = results
+      .map((r) => ({ ...r, integrity: byId.get(r.id) ?? null }))
+      .filter((r) => !(excludeFlagged && effectiveVerdict(r.integrity) === "FLAGGED"));
+
     return NextResponse.json({
       success: true,
       query: trimmedQuery,
-      count: results.length,
-      results,
+      count: withIntegrity.length,
+      hiddenFlagged: results.length - withIntegrity.length,
+      results: withIntegrity,
     });
   } catch (error: any) {
     console.error("POST /api/search error:", error);

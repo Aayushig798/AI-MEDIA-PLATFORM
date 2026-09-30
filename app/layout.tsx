@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
-import { 
-  FolderKanban, 
-  Layers, 
-  Sparkles, 
-  ShieldCheck, 
+import {
+  FolderKanban,
+  Layers,
+  Sparkles,
+  ShieldCheck,
   UploadCloud,
-  Globe2
+  Globe2,
+  ListChecks,
+  Link2,
+  Map as MapIcon,
 } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -46,7 +49,7 @@ export default function RootLayout({
         </div>
 
         {/* Main Navbar */}
-        <header className="sticky top-0 z-40 w-full glass-panel border-b border-white/5">
+        <header className="print:hidden sticky top-0 z-40 w-full glass-panel border-b border-white/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             {/* Logo */}
             <Link href="/projects" className="flex items-center gap-3 group">
@@ -76,6 +79,27 @@ export default function RootLayout({
                 <Sparkles className="w-4 h-4 text-emerald-400" />
                 Semantic Search
               </Link>
+              <Link
+                href="/review"
+                className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition flex items-center gap-2"
+              >
+                <ListChecks className="w-4 h-4 text-amber-400" />
+                Review Queue
+              </Link>
+              <Link
+                href="/ledger"
+                className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition flex items-center gap-2"
+              >
+                <Link2 className="w-4 h-4 text-cyan-400" />
+                Ledger
+              </Link>
+              <Link
+                href="/map"
+                className="px-3.5 py-2 rounded-lg text-sm font-medium text-slate-200 hover:text-white hover:bg-white/5 transition flex items-center gap-2"
+              >
+                <MapIcon className="w-4 h-4 text-teal-400" />
+                Impact Map
+              </Link>
             </nav>
 
             {/* Action CTA */}
@@ -98,7 +122,7 @@ export default function RootLayout({
         </main>
 
         {/* Global Footer */}
-        <footer className="border-t border-white/5 bg-[#070b12] py-8 text-xs text-slate-500">
+        <footer className="print:hidden border-t border-white/5 bg-[#070b12] py-8 text-xs text-slate-500">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />

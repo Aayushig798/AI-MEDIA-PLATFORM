@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { getThumbnailUrl } from "@/lib/cloudinary-url";
 import { AiTagItem } from "./AiTagChips";
+import { TrustBadge, IntegritySummary } from "./TrustBadge";
 
 export interface MediaAssetItem {
   id: string;
@@ -40,6 +41,8 @@ export interface MediaAssetItem {
   categories?: { category?: { id: string; name: string }; name?: string }[];
   createdAt: string;
   updatedAt: string;
+  claimText?: string | null;
+  integrity?: IntegritySummary | null;
 }
 
 interface GalleryGridProps {
@@ -191,6 +194,7 @@ export function GalleryGrid({ assets, onSelectAsset, onOpenUpload, onAssetUpdate
                     {asset.manualCategory || "Uncategorized"}
                   </span>
                 )}
+                <TrustBadge integrity={asset.integrity} />
               </div>
 
               {/* Video Play Overlay */}

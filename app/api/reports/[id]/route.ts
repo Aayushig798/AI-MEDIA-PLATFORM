@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { assembleProjectFacts } from "@/lib/reports/factAssembly";
+import { ungroundedNumbers } from "@/lib/reports/grounding";
+import { tryAppendLedger } from "@/lib/ledger";
+import { sha256Hex } from "@/lib/ledger-core";
+import { getActor } from "@/lib/auth";
 
 export async function GET(
   req: NextRequest,
@@ -76,6 +80,21 @@ export async function PATCH(
       );
     }
 
+    // Grounding guard: an edit may not introduce a number that isn't in the project facts.
+    if (typeof generatedSummary === "string") {
+      const facts = await assembleProjectFacts(existing.projectId);
+      const invented = ungroundedNumbers(generatedSummary, facts);
+      if (invented.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `These numbers are not in the project facts: ${invented.join(", ")}. Reports may only state measured figures.`,
+          },
+          { status: 422 }
+        );
+      }
+    }
+
     const updateData: any = {};
     if (typeof generatedSummary === "string") {
       updateData.generatedSummary = generatedSummary;
@@ -90,6 +109,17 @@ export async function PATCH(
     const updated = await db.report.update({
       where: { id: reportId },
       data: updateData,
+    });
+
+    await tryAppendLedger({
+      type: "REPORT_EDITED",
+      actor: (await getActor()).label,
+      projectId: existing.projectId,
+      payload: {
+        reportId,
+        fields: Object.keys(updateData),
+        narrativeDigest: await sha256Hex(updated.generatedSummary ?? ""),
+      },
     });
 
     return NextResponse.json({

@@ -1,9 +1,6 @@
-import OpenAI from "openai";
+import { generate, llmConfigured } from "@/lib/ai/llm";
 import { ProjectFacts } from "./factAssembly";
-
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+import { ungroundedNumbers } from "./grounding";
 
 /**
  * Fallback narrative generator strictly grounded in the assembled facts.
@@ -35,40 +32,65 @@ function buildDeterministicFactNarrative(facts: ProjectFacts): string {
 
   return [
     `This sustainability impact report summarizes evidence for "${facts.projectName}". To date, the repository contains ${facts.totalAssets} documented media asset(s) (${facts.imageCount} image(s), ${facts.videoCount} video(s)). Assets have been classified into primary domain categories: ${categorySummary || "pending category classification"}.`,
-    `${locationText} The chronological observation window represents active field monitoring ${dateSpanText}. All evidence records maintain immutable capture timestamps and cryptographic asset signatures to ensure verifiable auditability.`,
+    `${locationText} The chronological observation window represents active field monitoring ${dateSpanText}.${integrityText(facts)}`,
+    ...measuredText(facts),
     `${comparisonText} ${facts.notes.length > 0 ? `Field notes record: "${facts.notes.slice(0, 3).join('; ')}".` : ""}`,
   ].join("\n\n");
 }
 
+function integrityText(facts: ProjectFacts): string {
+  const i = facts.integrity;
+  let text = "";
+  if (i) {
+    text += ` Every asset is screened by the Proof-of-Impact Integrity Engine: ${i.verified} verified or approved by a reviewer, ${i.awaitingReview} awaiting human review, ${i.flagged} flagged as recycled, lifted or inconsistent, and ${i.unverified} not yet screened. Flagged assets are excluded from the cited evidence.`;
+  }
+  if (facts.ledger) {
+    text += ` Each upload, check, review and report is recorded in a hash-chained ledger (${facts.ledger.projectEntries} entries for this project, chain ${facts.ledger.chainIntact ? "intact" : "BROKEN"}), so any later edit is detectable.`;
+  }
+  return text;
+}
+
+function measuredText(facts: ProjectFacts): string[] {
+  return facts.measuredChanges.map((m) => {
+    const label = m.metric === "GREEN_COVER" ? "green cover" : "open-water area";
+    const sign = m.deltaPp > 0 ? "+" : "";
+    let s = `${m.location ? `At ${m.location}, ` : ""}${label} measured from aligned photos changed from ${m.beforePct}% (${m.beforeDate ?? "undated"}) to ${m.afterPct}% (${m.afterDate ?? "undated"}), ${sign}${m.deltaPp} percentage points.`;
+    if (m.satellite) {
+      s += ` Sentinel-2 ${m.satellite.index.toUpperCase()} at the site moved from ${m.satellite.before} to ${m.satellite.after}${m.satellite.agrees ? ", consistent with the photos" : ", which needs a closer look"}.`;
+    }
+    return s;
+  });
+}
+
 /**
  * Generates an executive narrative strictly grounded in assembled project facts.
- * Uses GPT-4o-mini when OPENAI_API_KEY is available; falls back to an exact,
+ * Uses Gemini when GEMINI_API_KEY is available; falls back to an exact,
  * fact-grounded template if unavailable.
  */
 export async function generateNarrative(facts: ProjectFacts): Promise<string> {
-  if (openai && process.env.OPENAI_API_KEY) {
+  if (llmConfigured()) {
     try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You write concise sustainability impact-report narratives. " +
-              "Use ONLY the facts provided in the user message. " +
-              "Never invent statistics, dates, or details not present in the facts. " +
-              "Write 2-3 paragraphs suitable for a stakeholder report.",
-          },
-          { role: "user", content: JSON.stringify(facts) },
-        ],
-        temperature: 0.2,
-      });
-
-      const content = completion.choices[0]?.message?.content?.trim();
-      if (content) return content;
+      const content = (
+        await generate({
+          system:
+            "You write concise sustainability impact-report narratives. " +
+            "Use ONLY the facts provided in the user message. " +
+            "Never invent statistics, dates, or details not present in the facts. " +
+            "Write 2-3 paragraphs suitable for a stakeholder report. Plain prose, no headings or bullet points.",
+          text: JSON.stringify(facts),
+          temperature: 0.2,
+          maxOutputTokens: 1500,
+        })
+      ).trim();
+      // Grounding guard: reject any draft that states a number not in the facts.
+      const invented = content ? ungroundedNumbers(content, facts) : [];
+      if (content && invented.length === 0) return content;
+      if (invented.length > 0) {
+        console.warn(`[NarrativeGen] LLM draft rejected; numbers not in facts: ${invented.join(", ")}`);
+      }
     } catch (err: any) {
       console.warn(
-        "[NarrativeGen] OpenAI generation failed; falling back to deterministic grounded narrative:",
+        "[NarrativeGen] LLM generation failed; falling back to deterministic grounded narrative:",
         err.message || err
       );
     }

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { effectiveVerdict } from "@/lib/reports/factAssembly";
 import { getNormalizedComparisonUrl } from "@/lib/cloudinary-url";
 import { COMPARISON_CONFIG } from "@/lib/comparison/config";
 import {
@@ -58,11 +59,15 @@ export async function suggestComparisons(
     include: {
       aiTags: { orderBy: { confidence: "desc" } },
       categories: { include: { category: true } },
+      integrity: { select: { status: true, verdict: true, reviewDecision: true } },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const allImages = (assets || []).filter((a: any) => a.resourceType === "image");
+  // Flagged or reviewer-rejected photos are not evidence, so they never pair.
+  const allImages = (assets || []).filter(
+    (a: any) => a.resourceType === "image" && effectiveVerdict(a.integrity) !== "FLAGGED"
+  );
   const missingDateAssets = allImages
     .filter((a: any) => !a.capturedAt)
     .map((a: any) => ({

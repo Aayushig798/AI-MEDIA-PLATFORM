@@ -35,6 +35,8 @@ export interface SearchResultItem {
   similarity: number;
   aiTags: Array<{ id: string; label: string; confidence: number; source: string }>;
   categories: string[];
+  /** Attached by the search route (Integrity Engine summary) */
+  integrity?: import("@/components/TrustBadge").IntegritySummary | null;
 }
 
 /**

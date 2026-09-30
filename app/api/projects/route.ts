@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { parseProjectIntegrityFields } from "@/lib/project-fields";
 
 export async function GET() {
   try {
@@ -47,6 +48,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Optional Integrity Engine inputs: site coordinates, geofence, impact type, claim
+    const integrityFields = parseProjectIntegrityFields(body);
+    if ("error" in integrityFields) {
+      return NextResponse.json({ success: false, error: integrityFields.error }, { status: 400 });
+    }
+
     const project = await db.project.create({
       data: {
         name: name.trim(),
@@ -54,6 +61,7 @@ export async function POST(req: NextRequest) {
         location: location?.trim() || null,
         startDate: startDate ? new Date(startDate) : null,
         createdBy: user.id,
+        ...integrityFields.data,
       },
     });
 

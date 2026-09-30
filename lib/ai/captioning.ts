@@ -1,40 +1,21 @@
-import OpenAI from "openai";
-
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+import { generate, llmConfigured } from "@/lib/ai/llm";
 
 /**
- * Optional GPT-4o-mini vision captioning for field media.
+ * Optional vision captioning for field media (Gemini).
  * Generates a concise, evidence-focused single sentence caption.
  */
 export async function generateImageCaption(secureUrl: string): Promise<string | null> {
-  if (!openai || !process.env.OPENAI_API_KEY || !secureUrl || !secureUrl.startsWith("http")) {
+  if (!llmConfigured() || !secureUrl || !secureUrl.startsWith("http")) {
     return null;
   }
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Briefly describe the physical environment, infrastructure condition, or field activity visible in this image in one factual sentence.",
-            },
-            {
-              type: "image_url",
-              image_url: { url: secureUrl, detail: "low" },
-            },
-          ],
-        },
-      ],
-      max_tokens: 60,
+    const caption = await generate({
+      text: "Briefly describe the physical environment, infrastructure condition, or field activity visible in this image in one factual sentence. Reply with the sentence only.",
+      images: [secureUrl],
+      maxOutputTokens: 200,
     });
-
-    return response.choices[0]?.message?.content?.trim() || null;
+    return caption.trim() || null;
   } catch (err: any) {
     console.warn("[Captioning] Vision captioning request failed:", err.message);
     return null;

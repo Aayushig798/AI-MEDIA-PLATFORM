@@ -1,14 +1,13 @@
-import OpenAI from "openai";
+import { embed, llmConfigured, EMBEDDING_MODEL } from "@/lib/ai/llm";
+import { prisma } from "@/lib/db";
+import { generateImageCaption } from "@/lib/ai/captioning";
+import { getOptimizedVisionUrl } from "@/lib/cloudinary-url";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/audit/logEvent";
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
 /**
  * Generates a deterministic normalized 1536-dimensional embedding vector
- * from text tokens and n-grams. Used when OPENAI_API_KEY is not configured
+ * from text tokens and n-grams. Used when GEMINI_API_KEY is not configured
  * so pgvector operations, tests, and vector similarity continue to function seamlessly.
  */
 export function generateDeterministicEmbedding(text: string, dimensions = 1536): number[] {
@@ -80,7 +79,7 @@ export function generateDeterministicEmbedding(text: string, dimensions = 1536):
 }
 
 /**
- * Embeds query text using OpenAI text-embedding-3-small (or deterministic fallback)
+ * Embeds query text with Gemini embeddings (or the deterministic fallback)
  */
 export async function embedQueryText(query: string): Promise<number[]> {
   const trimmed = query.trim();
@@ -88,15 +87,11 @@ export async function embedQueryText(query: string): Promise<number[]> {
     return new Array(1536).fill(0);
   }
 
-  if (openai && process.env.OPENAI_API_KEY) {
+  if (llmConfigured()) {
     try {
-      const res = await openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: trimmed,
-      });
-      return res.data[0].embedding;
+      return await embed(trimmed, "query");
     } catch (err: any) {
-      console.warn("[Embeddings] OpenAI query embedding failed, falling back to deterministic:", err.message);
+      console.warn("[Embeddings] Gemini query embedding failed, falling back to deterministic:", err.message);
     }
   }
 
@@ -107,6 +102,24 @@ export async function embedQueryText(query: string): Promise<number[]> {
  * Builds text summary for an asset from tags, categories, location, notes
  * and persists the embedding into the MediaEmbedding table in pgvector.
  */
+/**
+ * One-sentence visual description for the embedding text: reuse the Cloudinary
+ * AI Vision description from the integrity run when present, else caption it.
+ */
+async function describeAsset(assetId: string, secureUrl: string, resourceType: string): Promise<string | null> {
+  try {
+    const integrity = await prisma.assetIntegrity.findUnique({ where: { assetId }, select: { checks: true } });
+    const claim = ((integrity?.checks as any[]) ?? []).find((c) => c?.id === "claim");
+    const description = claim?.details?.description;
+    if (typeof description === "string" && description.trim()) return `Visual description: ${description.trim()}`;
+  } catch {
+    // file-store mode: no integrity table
+  }
+  if (resourceType !== "image") return null;
+  const caption = await generateImageCaption(getOptimizedVisionUrl(secureUrl));
+  return caption ? `Visual description: ${caption}` : null;
+}
+
 export async function generateEmbeddingForAsset(assetId: string): Promise<number[] | null> {
   try {
     const asset = await db.mediaAsset.findUnique({
@@ -137,21 +150,18 @@ export async function generateEmbeddingForAsset(assetId: string): Promise<number
       asset.manualLocation ? `Location: ${asset.manualLocation}.` : "",
       asset.manualNotes ? `Field notes: ${asset.manualNotes}.` : "",
       asset.resourceType ? `Media type: ${asset.resourceType}.` : "",
+      (await describeAsset(asset.id, asset.secureUrl, asset.resourceType)) ?? "",
     ];
     const textSummary = textParts.filter(Boolean).join(" ");
 
     let vector: number[];
-    let modelVersion = "text-embedding-3-small";
+    let modelVersion = EMBEDDING_MODEL;
 
-    if (openai && process.env.OPENAI_API_KEY) {
+    if (llmConfigured()) {
       try {
-        const response = await openai.embeddings.create({
-          model: "text-embedding-3-small",
-          input: textSummary,
-        });
-        vector = response.data[0].embedding;
+        vector = await embed(textSummary, "document");
       } catch (err: any) {
-        console.warn(`[Embeddings] OpenAI failed for asset ${assetId}:`, err.message);
+        console.warn(`[Embeddings] Gemini failed for asset ${assetId}:`, err.message);
         vector = generateDeterministicEmbedding(textSummary, 1536);
         modelVersion = "deterministic-fallback-1536";
       }
