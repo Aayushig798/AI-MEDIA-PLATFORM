@@ -1,0 +1,35 @@
+name: Restore database
+
+# Manual only. Replaces the live database with a dump made by `npm run db:export`
+# (stored as a private file in Cloudinary). scripts/restore-db.sh backs up the
+# current database on the server first and rolls back if the load fails.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dump_public_id:
+        description: "public_id printed by npm run db:export"
+        required: true
+      confirm:
+        description: "Type REPLACE: the live database will be overwritten"
+        required: true
+
+jobs:
+  restore:
+    if: ${{ inputs.confirm == 'REPLACE' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DUMP_PUBLIC_ID: ${{ inputs.dump_public_id }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 15m
+          envs: DUMP_PUBLIC_ID
+          script: |
+            set -e
+            cd ~/AI-MEDIA-PLATFORM
+            bash scripts/restore-db.sh "$DUMP_PUBLIC_ID"
