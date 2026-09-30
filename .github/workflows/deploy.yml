@@ -22,7 +22,7 @@ jobs:
             # fetch + reset instead of pull: survives a rewritten main (the untracked .env is untouched)
             git fetch origin main
             git reset --hard origin/main
-            docker build -t ai-media-platform .
+            docker build --no-cache -t ai-media-platform .
             docker stop ai-media-platform || true
             docker rm ai-media-platform || true
             docker run -d \
