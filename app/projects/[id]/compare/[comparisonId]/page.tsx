@@ -7,7 +7,6 @@ import {
   ArrowUpRight,
   CheckCircle2,
   ChevronDown,
-  Columns2,
   Droplets,
   ExternalLink,
   Leaf,
@@ -57,7 +56,7 @@ export default function ComparisonDetailPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader back={back} title="Comparison" icon={Columns2} />
+        <PageHeader back={back} title="Comparison" />
         <ErrorNote>{error}</ErrorNote>
       </div>
     );
@@ -91,7 +90,6 @@ export default function ComparisonDetailPage() {
       <PageHeader
         back={back}
         eyebrow={comparison.project.name}
-        icon={Columns2}
         title="Before and after"
         description={
           <>

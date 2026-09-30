@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowRight,
-  BarChart3,
   CalendarRange,
   CheckCircle2,
   ChevronRight,
@@ -92,7 +91,7 @@ export default function ProjectDashboardPage() {
   if (error || !stats) {
     return (
       <div className="space-y-6">
-        <PageHeader back={back} title="Insights" icon={BarChart3} />
+        <PageHeader back={back} title="Insights" />
         <div className="card max-w-md space-y-4 p-5">
           <ErrorNote>{error || "Project data is not available."}</ErrorNote>
           <button type="button" onClick={fetchStats} className="btn btn-secondary btn-sm">
@@ -121,7 +120,6 @@ export default function ProjectDashboardPage() {
       <PageHeader
         back={back}
         eyebrow={stats.projectName}
-        icon={BarChart3}
         title="Insights"
         description="Key numbers and evidence for this project, in one place."
         actions={

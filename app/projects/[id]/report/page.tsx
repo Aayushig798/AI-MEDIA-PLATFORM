@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { BarChart3, FileText } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { ReportBuilder } from "@/components/ReportBuilder";
 import { PageHeader, Loading } from "@/components/ui";
 
@@ -43,7 +43,6 @@ export default function ProjectReportPage() {
         <PageHeader
           back={{ href: `/projects/${projectId}`, label: "Back to project" }}
           eyebrow={projectName}
-          icon={FileText}
           title="Report"
           description="Turn the verified evidence for this project into a report you can share with funders and partners."
           actions={

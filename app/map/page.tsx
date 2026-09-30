@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LocateFixed, Map as MapIcon, MapPin, MousePointerClick, ShieldCheck } from "lucide-react";
+import { LocateFixed, MapPin, MousePointerClick, ShieldCheck } from "lucide-react";
 import { ImpactMap } from "@/components/ImpactMap";
 
 export const metadata: Metadata = {
@@ -38,12 +38,9 @@ const NOTES = [
 export default function ImpactMapPage() {
   return (
     <div className="space-y-8">
-      {/* Same layout as PageHeader, with a sky tile for places */}
+      {/* Same layout as PageHeader */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-start gap-4">
-          <span className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 text-white shadow-[0_8px_20px_-8px_rgba(2,132,199,0.6)] sm:inline-flex">
-            <MapIcon className="h-6 w-6" />
-          </span>
           <div className="min-w-0 space-y-1.5">
             <p className="text-[13px] font-medium text-sky-700">Evidence on the ground</p>
             <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-zinc-900">Map</h1>

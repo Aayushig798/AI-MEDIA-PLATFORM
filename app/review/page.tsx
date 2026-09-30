@@ -100,7 +100,6 @@ function ReviewQueue() {
             Human review
           </span>
         }
-        icon={Inbox}
         title="Review"
         description="Photos the automatic checks couldn't confirm. Approve or reject each one; your decision and note are added to the audit trail."
         actions={

@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Lock, Loader2, ChevronDown, History, Fingerprint, Link2, Info } from "lucide-react";
+import { Lock, Loader2, ChevronDown, Fingerprint, Link2, Info } from "lucide-react";
 import { ChainVerifier } from "@/components/ChainVerifier";
 import { PageHeader, SectionHeader, IconChip } from "@/components/ui";
 
@@ -50,7 +50,6 @@ function LedgerExplorer() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Tamper-evident record"
-        icon={History}
         title="Audit trail"
         description="A tamper-evident record of every upload, check and report."
         actions={

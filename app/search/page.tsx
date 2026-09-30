@@ -287,7 +287,6 @@ export default function SearchPage() {
     <div className="space-y-8">
       <PageHeader
         eyebrow="Smart search"
-        icon={Search}
         title="Search"
         description="Find photos across all your projects by describing what's in them."
         actions={

@@ -220,7 +220,6 @@ function ProjectsPageContent() {
   return (
     <div className="animate-fade-in space-y-8">
       <PageHeader
-        icon={FolderKanban}
         eyebrow="Workspace"
         title="Projects"
         description="Collect, verify and share photo evidence from every site you work on."
