@@ -13,21 +13,21 @@ jobs:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-  host: ${{ secrets.EC2_HOST }}
-  username: ubuntu
-  key: ${{ secrets.EC2_SSH_KEY }}
-  command_timeout: 20m
-  script: |
-    cd ~/AI-MEDIA-PLATFORM
-    # fetch + reset instead of pull: survives a rewritten main (the untracked .env is untouched)
-    git fetch origin main
-    git reset --hard origin/main
-    docker build -t ai-media-platform .
-    docker stop ai-media-platform || true
-    docker rm ai-media-platform || true
-    docker run -d \
-      --name ai-media-platform \
-      --env-file .env \
-      -p 3000:3000 \
-      --restart unless-stopped \
-      ai-media-platform
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            cd ~/AI-MEDIA-PLATFORM
+            # fetch + reset instead of pull: survives a rewritten main (the untracked .env is untouched)
+            git fetch origin main
+            git reset --hard origin/main
+            docker build -t ai-media-platform .
+            docker stop ai-media-platform || true
+            docker rm ai-media-platform || true
+            docker run -d \
+              --name ai-media-platform \
+              --env-file .env \
+              -p 3000:3000 \
+              --restart unless-stopped \
+              ai-media-platform
