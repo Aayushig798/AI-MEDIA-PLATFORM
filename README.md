@@ -14,7 +14,7 @@ Field teams produce thousands of photos, and nobody can check them all. Fake and
 
 **AI understanding (Phase 2).** Automatic tagging (Cloudinary Google auto-tagging at upload, Google Vision fallback), one primary domain category per asset (Environmental, Infrastructure, Community, Disaster Response), EXIF GPS extraction, tag rejection and re-analysis.
 
-**Search & comparison (Phase 3).** Hybrid semantic search (OpenAI embeddings + pgvector cosine distance + lexical ranking), suggested before/after pairs with AI same-scene verification, and a before/after slider.
+**Search & comparison (Phase 3).** Hybrid semantic search (embeddings + pgvector cosine distance + lexical ranking; OpenAI embeddings are optional), suggested before/after pairs with AI same-scene verification, and a before/after slider.
 
 **Reporting (Phase 4).** Structured project facts computed without AI, a grounded narrative (GPT-4o-mini or a fact template), an editable report studio, PDF export, a per-asset traceability timeline and an analytics dashboard.
 
@@ -73,7 +73,8 @@ For QR codes that open on a phone and for Cloudinary webhooks, run behind a publ
 | Setting | Enables | Free tier |
 |---|---|---|
 | Cloudinary **AI Vision** add-on (console) | AI auditor, provenance, weather cues, clip picking, Ask the auditor | free tier; token cost per image unpublished |
-| `OPENAI_API_KEY` | embeddings, pair verification, LLM report narrative, captions | paid |
+| `GROQ_API_KEY` | pair verification, captions, LLM report narrative (`GROQ_TEXT_MODEL`, `GROQ_VISION_MODEL`) | free tier with rate limits |
+| `OPENAI_API_KEY` (optional) | true semantic embeddings for search. Groq has no embeddings; without it search uses hashed keyword-style vectors | paid |
 | `GOOGLE_VISION_API_KEY` | tagging fallback + web detection | 1,000 units/month |
 | `COPERNICUS_CLIENT_ID/SECRET` | Sentinel-2 satellite check | 10,000 PU/month |
 | `CLOUDINARY_AUTO_TRANSCRIPTION=true` | voice-note subtitles on reel clips | check your plan |

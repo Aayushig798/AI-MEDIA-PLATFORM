@@ -1,10 +1,6 @@
-import OpenAI from "openai";
+import { chat, llmConfigured, TEXT_MODEL } from "@/lib/ai/llm";
 import { ProjectFacts } from "./factAssembly";
 import { ungroundedNumbers } from "./grounding";
-
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
 
 /**
  * Fallback narrative generator strictly grounded in the assembled facts.
@@ -68,15 +64,16 @@ function measuredText(facts: ProjectFacts): string[] {
 
 /**
  * Generates an executive narrative strictly grounded in assembled project facts.
- * Uses GPT-4o-mini when OPENAI_API_KEY is available; falls back to an exact,
+ * Uses the Groq text model when GROQ_API_KEY is available; falls back to an exact,
  * fact-grounded template if unavailable.
  */
 export async function generateNarrative(facts: ProjectFacts): Promise<string> {
-  if (openai && process.env.OPENAI_API_KEY) {
+  if (llmConfigured()) {
     try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
+      const content = (
+        await chat({
+          model: TEXT_MODEL,
+          messages: [
           {
             role: "system",
             content:
@@ -86,11 +83,10 @@ export async function generateNarrative(facts: ProjectFacts): Promise<string> {
               "Write 2-3 paragraphs suitable for a stakeholder report.",
           },
           { role: "user", content: JSON.stringify(facts) },
-        ],
-        temperature: 0.2,
-      });
-
-      const content = completion.choices[0]?.message?.content?.trim();
+          ],
+          temperature: 0.2,
+        })
+      ).trim();
       // Grounding guard: reject any draft that states a number not in the facts.
       const invented = content ? ungroundedNumbers(content, facts) : [];
       if (content && invented.length === 0) return content;
@@ -99,7 +95,7 @@ export async function generateNarrative(facts: ProjectFacts): Promise<string> {
       }
     } catch (err: any) {
       console.warn(
-        "[NarrativeGen] OpenAI generation failed; falling back to deterministic grounded narrative:",
+        "[NarrativeGen] LLM generation failed; falling back to deterministic grounded narrative:",
         err.message || err
       );
     }

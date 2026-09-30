@@ -5,6 +5,9 @@ import { getOptimizedVisionUrl } from "@/lib/cloudinary-url";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/audit/logEvent";
 
+// Groq (used for chat/vision elsewhere) has no embeddings endpoint. OPENAI_API_KEY is
+// now optional and used ONLY for embeddings; without it the deterministic hashed
+// embedding below is used (keyword-like matching, not true semantic similarity).
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;

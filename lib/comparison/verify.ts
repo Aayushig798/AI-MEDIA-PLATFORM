@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { chat, extractJson, llmConfigured, VISION_MODEL } from "@/lib/ai/llm";
 import { db } from "@/lib/db";
 import { COMPARISON_CONFIG } from "./config";
 import { getOptimizedVisionUrl } from "@/lib/cloudinary-url";
@@ -266,10 +266,9 @@ export async function verifyPairWithVision(
     };
   }
 
-  // 2. Validate OpenAI API key
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    const errorMsg = "OPENAI_API_KEY is not configured. Falling back to multi-modal AI tag and semantic verification analysis.";
+  // 2. Validate LLM key (Groq)
+  if (!llmConfigured()) {
+    const errorMsg = "GROQ_API_KEY is not configured. Falling back to multi-modal AI tag and semantic verification analysis.";
     console.error(`[Vision Verification Error] ${errorMsg}`);
 
     // Fetch tags to perform content analysis
@@ -342,13 +341,11 @@ export async function verifyPairWithVision(
   const beforeUrl = getOptimizedVisionUrl(beforeAsset.secureUrl, COMPARISON_CONFIG.VISION_IMAGE_WIDTH);
   const afterUrl = getOptimizedVisionUrl(afterAsset.secureUrl, COMPARISON_CONFIG.VISION_IMAGE_WIDTH);
 
-  console.log(`[Vision Verification] Calling GPT-4o-mini for pair: ${beforeAsset.id} -> ${afterAsset.id}`);
+  console.log(`[Vision Verification] Calling ${VISION_MODEL} for pair: ${beforeAsset.id} -> ${afterAsset.id}`);
 
   try {
-    const openai = new OpenAI({ apiKey });
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const rawContent = await chat({
+      model: VISION_MODEL,
       response_format: { type: "json_object" },
       messages: [
         {
@@ -368,14 +365,12 @@ export async function verifyPairWithVision(
               type: "image_url",
               image_url: {
                 url: beforeUrl,
-                detail: "low",
               },
             },
             {
               type: "image_url",
               image_url: {
                 url: afterUrl,
-                detail: "low",
               },
             },
           ],
@@ -384,8 +379,7 @@ export async function verifyPairWithVision(
       max_tokens: 300,
     });
 
-    const rawContent = completion.choices[0]?.message?.content || "{}";
-    const parsed = JSON.parse(rawContent);
+    const parsed = extractJson(rawContent || "{}");
 
     const sameScene = Boolean(parsed.sameScene);
     const confidence = typeof parsed.confidence === "number" ? Math.max(0, Math.min(1, parsed.confidence)) : 0.5;
@@ -429,6 +423,6 @@ export async function verifyPairWithVision(
     };
   } catch (err: any) {
     console.error(`[Vision Verification Failed] Pair ${beforeAsset.id} <-> ${afterAsset.id}:`, err.message || err);
-    throw new Error(`OpenAI Vision Verification failed: ${err.message || "Network error"}`);
+    throw new Error(`Vision verification failed: ${err.message || "Network error"}`);
   }
 }
