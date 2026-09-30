@@ -1,0 +1,65 @@
+# The app and its PostgreSQL (pgvector) database, started together:
+#
+#   docker compose up -d --build
+#
+# Start order: db (waits until healthy) -> migrate (sets up the schema, then exits) -> app.
+# Data lives in the "pgdata" volume and survives restarts and rebuilds.
+#
+# Inside Compose the app always uses the db service: DATABASE_URL from .env is overridden
+# below. That .env value is only used by `npm run dev` outside Docker, and by
+# scripts/deploy.sh as the Neon database to copy from on the first deploy.
+name: ai-media-platform
+
+x-database-url: &database-url postgresql://ecoevidence:${POSTGRES_PASSWORD:-ecoevidence_dev}@db:5432/ecoevidence
+
+services:
+  db:
+    # Postgres 18 matches Neon's server version, so the one-time pg_dump/pg_restore is clean
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ecoevidence
+      # Read only when the volume is first created; letters and digits only (it goes in a URL)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecoevidence_dev}
+      POSTGRES_DB: ecoevidence
+    volumes:
+      - pgdata:/var/lib/postgresql
+    # No published port: only the app and migrate containers can reach it.
+    # For a SQL shell: docker compose exec db psql -U ecoevidence
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecoevidence -d ecoevidence"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    # Same image as the app; runs `npm run db:setup` equivalent, then exits
+    image: ai-media-platform
+    pull_policy: never
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: *database-url
+      CHECKPOINT_DISABLE: "1" # no Prisma version-check call on every start
+    command: >
+      sh -c "node node_modules/prisma/build/index.js db execute --file prisma/extensions.sql --schema prisma/schema.prisma
+      && node node_modules/prisma/build/index.js db push --skip-generate --schema prisma/schema.prisma
+      && node node_modules/prisma/build/index.js db execute --file prisma/indexes.sql --schema prisma/schema.prisma"
+    restart: "no"
+
+  app:
+    build: .
+    image: ai-media-platform
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: *database-url
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

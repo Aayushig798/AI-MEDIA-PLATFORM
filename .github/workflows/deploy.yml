@@ -22,12 +22,5 @@ jobs:
             # fetch + reset instead of pull: survives a rewritten main (the untracked .env is untouched)
             git fetch origin main
             git reset --hard origin/main
-            docker build --no-cache -t ai-media-platform .
-            docker stop ai-media-platform || true
-            docker rm ai-media-platform || true
-            docker run -d \
-              --name ai-media-platform \
-              --env-file .env \
-              -p 3000:3000 \
-              --restart unless-stopped \
-              ai-media-platform
+            # Builds and starts the app + Postgres together (docker-compose.yml)
+            bash scripts/deploy.sh
