@@ -1,10 +1,20 @@
-node_modules
-.next
+# Not needed to build the image
 .git
 .gitignore
-.env
-.env.local
-.env.*.local
+.github
+node_modules
+.next
+.next-*
 README.md
 docs
 test-media
+*.dump
+
+# Secrets stay on the host (docker-compose passes .env at runtime)
+.env
+.env.local
+.env.*.local
+
+# Local tooling
+.agents
+.claude

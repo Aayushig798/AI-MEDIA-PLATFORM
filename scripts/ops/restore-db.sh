@@ -3,14 +3,14 @@
 # Run on the EC2 box by .github/workflows/restore-db.yml (Actions tab -> "Restore
 # database"). Make the dump with `npm run db:export` on the machine whose data you want.
 #
-#   bash scripts/restore-db.sh <cloudinary raw public_id>
+#   bash scripts/ops/restore-db.sh <cloudinary raw public_id>
 #
 # The current database is saved to ~/db-backups/ first, and put back automatically
 # if the new dump fails to load. The download link is signed here with the
 # Cloudinary keys from .env and never printed, so it doesn't show in the
 # (public) Actions log.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 PUBLIC_ID="${1:?usage: restore-db.sh <cloudinary raw public_id>}"
 [[ "$PUBLIC_ID" =~ ^[A-Za-z0-9/_.-]+$ ]] || { echo "invalid public_id: $PUBLIC_ID" >&2; exit 1; }

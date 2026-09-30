@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       and.push({ integrity: { status: "DONE", reviewDecision: null, verdict: "REVIEW" } });
     }
 
-    // Phase 2 FR-13: filter by the AI-assigned domain category
+    // Filter by the AI-assigned domain category
     const aiCategory = searchParams.get("aiCategory") || undefined;
     if (aiCategory && aiCategory.toLowerCase() !== "all") {
       and.push({ categories: { some: { category: { name: { equals: aiCategory, mode: "insensitive" } } } } });

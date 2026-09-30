@@ -9,7 +9,7 @@ try {
   // rely on the real environment
 }
 
-import { generate, embed, extractJson, llmConfigured, MODEL, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "../lib/ai/llm";
+import { generate, embed, extractJson, llmConfigured, MODEL, EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from "../../lib/ai/llm";
 
 // A tiny public image (Cloudinary's demo sample) so the vision path is exercised too.
 const SAMPLE_IMAGE = "https://res.cloudinary.com/demo/image/upload/w_400,c_limit,f_jpg/sample.jpg";

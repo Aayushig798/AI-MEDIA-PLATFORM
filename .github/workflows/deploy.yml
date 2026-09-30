@@ -18,9 +18,28 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 20m
           script: |
+            # Stop at the first failure instead of running a stale deploy.sh
+            set -e
             cd ~/AI-MEDIA-PLATFORM
+            # The Next.js production build needs more memory than the box has free next to
+            # the running app and Postgres. Without swap the kernel kills processes mid-build,
+            # this SSH session included (exit 255). Create a 3 GB swap file once.
+            if ! sudo swapon --show=NAME --noheadings | grep -qx /swapfile; then
+              [ -f /swapfile ] || sudo fallocate -l 3G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile > /dev/null
+              sudo swapon /swapfile
+              grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab > /dev/null
+            fi
+            free -m
+            # Free disk space before anything else: once Docker's build cache fills the
+            # disk, even git fetch fails. Running containers and their images are untouched.
+            docker builder prune -af > /dev/null 2>&1 || true
+            docker image prune -f > /dev/null 2>&1 || true
+            df -h /
+            docker system df
             # fetch + reset instead of pull: survives a rewritten main (the untracked .env is untouched)
             git fetch origin main
             git reset --hard origin/main
             # Builds and starts the app + Postgres together (docker-compose.yml)
-            bash scripts/deploy.sh
+            bash scripts/ops/deploy.sh

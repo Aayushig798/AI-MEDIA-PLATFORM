@@ -1,7 +1,7 @@
 /**
  * Standalone re-verification script for existing comparisons
- * Usage: node --env-file=.env.local scripts/reverify_comparisons.mjs
- * Or: npx dotenv-cli -e .env.local -- node scripts/reverify_comparisons.mjs
+ * Usage: node --env-file=.env.local scripts/data/reverify-comparisons.mjs
+ * Or: npx dotenv-cli -e .env.local -- node scripts/data/reverify-comparisons.mjs
  */
 
 async function run() {

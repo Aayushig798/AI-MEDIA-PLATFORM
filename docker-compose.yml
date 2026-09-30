@@ -7,7 +7,7 @@
 #
 # Inside Compose the app always uses the db service: DATABASE_URL from .env is overridden
 # below. That .env value is only used by `npm run dev` outside Docker, and by
-# scripts/deploy.sh as the Neon database to copy from on the first deploy.
+# scripts/ops/deploy.sh as the Neon database to copy from on the first deploy.
 name: ai-media-platform
 
 x-database-url: &database-url postgresql://ecoevidence:${POSTGRES_PASSWORD:-ecoevidence_dev}@db:5432/ecoevidence

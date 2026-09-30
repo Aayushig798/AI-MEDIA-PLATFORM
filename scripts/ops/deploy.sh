@@ -6,7 +6,7 @@
 # local Postgres before the app switches over. Neon itself is never modified, so it
 # stays as a backup.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 if ! docker compose version >/dev/null 2>&1; then
   echo "Installing the Docker Compose plugin..."
@@ -21,6 +21,15 @@ fi
 
 env_value() { sed -n "s/^$1=//p" .env | tr -d '"' | tail -1; }
 local_sql() { docker compose exec -T db psql -U ecoevidence -d ecoevidence -tAc "$1"; }
+disk_free() { df -h / | awk 'NR==2 {print $4 " free of " $2}'; }
+
+# Every build starts from scratch (--no-cache), so Docker's build cache is dead weight,
+# and 2-3 GB of it piled up per deploy until the disk filled and a build failed.
+# Clear it and dangling images first; running containers and their images are untouched.
+echo "Disk before cleanup: $(disk_free)"
+docker builder prune -af >/dev/null 2>&1 || true
+docker image prune -f >/dev/null 2>&1 || true
+echo "Disk after cleanup:  $(disk_free)"
 
 docker compose build --no-cache app
 docker compose up -d --wait db
@@ -57,5 +66,7 @@ docker compose run --rm migrate
 docker rm -f ai-media-platform >/dev/null 2>&1 || true
 docker compose up -d --remove-orphans
 
-# --no-cache builds leave the previous image behind each time; don't let them fill the disk
-docker image prune -f >/dev/null
+# The previous app image (now untagged) and this build's cache are no longer needed
+docker image prune -f >/dev/null 2>&1 || true
+docker builder prune -af >/dev/null 2>&1 || true
+echo "Disk after deploy:   $(disk_free)"

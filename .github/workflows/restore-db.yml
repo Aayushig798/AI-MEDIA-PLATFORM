@@ -1,7 +1,7 @@
 name: Restore database
 
 # Manual only. Replaces the live database with a dump made by `npm run db:export`
-# (stored as a private file in Cloudinary). scripts/restore-db.sh backs up the
+# (stored as a private file in Cloudinary). scripts/ops/restore-db.sh backs up the
 # current database on the server first and rolls back if the load fails.
 
 on:
@@ -32,4 +32,4 @@ jobs:
           script: |
             set -e
             cd ~/AI-MEDIA-PLATFORM
-            bash scripts/restore-db.sh "$DUMP_PUBLIC_ID"
+            bash scripts/ops/restore-db.sh "$DUMP_PUBLIC_ID"

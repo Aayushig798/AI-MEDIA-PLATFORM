@@ -9,12 +9,12 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:seed": "prisma db seed",
-    "demo:data": "tsx --env-file=.env scripts/demo-data.ts",
-    "db:export": "tsx --env-file=.env scripts/export-db.ts",
+    "demo:data": "tsx --env-file=.env scripts/data/demo-data.ts",
+    "db:export": "tsx --env-file=.env scripts/ops/export-db.ts",
     "db:setup": "prisma db execute --file prisma/extensions.sql --schema prisma/schema.prisma && prisma db push && prisma db execute --file prisma/indexes.sql --schema prisma/schema.prisma",
-    "ai:check": "tsx scripts/check_ai.ts",
-    "ai:reembed": "tsx scripts/backfill_embeddings.ts",
-    "integrity:reverify": "tsx scripts/reverify_all.ts"
+    "ai:check": "tsx scripts/ops/check-ai.ts",
+    "ai:reembed": "tsx scripts/data/backfill-embeddings.ts",
+    "integrity:reverify": "tsx scripts/data/reverify-all.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

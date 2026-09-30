@@ -21,7 +21,7 @@ if (fs.existsSync(envPath)) {
 }
 
 import { PrismaClient } from "@prisma/client";
-import { generateEmbeddingForAsset } from "../lib/ai/embeddings";
+import { generateEmbeddingForAsset } from "../../lib/ai/embeddings";
 
 const prisma = new PrismaClient();
 

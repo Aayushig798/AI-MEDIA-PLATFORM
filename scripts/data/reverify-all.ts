@@ -14,8 +14,8 @@ try {
   // rely on the real environment
 }
 
-import { prisma } from "../lib/db";
-import { runIntegrity } from "../lib/integrity/run";
+import { prisma } from "../../lib/db";
+import { runIntegrity } from "../../lib/integrity/run";
 
 const PAUSE_MS = 1500; // stay under the free-tier request rate of the AI and weather services
 
