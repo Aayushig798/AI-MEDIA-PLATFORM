@@ -1,7 +1,7 @@
-import { chat, llmConfigured, VISION_MODEL } from "@/lib/ai/llm";
+import { generate, llmConfigured } from "@/lib/ai/llm";
 
 /**
- * Optional vision captioning for field media (Groq vision model).
+ * Optional vision captioning for field media (Gemini).
  * Generates a concise, evidence-focused single sentence caption.
  */
 export async function generateImageCaption(secureUrl: string): Promise<string | null> {
@@ -10,23 +10,12 @@ export async function generateImageCaption(secureUrl: string): Promise<string | 
   }
 
   try {
-    const caption = await chat({
-      model: VISION_MODEL,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Briefly describe the physical environment, infrastructure condition, or field activity visible in this image in one factual sentence. Reply with the sentence only.",
-            },
-            { type: "image_url", image_url: { url: secureUrl } },
-          ],
-        },
-      ],
-      max_tokens: 80,
+    const caption = await generate({
+      text: "Briefly describe the physical environment, infrastructure condition, or field activity visible in this image in one factual sentence. Reply with the sentence only.",
+      images: [secureUrl],
+      maxOutputTokens: 200,
     });
-    return caption.replace(/<think>[\s\S]*?<\/think>/g, "").trim() || null;
+    return caption.trim() || null;
   } catch (err: any) {
     console.warn("[Captioning] Vision captioning request failed:", err.message);
     return null;
