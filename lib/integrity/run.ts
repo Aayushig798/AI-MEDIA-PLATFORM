@@ -6,6 +6,7 @@ import { getResourceFacts } from "@/lib/cloudinary";
 import { getAnalysisImageUrl, EVIDENCE_TRANSFORMATION } from "@/lib/cloudinary-url";
 import { registerDerivative } from "@/lib/derivatives";
 import { appendLedger } from "@/lib/ledger";
+import { ensureProjectSite } from "@/lib/geocode";
 import { canonicalJSON, sha256Hex } from "@/lib/ledger-core";
 import { CHECK_LABELS, CheckResult, IntegrityContext, errored } from "./types";
 import { checkDuplicate, checkPhash } from "./checks/fingerprints";
@@ -50,7 +51,14 @@ function parseDms(value: unknown): number | null {
 }
 
 async function buildContext(assetId: string): Promise<IntegrityContext> {
-  const asset = await db.mediaAsset.findUniqueOrThrow({ where: { id: assetId }, include: { project: true } });
+  let asset = await db.mediaAsset.findUniqueOrThrow({ where: { id: assetId }, include: { project: true } });
+
+  // Projects usually have a place NAME but no coordinates: look them up once so the
+  // weather, satellite and geofence checks (and the impact map) have somewhere to work.
+  if (asset.project.latitude == null && asset.project.location) {
+    const placed = await ensureProjectSite(asset.project).catch(() => null);
+    if (placed) asset = await db.mediaAsset.findUniqueOrThrow({ where: { id: assetId }, include: { project: true } });
+  }
 
   const facts = await getResourceFacts(asset.cloudinaryPublicId, asset.resourceType).catch((err) => {
     console.warn(`[integrity] resource facts unavailable for ${asset.id}:`, err.message);

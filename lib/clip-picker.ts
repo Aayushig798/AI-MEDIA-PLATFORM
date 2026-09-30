@@ -2,6 +2,7 @@ import type { MediaAsset, Project } from "@prisma/client";
 import { cloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { withTransformation } from "@/lib/cloudinary-url";
 import { buildClaimQuestions } from "@/lib/integrity/checks/vision";
+import { generate, llmConfigured } from "@/lib/ai/llm";
 
 const MAX_FRAMES = 6;
 const DEFAULT_START = 1;
@@ -12,6 +13,15 @@ export interface ClipPick {
 }
 
 async function isYes(uri: string, question: string): Promise<boolean> {
+  if (llmConfigured()) {
+    const reply = await generate({
+      text: `${question} Answer with exactly one word: yes, no or unknown.`,
+      images: [uri],
+      maxOutputTokens: 100,
+      temperature: 0,
+    });
+    return reply.trim().toLowerCase().startsWith("yes");
+  }
   const cloud = process.env.CLOUDINARY_CLOUD_NAME;
   const auth = Buffer.from(`${process.env.CLOUDINARY_API_KEY}:${process.env.CLOUDINARY_API_SECRET}`).toString("base64");
   const res = await fetch(`https://api.cloudinary.com/v2/analysis/${cloud}/analyze/ai_vision_moderation`, {
@@ -34,7 +44,7 @@ export async function pickClipStart(
   project: Pick<Project, "claim">,
   clipSeconds: number
 ): Promise<ClipPick> {
-  if (!isCloudinaryConfigured()) return { start: DEFAULT_START, reason: "default (Cloudinary not configured)" };
+  if (!isCloudinaryConfigured() && !llmConfigured()) return { start: DEFAULT_START, reason: "default (no vision service configured)" };
   try {
     const resource = await cloudinary.api.resource(clip.cloudinaryPublicId, { resource_type: "video" });
     const duration = Number(resource.duration) || 0;
@@ -48,7 +58,7 @@ export async function pickClipStart(
     const times = Array.from({ length: MAX_FRAMES }, (_, i) => Math.round(i * step * 10) / 10).filter((t) => t <= lastStart);
 
     const answers = await Promise.all(
-      times.map((t) => isYes(withTransformation(clip.secureUrl, `so_${t},w_640,c_limit`, "jpg"), question).catch(() => null))
+      times.map((t) => isYes(withTransformation(clip.secureUrl, `so_${t},w_640,c_limit,f_jpg`, "jpg"), question).catch(() => null))
     );
     if (answers.every((a) => a === null)) return { start: DEFAULT_START, reason: "default (AI Vision unavailable)" };
 

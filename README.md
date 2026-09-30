@@ -63,7 +63,7 @@ npm run db:seed               # demo projects + photos (uploaded to your Cloudin
 npm run dev
 ```
 
-Open a project and click **Verify N unverified**. The seed stages two frauds: a byte-identical photo resubmitted to another project (Flagged) and a resized, re-compressed copy (caught by pHash, Review). The seeded Pune before/after pair is **synthetic test data** (two different stock photos); use real same-spot field photos for a demo. Stock photos are on the public web, so Web Detection will flag them once enabled.
+Open a project and click **Verify N unverified** (to re-score photos already checked, run `npm run integrity:reverify`). A project that only has a place name (e.g. "Pune, Maharashtra") is located automatically, which powers the weather check and the impact map. The seed stages two frauds: a byte-identical photo resubmitted to another project (Flagged) and a resized, re-compressed copy (caught by pHash, Review). The seeded Pune before/after pair is **synthetic test data** (two different stock photos); use real same-spot field photos for a demo. Stock photos are on the public web, so Web Detection will flag them once enabled.
 
 Without `DATABASE_URL`, the Phase 1–4 features fall back to `prisma/dev_data.json`; the Integrity Engine, ledger, reels and map need PostgreSQL.
 
@@ -72,7 +72,8 @@ For QR codes that open on a phone and for Cloudinary webhooks, run behind a publ
 ### Optional services (each check is skipped, not failed, when unset)
 | Setting | Enables | Free tier |
 |---|---|---|
-| Cloudinary **AI Vision** add-on (console) | AI auditor, provenance, weather cues, clip picking, Ask the auditor | free tier; token cost per image unpublished |
+| `GEMINI_API_KEY` (also covers vision) | AI auditor, provenance, weather cues, clip picking and Ask the auditor look at the photo with Gemini; the Cloudinary AI Vision add-on is an optional fallback | free tier |
+| Google Cloud **billing** enabled on the `GOOGLE_VISION_API_KEY` project | "found on the internet" check (the API refuses calls until billing is on; the first 1,000/month are free) | 1,000 units/month |
 | `GEMINI_API_KEY` | pair verification, captions, report narrative, and true semantic embeddings for search (`GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL`); check yours with `npm run ai:check` | free tier with rate limits |
 | `GOOGLE_VISION_API_KEY` | tagging fallback + web detection | 1,000 units/month |
 | `COPERNICUS_CLIENT_ID/SECRET` | Sentinel-2 satellite check | 10,000 PU/month |

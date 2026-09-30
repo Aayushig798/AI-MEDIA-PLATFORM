@@ -11,7 +11,8 @@
     "db:seed": "prisma db seed",
     "db:setup": "prisma db execute --file prisma/extensions.sql --schema prisma/schema.prisma && prisma db push && prisma db execute --file prisma/indexes.sql --schema prisma/schema.prisma",
     "ai:check": "tsx scripts/check_ai.ts",
-    "ai:reembed": "tsx scripts/backfill_embeddings.ts"
+    "ai:reembed": "tsx scripts/backfill_embeddings.ts",
+    "integrity:reverify": "tsx scripts/reverify_all.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
