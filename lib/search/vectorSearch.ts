@@ -153,14 +153,16 @@ export async function searchAssets(
       );
 
       const assetIds = rawRows.map((r) => r.id);
-      const allTags = await db.aiTag.findMany({
-        where: { mediaAssetId: { in: assetIds } as any },
-        orderBy: { confidence: "desc" },
-      });
-      const allCategories = await db.mediaAssetCategory.findMany({
-        where: { mediaAssetId: { in: assetIds } as any },
-        include: { category: true },
-      });
+      const [allTags, allCategories] = await Promise.all([
+        db.aiTag.findMany({
+          where: { mediaAssetId: { in: assetIds } as any },
+          orderBy: { confidence: "desc" },
+        }),
+        db.mediaAssetCategory.findMany({
+          where: { mediaAssetId: { in: assetIds } as any },
+          include: { category: true },
+        }),
+      ]);
 
       return rawRows.map((row) => {
         const tags = allTags.filter((t: any) => t.mediaAssetId === row.id);
@@ -234,14 +236,16 @@ export async function searchAssets(
 
     if (rawRows && rawRows.length > 0) {
       const assetIds = rawRows.map((r) => r.id);
-      const allTags = await db.aiTag.findMany({
-        where: { mediaAssetId: { in: assetIds } as any },
-        orderBy: { confidence: "desc" },
-      });
-      const allCategories = await db.mediaAssetCategory.findMany({
-        where: { mediaAssetId: { in: assetIds } as any },
-        include: { category: true },
-      });
+      const [allTags, allCategories] = await Promise.all([
+        db.aiTag.findMany({
+          where: { mediaAssetId: { in: assetIds } as any },
+          orderBy: { confidence: "desc" },
+        }),
+        db.mediaAssetCategory.findMany({
+          where: { mediaAssetId: { in: assetIds } as any },
+          include: { category: true },
+        }),
+      ]);
 
       const scoredResults = rawRows
         .map((row) => {

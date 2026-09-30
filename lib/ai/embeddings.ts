@@ -81,6 +81,10 @@ export function generateDeterministicEmbedding(text: string, dimensions = 1536):
 /**
  * Embeds query text with Gemini embeddings (or the deterministic fallback)
  */
+// Repeat searches (demo queries, typing the same thing again) skip the Gemini round trip
+const queryVectorCache = new Map<string, number[]>();
+const QUERY_CACHE_MAX = 200;
+
 export async function embedQueryText(query: string): Promise<number[]> {
   const trimmed = query.trim();
   if (!trimmed) {
@@ -88,8 +92,16 @@ export async function embedQueryText(query: string): Promise<number[]> {
   }
 
   if (llmConfigured()) {
+    const key = trimmed.toLowerCase();
+    const cached = queryVectorCache.get(key);
+    if (cached) return cached;
     try {
-      return await embed(trimmed, "query");
+      const vector = await embed(trimmed, "query");
+      if (queryVectorCache.size >= QUERY_CACHE_MAX) {
+        queryVectorCache.delete(queryVectorCache.keys().next().value as string);
+      }
+      queryVectorCache.set(key, vector);
+      return vector;
     } catch (err: any) {
       console.warn("[Embeddings] Gemini query embedding failed, falling back to deterministic:", err.message);
     }

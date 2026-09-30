@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, prisma } from "@/lib/db";
+import { db } from "@/lib/db";
 import { normalizePhash } from "@/lib/cloudinary";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -143,6 +143,7 @@ export async function POST(req: NextRequest) {
     // Ensure project exists
     const project = await db.project.findUnique({
       where: { id: projectId },
+      select: { id: true },
     });
 
     if (!project) {
@@ -171,10 +172,19 @@ export async function POST(req: NextRequest) {
     // Check for inline Cloudinary AI tags
     const inlineAiTags = extractCloudinaryAiTags(info);
     const hasInlineTags = inlineAiTags.length > 0;
+    // Pure function of the tags, so it's known before the asset is written
+    const primaryCategory = hasInlineTags ? determinePrimaryCategory(inlineAiTags) : null;
 
-    // Create the media asset in DB
+    // Create the media asset in DB, with the Integrity Engine fingerprints (Cloudinary etag =
+    // MD5, phash = 64-bit perceptual hash) and a pending integrity record in the same write.
+    // The fingerprint fields only exist in PostgreSQL mode; the file store ignores them.
     const asset = await db.mediaAsset.create({
       data: {
+        ...(await db.isPrismaConnected() && {
+          etag: typeof info?.etag === "string" ? info.etag : null,
+          phash: normalizePhash(info?.phash),
+          integrity: { create: {} },
+        }),
         projectId,
         cloudinaryPublicId,
         secureUrl,
@@ -183,7 +193,8 @@ export async function POST(req: NextRequest) {
         bytes: Number(bytes) || 0,
         width: width ? Number(width) : null,
         height: height ? Number(height) : null,
-        manualCategory: initialCategory,
+        // If categorySource is "ai", the AI primary category becomes manualCategory
+        manualCategory: categorySource === "ai" && primaryCategory ? primaryCategory : initialCategory,
         categorySource,
         manualLocation: manualLocation?.trim() || null,
         manualNotes: manualNotes?.trim() || null,
@@ -195,23 +206,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Integrity Engine fingerprints (Cloudinary etag = MD5, phash = 64-bit perceptual hash)
-    // and a pending integrity record. Needs PostgreSQL; skipped in file-store mode.
-    try {
-      await prisma.mediaAsset.update({
-        where: { id: asset.id },
-        data: {
-          etag: typeof info?.etag === "string" ? info.etag : null,
-          phash: normalizePhash(info?.phash),
-          integrity: { create: {} },
-        },
-      });
-    } catch (err) {
-      console.warn("[integrity] could not store fingerprints:", (err as Error).message);
-    }
-
-    // Log upload event for asset traceability
-    await logEvent(
+    // Log upload event for asset traceability (runs while the tags are written)
+    const uploadLogged = logEvent(
       asset.id,
       "uploaded",
       { format: asset.format, bytes: asset.bytes, resourceType: asset.resourceType },
@@ -219,51 +215,41 @@ export async function POST(req: NextRequest) {
     );
 
     // If inline tags were available from Cloudinary, write them immediately
-    if (hasInlineTags) {
+    if (hasInlineTags && primaryCategory) {
       console.log(
         `[AI Tagging] Asset ${asset.id} (${inlineAiTags[0]?.source || "cloudinary_google"}) raw labels:`,
         inlineAiTags.map((t) => `${t.label} (${t.confidence})`).join(", ")
       );
-
-      // Clean up any stale tags or categories (Requirement 7)
-      await db.aiTag.deleteMany({ where: { mediaAssetId: asset.id } });
-      await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: asset.id } });
-
-      for (const t of inlineAiTags) {
-        await db.aiTag.create({
-          data: {
-            mediaAssetId: asset.id,
-            label: t.label,
-            confidence: t.confidence,
-            source: t.source,
-          },
-        });
-      }
-
-      // Assign ONE primary category based on highest total confidence (Requirement 5)
-      const primaryCategory = determinePrimaryCategory(inlineAiTags);
+      // ONE primary category based on highest total confidence (Requirement 5)
       console.log(
         `[AI Tagging] Asset ${asset.id} primary category assigned: ${primaryCategory}`
       );
 
-      const cat = await db.category.upsert({
-        where: { name: primaryCategory },
-        update: {},
-        create: { name: primaryCategory },
-      });
+      // The asset is brand new, so there are no stale tags or categories to clear first
+      await Promise.all([
+        db.aiTag.createMany({
+          data: inlineAiTags.map((t) => ({
+            mediaAssetId: asset.id,
+            label: t.label,
+            confidence: t.confidence,
+            source: t.source,
+          })),
+        }),
+        db.category
+          .upsert({
+            where: { name: primaryCategory },
+            update: {},
+            create: { name: primaryCategory },
+          })
+          .then((cat) =>
+            db.mediaAssetCategory.create({
+              data: { mediaAssetId: asset.id, categoryId: cat.id },
+            })
+          ),
+      ]);
 
-      await db.mediaAssetCategory.create({
-        data: { mediaAssetId: asset.id, categoryId: cat.id },
-      });
-
-      // If categorySource is "ai", update manualCategory with the AI primary category
-      if (asset.categorySource === "ai") {
-        await db.mediaAsset.update({
-          where: { id: asset.id },
-          data: { manualCategory: primaryCategory },
-        });
-      }
-
+      // Ledger order: "uploaded" before "ai_tagged"
+      await uploadLogged;
       await logEvent(
         asset.id,
         "ai_tagged",
@@ -282,23 +268,28 @@ export async function POST(req: NextRequest) {
       });
     } else {
       // Asynchronous fallback: Google Vision or fail gracefully without mock tags
-      runVisionFallback(asset.id, asset.secureUrl, {
+      // (starts after the "uploaded" ledger entry so the chain keeps its order)
+      uploadLogged.then(() => runVisionFallback(asset.id, asset.secureUrl, {
         filename: filename || cloudinaryPublicId,
         manualNotes: asset.manualNotes || undefined,
         manualLocation: asset.manualLocation || undefined,
-      }).catch((err) => {
+      })).catch((err) => {
         console.error("Async runVisionFallback background error:", err);
       });
     }
 
+    await uploadLogged;
+
     // Refresh asset to include aiTags and categories if created inline
-    const finalAsset = await db.mediaAsset.findUnique({
-      where: { id: asset.id },
-      include: {
-        aiTags: { orderBy: { confidence: "desc" } },
-        categories: { include: { category: true } },
-      },
-    }) || asset;
+    const finalAsset = hasInlineTags
+      ? (await db.mediaAsset.findUnique({
+          where: { id: asset.id },
+          include: {
+            aiTags: { orderBy: { confidence: "desc" } },
+            categories: { include: { category: true } },
+          },
+        })) || asset
+      : asset;
 
     return NextResponse.json({ success: true, asset: finalAsset }, { status: 201 });
   } catch (error: any) {

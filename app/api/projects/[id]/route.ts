@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, prisma } from "@/lib/db";
 import { destroyCloudinaryAsset } from "@/lib/cloudinary";
 import { parseProjectIntegrityFields } from "@/lib/project-fields";
-import { INTEGRITY_SUMMARY } from "@/lib/integrity/summary";
 
 export async function GET(
   req: NextRequest,
@@ -17,19 +16,10 @@ export async function GET(
       );
     }
 
+    // Project fields + asset count only: the page loads its assets from /api/assets
     const project = await db.project.findUnique({
       where: { id },
-      include: {
-        assets: {
-          orderBy: { createdAt: "desc" },
-          include: {
-            aiTags: true,
-            categories: { include: { category: true } },
-            integrity: { select: INTEGRITY_SUMMARY },
-          },
-        },
-        _count: { select: { assets: true } },
-      },
+      include: { _count: { select: { assets: true } } },
     });
 
     if (!project) {

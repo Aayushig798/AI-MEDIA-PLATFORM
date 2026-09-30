@@ -19,14 +19,21 @@ import { scoreChecks } from "./score";
 
 const MAX_HASH_BYTES = 60 * 1024 * 1024;
 
+// Camera EXIF strings are often NUL-padded ("Canon\0\0\0"), and PostgreSQL rejects
+// \u0000 in text and jsonb, which would fail the whole integrity run.
+const stripNul = (s: string) => s.replace(/\u0000/g, "");
+
 /** JSON-safe copy of exifr output (Dates -> ISO strings, binary blobs dropped). */
 function sanitizeExif(raw: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(raw)) {
     if (v instanceof Date) out[k] = isNaN(v.getTime()) ? null : v.toISOString();
     else if (v instanceof Uint8Array || ArrayBuffer.isView(v)) continue;
-    else if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") out[k] = v;
-    else if (Array.isArray(v) && v.length <= 16 && v.every((x) => typeof x === "number" || typeof x === "string")) out[k] = v;
+    else if (typeof v === "string") out[k] = stripNul(v);
+    else if (typeof v === "number" || typeof v === "boolean") out[k] = v;
+    else if (Array.isArray(v) && v.length <= 16 && v.every((x) => typeof x === "number" || typeof x === "string")) {
+      out[k] = v.map((x) => (typeof x === "string" ? stripNul(x) : x));
+    }
   }
   return out;
 }
@@ -51,38 +58,46 @@ function parseDms(value: unknown): number | null {
 }
 
 async function buildContext(assetId: string): Promise<IntegrityContext> {
-  let asset = await db.mediaAsset.findUniqueOrThrow({ where: { id: assetId }, include: { project: true } });
+  const loaded = await db.mediaAsset.findUniqueOrThrow({ where: { id: assetId }, include: { project: true } });
 
-  // Projects usually have a place NAME but no coordinates: look them up once so the
-  // weather, satellite and geofence checks (and the impact map) have somewhere to work.
-  if (asset.project.latitude == null && asset.project.location) {
-    const placed = await ensureProjectSite(asset.project).catch(() => null);
-    if (placed) asset = await db.mediaAsset.findUniqueOrThrow({ where: { id: assetId }, include: { project: true } });
-  }
-
-  const facts = await getResourceFacts(asset.cloudinaryPublicId, asset.resourceType).catch((err) => {
-    console.warn(`[integrity] resource facts unavailable for ${asset.id}:`, err.message);
-    return null;
-  });
-
-  // Hash and parse the stored original (the untransformed delivery URL serves it byte-for-byte).
-  let sha256: string | null = null;
-  let exif: Record<string, unknown> | null = null;
-  if (/^https?:\/\//.test(asset.secureUrl) && (asset.bytes || 0) <= MAX_HASH_BYTES) {
-    try {
-      const res = await fetch(asset.secureUrl);
-      if (res.ok) {
-        const buffer = Buffer.from(await res.arrayBuffer());
-        sha256 = createHash("sha256").update(buffer).digest("hex");
-        if (asset.resourceType === "image") {
-          const parsed = await exifr.parse(buffer, { tiff: true, exif: true, gps: true, xmp: false, icc: false, iptc: false }).catch(() => null);
-          if (parsed && Object.keys(parsed).length > 0) exif = parsed;
+  // Site lookup, Cloudinary resource facts and the original download are independent
+  // network calls, so they run at the same time.
+  const [asset, facts, original] = await Promise.all([
+    // Projects usually have a place NAME but no coordinates: look them up once so the
+    // weather, satellite and geofence checks (and the impact map) have somewhere to work.
+    (async () => {
+      if (loaded.project.latitude != null || !loaded.project.location) return loaded;
+      const placed = await ensureProjectSite(loaded.project).catch(() => null);
+      return placed ? db.mediaAsset.findUniqueOrThrow({ where: { id: assetId }, include: { project: true } }) : loaded;
+    })(),
+    getResourceFacts(loaded.cloudinaryPublicId, loaded.resourceType).catch((err) => {
+      console.warn(`[integrity] resource facts unavailable for ${loaded.id}:`, err.message);
+      return null;
+    }),
+    // Hash and parse the stored original (the untransformed delivery URL serves it byte-for-byte).
+    (async () => {
+      let sha256: string | null = null;
+      let exif: Record<string, unknown> | null = null;
+      if (/^https?:\/\//.test(loaded.secureUrl) && (loaded.bytes || 0) <= MAX_HASH_BYTES) {
+        try {
+          const res = await fetch(loaded.secureUrl);
+          if (res.ok) {
+            const buffer = Buffer.from(await res.arrayBuffer());
+            sha256 = createHash("sha256").update(buffer).digest("hex");
+            if (loaded.resourceType === "image") {
+              const parsed = await exifr.parse(buffer, { tiff: true, exif: true, gps: true, xmp: false, icc: false, iptc: false }).catch(() => null);
+              if (parsed && Object.keys(parsed).length > 0) exif = parsed;
+            }
+          }
+        } catch (err: any) {
+          console.warn(`[integrity] could not fetch original for ${loaded.id}:`, err.message);
         }
       }
-    } catch (err: any) {
-      console.warn(`[integrity] could not fetch original for ${asset.id}:`, err.message);
-    }
-  }
+      return { sha256, exif };
+    })(),
+  ]);
+  const { sha256 } = original;
+  let { exif } = original;
   // Fall back to the metadata Cloudinary extracted, if we couldn't parse it ourselves.
   if (!exif && facts?.metadata && Object.keys(facts.metadata).length > 0) {
     exif = {
@@ -186,7 +201,10 @@ export async function runIntegrity(assetId: string, actor: string) {
         summary: `Only ${evidenceChecks} check${evidenceChecks === 1 ? "" : "s"} could run on this asset, too few to verify it automatically; a reviewer should confirm it.`,
       });
     }
-    const checksJson = JSON.parse(JSON.stringify(checks)) as Prisma.InputJsonValue;
+    // Summaries can quote EXIF text (e.g. the editing software's name), so strip NULs here too
+    const checksJson = JSON.parse(
+      JSON.stringify(checks, (_key, value) => (typeof value === "string" ? stripNul(value) : value))
+    ) as Prisma.InputJsonValue;
 
     const integrity = await db.assetIntegrity.update({
       where: { assetId },

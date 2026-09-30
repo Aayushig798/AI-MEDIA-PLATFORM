@@ -22,19 +22,31 @@ async function lookup(name: string): Promise<{ lat: number; lng: number; label: 
   return { lat: hit.latitude, lng: hit.longitude, label: [hit.name, hit.admin1, hit.country].filter(Boolean).join(", ") };
 }
 
-/** Try the most specific reading first: the whole string, then each comma-separated part. */
+// Per-process memo, so a place that can't be found isn't looked up again on every map load
+const MISS_TTL_MS = 6 * 60 * 60 * 1000;
+const memo = new Map<string, { at: number; result: { lat: number; lng: number; label: string } | null }>();
+
+/** Prefer the most specific reading: the whole string, then each comma-separated part. */
 export async function geocodePlace(text: string): Promise<{ lat: number; lng: number; label: string } | null> {
+  const key = text.trim().toLowerCase();
+  const hit = memo.get(key);
+  if (hit && (hit.result || Date.now() - hit.at < MISS_TTL_MS)) return hit.result;
+
   const parts = text.split(",").map((p) => p.trim()).filter(Boolean);
-  const candidates = Array.from(new Set([text.trim(), ...parts]));
-  for (const candidate of candidates.slice(0, 4)) {
-    try {
-      const found = await lookup(candidate);
-      if (found) return found;
-    } catch {
-      // network hiccup: try the next reading
-    }
-  }
-  return null;
+  const candidates = Array.from(new Set([text.trim(), ...parts])).slice(0, 4);
+  // All readings in parallel (one lookup's latency, not four); still pick the most specific hit
+  let failed = false;
+  const results = await Promise.all(
+    candidates.map((c) =>
+      lookup(c).catch(() => {
+        failed = true; // network hiccup: don't remember this as "not found"
+        return null;
+      })
+    )
+  );
+  const result = results.find(Boolean) ?? null;
+  if (result || !failed) memo.set(key, { at: Date.now(), result });
+  return result;
 }
 
 /**

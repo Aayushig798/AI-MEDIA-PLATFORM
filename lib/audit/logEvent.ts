@@ -22,22 +22,25 @@ export async function logEvent(
   eventDetail: Record<string, unknown>,
   actor: string = "system"
 ) {
-  try {
-    if (!mediaAssetId) return;
-    await db.assetAuditLog.create({
-      data: {
-        mediaAssetId,
-        eventType,
-        eventDetail: eventDetail || {},
-        actor: actor || "system",
-      },
-    });
-  } catch (err) {
-    console.error(`[AuditLog Error] Failed to log ${eventType} for asset ${mediaAssetId}:`, err);
-  }
+  if (!mediaAssetId) return;
+  // The audit row and the asset's projectId (needed for the ledger entry) are fetched together
+  const [, asset] = await Promise.all([
+    db.assetAuditLog
+      .create({
+        data: {
+          mediaAssetId,
+          eventType,
+          eventDetail: eventDetail || {},
+          actor: actor || "system",
+        },
+      })
+      .catch((err: unknown) => {
+        console.error(`[AuditLog Error] Failed to log ${eventType} for asset ${mediaAssetId}:`, err);
+      }),
+    db.mediaAsset.findUnique({ where: { id: mediaAssetId }, select: { projectId: true } }).catch(() => null),
+  ]);
 
   // Mirror into the tamper-evident hash chain (PostgreSQL only; best effort).
-  const asset = await db.mediaAsset.findUnique({ where: { id: mediaAssetId } }).catch(() => null);
   await tryAppendLedger({
     type: LEDGER_TYPES[eventType],
     actor: actor || "system",

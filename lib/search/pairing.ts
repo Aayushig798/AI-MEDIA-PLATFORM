@@ -104,27 +104,27 @@ export async function suggestComparisons(
     };
   }
 
-  // Load embeddings if available in pgvector
+  // Load embeddings (if available in pgvector) and the saved comparisons in parallel
   const embeddingMap = new Map<string, number[]>();
-  try {
-    const assetIds = datedImages.map((a: any) => a.id);
-    const rawEmbeddings = await db.$queryRawUnsafe<
-      Array<{ mediaAssetId: string; embedding: string }>
-    >(
-      `SELECT "mediaAssetId", embedding::text FROM "MediaEmbedding" WHERE "mediaAssetId" = ANY($1::text[])`,
-      assetIds
-    );
-    for (const row of rawEmbeddings) {
-      if (row.embedding) {
-        const numbers = row.embedding
-          .replace(/[\[\]]/g, "")
-          .split(",")
-          .map(Number);
-        embeddingMap.set(row.mediaAssetId, numbers);
-      }
+  const assetIds = datedImages.map((a: any) => a.id);
+  const [rawEmbeddings, savedComparisons] = await Promise.all([
+    db
+      .$queryRawUnsafe<Array<{ mediaAssetId: string; embedding: string }>>(
+        `SELECT "mediaAssetId", embedding::text FROM "MediaEmbedding" WHERE "mediaAssetId" = ANY($1::text[])`,
+        assetIds
+      )
+      // If pgvector query fails or is not enabled, embeddings are optional
+      .catch(() => [] as Array<{ mediaAssetId: string; embedding: string }>),
+    db.comparison.findMany({ where: { projectId } }),
+  ]);
+  for (const row of rawEmbeddings) {
+    if (row.embedding) {
+      const numbers = row.embedding
+        .replace(/[\[\]]/g, "")
+        .split(",")
+        .map(Number);
+      embeddingMap.set(row.mediaAssetId, numbers);
     }
-  } catch (e) {
-    // If pgvector query fails or is not enabled, embeddings are optional
   }
 
   // 1 & 2. Evaluate all image pairs against Hard Rules and Content Similarity Gate
@@ -202,15 +202,10 @@ export async function suggestComparisons(
   candidatePairs.sort((a, b) => b.rankingScore - a.rankingScore);
   const topCandidates = candidatePairs.slice(0, COMPARISON_CONFIG.VISION_VERIFY_TOP_K);
 
-  // Fetch already saved comparisons to cross-reference alreadySaved state
-  const savedComparisons = await db.comparison.findMany({
-    where: { projectId },
-  });
-
   const verifiedSuggestions: ComparisonSuggestion[] = [];
 
-  // Gate 3: Vision Verification on top candidates
-  for (const cand of topCandidates) {
+  // Gate 3: Vision Verification on top candidates, all at once (results are sorted below)
+  await Promise.all(topCandidates.map(async (cand) => {
     try {
       const verification = await verifyPairWithVision(cand.beforeAsset, cand.afterAsset);
 
@@ -273,7 +268,7 @@ export async function suggestComparisons(
         err.message || err
       );
     }
-  }
+  }));
 
   // Sort suggestions by confidence (descending), then by time gap (descending)
   verifiedSuggestions.sort((a, b) => {

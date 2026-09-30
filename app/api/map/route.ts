@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       where: { ...(projectId && { projectId }), integrity: { status: "DONE" } },
       include: {
         integrity: { select: { status: true, verdict: true, reviewDecision: true, trustScore: true, gpsLat: true, gpsLng: true } },
-        project: { select: { id: true, name: true, latitude: true, longitude: true } },
+        project: { select: { id: true, name: true, location: true, latitude: true, longitude: true, geofenceRadiusM: true } },
       },
       orderBy: { capturedAt: "desc" },
     });
@@ -27,13 +27,12 @@ export async function GET(req: NextRequest) {
     // Look up coordinates (once, then stored) for projects that only have a place name
     const needSite = new Map<string, (typeof verified)[number]["project"]>();
     for (const a of verified) if (a.project.latitude == null) needSite.set(a.project.id, a.project);
-    if (needSite.size > 0) {
-      const projects = await prisma.project.findMany({ where: { id: { in: Array.from(needSite.keys()) } } });
-      for (const project of projects.slice(0, 10)) {
+    await Promise.all(
+      Array.from(needSite.values()).slice(0, 10).map(async (project) => {
         const placed = await ensureProjectSite(project).catch(() => null);
         if (placed) for (const a of verified) if (a.project.id === project.id) Object.assign(a.project, { latitude: placed.lat, longitude: placed.lng });
-      }
-    }
+      })
+    );
 
     const points = verified
       .map((a) => {
