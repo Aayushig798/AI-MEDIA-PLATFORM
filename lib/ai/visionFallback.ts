@@ -2,16 +2,41 @@ import { db } from "@/lib/db";
 import { determinePrimaryCategory, DomainCategory } from "./categoryMapping";
 import { generateEmbeddingForAsset } from "./embeddings";
 import { logEvent } from "@/lib/audit/logEvent";
+import { extractJson, generate, llmConfigured } from "./llm";
+import { getOptimizedVisionUrl } from "@/lib/cloudinary-url";
 
 export interface VisionLabelResult {
   label: string;
   confidence: number;
-  source: "cloudinary_google" | "cloudinary_rekognition" | "external_vision";
+  source: "cloudinary_google" | "cloudinary_rekognition" | "external_vision" | "gemini_vision";
+}
+
+/** Labels from Gemini looking at the photo; used when Google Cloud Vision can't answer. */
+async function geminiLabels(secureUrl: string): Promise<VisionLabelResult[]> {
+  const raw = await generate({
+    system: "You label photos for an environmental and community impact evidence library. Reply ONLY with JSON.",
+    text:
+      'List 8 to 15 short visual labels for what this photo shows (objects, landscape, activity, infrastructure), most prominent first, each with a confidence from 0 to 1. JSON: {"labels":[{"label":string,"confidence":number}]}',
+    images: [getOptimizedVisionUrl(secureUrl, 768)],
+    json: true,
+    maxOutputTokens: 1024,
+  });
+  const seen = new Set<string>();
+  const labels: VisionLabelResult[] = [];
+  for (const item of extractJson(raw)?.labels ?? []) {
+    const label = typeof item?.label === "string" ? item.label.trim() : "";
+    const confidence = Number(item?.confidence);
+    if (!label || !Number.isFinite(confidence) || seen.has(label.toLowerCase())) continue;
+    seen.add(label.toLowerCase());
+    labels.push({ label, confidence: Math.round(Math.min(1, Math.max(0, confidence)) * 1000) / 1000, source: "gemini_vision" });
+  }
+  return labels.slice(0, 15);
 }
 
 /**
  * Real Vision Fallback Engine
- * Calls Google Cloud Vision LABEL_DETECTION using GOOGLE_VISION_API_KEY when Cloudinary add-on tags are absent.
+ * Calls Google Cloud Vision LABEL_DETECTION using GOOGLE_VISION_API_KEY when Cloudinary add-on tags are absent,
+ * then Gemini if Vision gives nothing (no key, or billing not enabled).
  * If no real tags can be obtained, marks the asset as "failed" and never invents mock tags.
  */
 export async function runVisionFallback(
@@ -73,11 +98,20 @@ export async function runVisionFallback(
       }
     }
 
+    // 2b. Vision gave nothing: ask Gemini to label the photo instead
+    if (detectedLabels.length === 0 && llmConfigured() && secureUrl?.startsWith("http")) {
+      try {
+        detectedLabels.push(...(await geminiLabels(secureUrl)));
+      } catch (err: any) {
+        console.warn("[Gemini] label fallback failed:", err.message || err);
+      }
+    }
+
     // 3. If no real tags were obtained, FAIL GRACEFULLY - DO NOT INVENT MOCK TAGS
     if (detectedLabels.length === 0) {
       const missingReason = !googleApiKey
-        ? "Google Auto Tagging add-on returned no data and GOOGLE_VISION_API_KEY not set"
-        : "Google Auto Tagging add-on returned no data and Google Cloud Vision API returned 0 labels";
+        ? "Google Auto Tagging add-on returned no data, GOOGLE_VISION_API_KEY not set and Gemini returned no labels"
+        : "Google Auto Tagging add-on returned no data, and neither Google Cloud Vision nor Gemini returned labels";
 
       console.error(
         `[AI Tagging Failed] Asset ${assetId}: ${missingReason}. No mock tags will be generated.`
@@ -108,8 +142,9 @@ export async function runVisionFallback(
     }
 
     // 4. Log raw labels and confidences (Requirement 6)
+    const source = detectedLabels[0].source;
     console.log(
-      `[AI Tagging] Asset ${assetId} (external_vision) raw labels:`,
+      `[AI Tagging] Asset ${assetId} (${source}) raw labels:`,
       detectedLabels.map((t) => `${t.label} (${t.confidence})`).join(", ")
     );
 
@@ -118,16 +153,14 @@ export async function runVisionFallback(
     await db.mediaAssetCategory.deleteMany({ where: { mediaAssetId: assetId } });
 
     // 6. Save real AI tags
-    for (const item of detectedLabels) {
-      await db.aiTag.create({
-        data: {
-          mediaAssetId: assetId,
-          label: item.label,
-          confidence: item.confidence,
-          source: "external_vision",
-        },
-      });
-    }
+    await db.aiTag.createMany({
+      data: detectedLabels.map((item) => ({
+        mediaAssetId: assetId,
+        label: item.label,
+        confidence: item.confidence,
+        source: item.source,
+      })),
+    });
 
     // 7. Assign ONE primary category based on highest total confidence (Requirement 5)
     const primaryCategory = determinePrimaryCategory(detectedLabels);
@@ -166,7 +199,7 @@ export async function runVisionFallback(
       {
         tags: detectedLabels.map((t) => t.label),
         confidences: detectedLabels.map((t) => t.confidence),
-        source: "external_vision",
+        source,
         primaryCategory,
       },
       "system-ai"

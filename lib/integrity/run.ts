@@ -227,8 +227,11 @@ export async function runIntegrity(assetId: string, actor: string) {
       },
     });
 
-    // Evidence-grade derivative for the Verify page and reports.
-    await registerDerivative(ctx.asset, EVIDENCE_TRANSFORMATION, "verify-page evidence", actor);
+    // Evidence-grade derivative for the Verify page and reports. The checks are already
+    // saved, so a problem here must not turn a finished verification into a failed one.
+    await registerDerivative(ctx.asset, EVIDENCE_TRANSFORMATION, "verify-page evidence", actor).catch((err) =>
+      console.warn(`[integrity] could not register evidence derivative for ${assetId}:`, err?.message || err)
+    );
 
     await appendLedger({
       type: "INTEGRITY_CHECKED",

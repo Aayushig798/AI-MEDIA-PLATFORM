@@ -61,6 +61,10 @@ interface UploadModalProps {
 
 const FIELD_CLASS = "input disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:text-zinc-500";
 
+// Set once Cloudinary reports the monthly Google auto-tagging allowance is used up,
+// so later files in this session skip straight to uploading without it.
+let autoTaggingExhausted = false;
+
 function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
@@ -296,18 +300,20 @@ export function UploadModal({
       updateStagedField(staged.id, "progress", 10);
 
       // Step 1: Request signed upload params from /api/cloudinary/sign
-      const signRes = await fetch("/api/cloudinary/sign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, resourceType: staged.resourceType }),
-      });
+      const requestSignature = async (autoTagging: boolean) => {
+        const signRes = await fetch("/api/cloudinary/sign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId, resourceType: staged.resourceType, autoTagging }),
+        });
+        if (!signRes.ok) {
+          throw new Error("Couldn't start the upload. Please try again.");
+        }
+        return signRes.json();
+      };
 
-      if (!signRes.ok) {
-        throw new Error("Couldn't start the upload. Please try again.");
-      }
-
-      const signData = await signRes.json();
-      const { signature, timestamp, apiKey, cloudName, folder } = signData;
+      let signData = await requestSignature(!autoTaggingExhausted);
+      const { apiKey, cloudName, folder } = signData;
 
       updateStagedField(staged.id, "progress", 30);
 
@@ -330,55 +336,58 @@ export function UploadModal({
 
       let rawCloudinaryInfo: any = null;
 
-      // Step 2: Attempt direct upload to Cloudinary
-      let uploadedToCloudinary = false;
-
-      // Only attempt network upload if we have an API key and valid cloud name
+      // Step 2: Direct upload to Cloudinary (whenever real credentials are configured)
       if (apiKey && apiKey !== "" && cloudName && cloudName !== "demo") {
-        try {
+        const attemptUpload = async (sd: any) => {
           const uploadFormData = new FormData();
           uploadFormData.append("file", staged.file);
-          uploadFormData.append("api_key", apiKey);
-          uploadFormData.append("timestamp", timestamp.toString());
-          uploadFormData.append("signature", signature);
-          uploadFormData.append("folder", folder);
-          uploadFormData.append("categorization", signData.categorization || "google_tagging");
-          uploadFormData.append("auto_tagging", (signData.auto_tagging ?? signData.autoTagging ?? 0.6).toString());
-          uploadFormData.append("image_metadata", (signData.image_metadata ?? signData.imageMetadata ?? true).toString());
+          uploadFormData.append("api_key", sd.apiKey);
+          uploadFormData.append("timestamp", sd.timestamp.toString());
+          uploadFormData.append("signature", sd.signature);
+          uploadFormData.append("folder", sd.folder);
+          // Only fields the server signed may be sent, or Cloudinary rejects the signature
+          if (sd.categorization) {
+            uploadFormData.append("categorization", sd.categorization);
+            uploadFormData.append("auto_tagging", String(sd.auto_tagging ?? 0.6));
+          }
+          uploadFormData.append("image_metadata", (sd.image_metadata ?? true).toString());
           // Signed too: perceptual hash for the Integrity Engine, optional webhook
-          if (signData.phash) uploadFormData.append("phash", "true");
-          if (signData.notification_url) uploadFormData.append("notification_url", signData.notification_url);
-          if (signData.auto_transcription) uploadFormData.append("auto_transcription", "true");
+          if (sd.phash) uploadFormData.append("phash", "true");
+          if (sd.notification_url) uploadFormData.append("notification_url", sd.notification_url);
+          if (sd.auto_transcription) uploadFormData.append("auto_transcription", "true");
 
-          updateStagedField(staged.id, "progress", 50);
-
-          const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`;
-          const cldRes = await fetch(uploadUrl, {
+          const cldRes = await fetch(`https://api.cloudinary.com/v1_1/${sd.cloudName}/auto/upload`, {
             method: "POST",
             body: uploadFormData,
           });
+          return { ok: cldRes.ok, data: await cldRes.json().catch(() => ({})) };
+        };
 
-          if (cldRes.ok) {
-            const cldData = await cldRes.json();
-            rawCloudinaryInfo = cldData;
-            publicId = cldData.public_id;
-            secureUrl = cldData.secure_url;
-            resourceType = cldData.resource_type || resourceType;
-            format = cldData.format || format;
-            bytes = cldData.bytes || bytes;
-            width = cldData.width || width;
-            height = cldData.height || height;
-            uploadedToCloudinary = true;
-          } else {
-            console.warn("Cloudinary direct upload responded with:", await cldRes.text());
-          }
-        } catch (cldErr) {
-          console.warn("Cloudinary upload failed over network, using fallback storage:", cldErr);
+        updateStagedField(staged.id, "progress", 50);
+        let result = await attemptUpload(signData);
+
+        // The free Google auto-tagging allowance (50 a month) can run out, and Cloudinary then
+        // refuses the whole upload. Upload without it; the server tags the photo with Gemini.
+        if (!result.ok && signData.categorization && /auto tagging/i.test(result.data?.error?.message || "")) {
+          autoTaggingExhausted = true;
+          signData = await requestSignature(false);
+          result = await attemptUpload(signData);
         }
-      }
+        if (!result.ok) {
+          throw new Error(`Cloudinary rejected the upload: ${result.data?.error?.message || "unknown error"}`);
+        }
 
-      // Fallback for development / mock mode when real Cloudinary API credentials aren't active
-      if (!uploadedToCloudinary) {
+        const cldData = result.data;
+        rawCloudinaryInfo = cldData;
+        publicId = cldData.public_id;
+        secureUrl = cldData.secure_url;
+        resourceType = cldData.resource_type || resourceType;
+        format = cldData.format || format;
+        bytes = cldData.bytes || bytes;
+        width = cldData.width || width;
+        height = cldData.height || height;
+      } else {
+        // Development / mock mode only: no Cloudinary credentials configured
         const uuidStr = Math.random().toString(36).substring(2, 9);
         publicId = `${folder}/${uuidStr}_${staged.file.name.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 

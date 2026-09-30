@@ -5,7 +5,7 @@ import crypto from "crypto";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { projectId, resourceType } = body;
+    const { projectId, resourceType, autoTagging } = body;
 
     if (!projectId) {
       return NextResponse.json(
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     const folderUuid = crypto.randomUUID();
-    const signedParams = generateUploadSignature(projectId, folderUuid, resourceType);
+    const signedParams = generateUploadSignature(projectId, folderUuid, resourceType, autoTagging !== false);
 
     return NextResponse.json({
       success: true,

@@ -16,8 +16,9 @@ export interface CloudinarySignedParams {
   apiKey: string;
   cloudName: string;
   folder: string;
-  categorization: string;
-  autoTagging: number;
+  /** null when the upload is signed without Google auto-tagging */
+  categorization: string | null;
+  autoTagging: number | null;
   imageMetadata: boolean;
   phash: boolean;
   notificationUrl: string | null;
@@ -32,7 +33,10 @@ export interface CloudinarySignedParams {
 export function generateUploadSignature(
   projectId: string,
   folderUuid: string,
-  resourceType?: string
+  resourceType?: string,
+  // false once the monthly Google auto-tagging allowance is used up: Cloudinary refuses
+  // the whole upload then, so it is signed without it (the server tags with Gemini)
+  autoTagging = true
 ): CloudinarySignedParams {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "demo";
   const apiKey = process.env.CLOUDINARY_API_KEY || "";
@@ -43,8 +47,7 @@ export function generateUploadSignature(
 
   // Parameters to sign (must match form fields submitted to Cloudinary)
   const paramsToSign: Record<string, string | number | boolean> = {
-    auto_tagging: 0.6,
-    categorization: "google_tagging",
+    ...(autoTagging && { auto_tagging: 0.6, categorization: "google_tagging" }),
     folder,
     image_metadata: true,
     // Perceptual hash for the Integrity Engine's recycled-photo check
@@ -75,8 +78,8 @@ export function generateUploadSignature(
     apiKey,
     cloudName,
     folder,
-    categorization: "google_tagging",
-    autoTagging: 0.6,
+    categorization: autoTagging ? "google_tagging" : null,
+    autoTagging: autoTagging ? 0.6 : null,
     imageMetadata: true,
     phash: true,
     notificationUrl,

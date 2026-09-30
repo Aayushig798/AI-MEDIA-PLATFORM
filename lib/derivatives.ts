@@ -19,6 +19,11 @@ export async function registerDerivative(
   actor: string,
   extension?: string
 ) {
+  // Derivatives are Cloudinary transformation URLs. An asset stored any other way (e.g. an
+  // inline data: URL from an upload that never reached Cloudinary) has none, and its URL
+  // can be larger than a Postgres index entry allows.
+  if (!/^https:\/\/res\.cloudinary\.com\//.test(asset.secureUrl)) return null;
+
   const cls = classifyTransformation(transformation);
   // Signed Content Credentials only apply to images.
   const full =
