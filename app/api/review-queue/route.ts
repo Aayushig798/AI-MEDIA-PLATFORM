@@ -30,10 +30,12 @@ export async function GET(req: NextRequest) {
 
     // Attach the matched assets so the queue can show them side by side.
     const matchIds = Array.from(new Set(assets.flatMap((a) => a.phashMatches.map((m) => m.matchAssetId))));
-    const matched = await db.mediaAsset.findMany({
-      where: { id: { in: matchIds } },
-      select: { id: true, secureUrl: true, resourceType: true, capturedAt: true, project: { select: { id: true, name: true } } },
-    });
+    const matched = matchIds.length
+      ? await db.mediaAsset.findMany({
+          where: { id: { in: matchIds } },
+          select: { id: true, secureUrl: true, resourceType: true, capturedAt: true, project: { select: { id: true, name: true } } },
+        })
+      : [];
     const byId = Object.fromEntries(matched.map((m) => [m.id, m]));
 
     return NextResponse.json({

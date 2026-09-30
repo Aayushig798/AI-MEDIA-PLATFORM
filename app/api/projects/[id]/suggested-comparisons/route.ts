@@ -9,10 +9,11 @@ export async function GET(
   try {
     const { id } = params;
 
-    // Check project exists
-    const project = await db.project.findUnique({
-      where: { id },
-    });
+    // Existence check runs alongside the pairing work instead of before it
+    const [project, result] = await Promise.all([
+      db.project.findUnique({ where: { id }, select: { id: true, name: true } }),
+      suggestComparisons(id),
+    ]);
 
     if (!project) {
       return NextResponse.json(
@@ -20,8 +21,6 @@ export async function GET(
         { status: 404 }
       );
     }
-
-    const result = await suggestComparisons(id);
 
     return NextResponse.json({
       success: true,

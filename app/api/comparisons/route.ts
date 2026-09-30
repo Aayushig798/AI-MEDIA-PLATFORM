@@ -20,35 +20,38 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Hydrate each comparison with beforeAsset, afterAsset details, and latest PairVerification
+    // Hydrate every comparison with its before/after assets and latest PairVerification using
+    // two batched queries in total, instead of three queries per comparison
+    const assetIds = Array.from(new Set(comparisons.flatMap((c: any) => [c.beforeAssetId, c.afterAssetId])));
+    const pairFilters = comparisons.flatMap((c: any) => [
+      { beforeAssetId: c.beforeAssetId, afterAssetId: c.afterAssetId },
+      { beforeAssetId: c.afterAssetId, afterAssetId: c.beforeAssetId },
+    ]);
+    const [assets, pairVers] = comparisons.length
+      ? await Promise.all([
+          db.mediaAsset.findMany({
+            where: { id: { in: assetIds } },
+            include: {
+              aiTags: { orderBy: { confidence: "desc" } },
+              categories: { include: { category: true } },
+            },
+          }),
+          prisma.pairVerification.findMany({ where: { OR: pairFilters }, orderBy: { createdAt: "desc" } }),
+        ])
+      : [[], []];
+    const assetById = new Map<string, any>(assets.map((a: any) => [a.id, a]));
+    // Newest first, so the first row seen for a pair (either direction) is its latest verification
+    const latestPair = new Map<string, (typeof pairVers)[number]>();
+    for (const pv of pairVers) {
+      const key = [pv.beforeAssetId, pv.afterAssetId].sort().join("|");
+      if (!latestPair.has(key)) latestPair.set(key, pv);
+    }
+
     const hydrated = await Promise.all(
       comparisons.map(async (comp: any) => {
-        const [beforeAsset, afterAsset, pairVer] = await Promise.all([
-          db.mediaAsset.findUnique({
-            where: { id: comp.beforeAssetId },
-            include: {
-              aiTags: { orderBy: { confidence: "desc" } },
-              categories: { include: { category: true } },
-            },
-          }),
-          db.mediaAsset.findUnique({
-            where: { id: comp.afterAssetId },
-            include: {
-              aiTags: { orderBy: { confidence: "desc" } },
-              categories: { include: { category: true } },
-            },
-          }),
-          // Lookup latest PairVerification row for this exact pair
-          db.pairVerification.findFirst({
-            where: {
-              OR: [
-                { beforeAssetId: comp.beforeAssetId, afterAssetId: comp.afterAssetId },
-                { beforeAssetId: comp.afterAssetId, afterAssetId: comp.beforeAssetId },
-              ],
-            },
-            orderBy: { createdAt: "desc" },
-          }),
-        ]);
+        const beforeAsset = assetById.get(comp.beforeAssetId) ?? null;
+        const afterAsset = assetById.get(comp.afterAssetId) ?? null;
+        const pairVer = latestPair.get([comp.beforeAssetId, comp.afterAssetId].sort().join("|")) ?? null;
 
         const verified = pairVer
           ? Boolean(pairVer.sameScene && pairVer.confidence >= 0.7)

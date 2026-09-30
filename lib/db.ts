@@ -11,7 +11,9 @@ export const prisma =
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Always reuse one client (and one connection pool) per process, in production too: every
+// extra client means fresh TLS handshakes to the database.
+globalForPrisma.prisma = prisma;
 
 // File-backed fallback store for development when PostgreSQL is not yet configured or offline
 const DATA_FILE = path.join(process.cwd(), "prisma", "dev_data.json");
@@ -389,9 +391,10 @@ export const db = {
       return projects;
     },
 
-    async findUnique({ where, include }: { where: { id: string }; include?: any }) {
+    async findUnique({ where, include, select }: { where: { id: string }; include?: any; select?: any }) {
       if (hasDatabaseUrl()) {
         try {
+          if (select) return await (prisma.project.findUnique as any)({ where, select });
           return await prisma.project.findUnique({
             where,
             include: include || {

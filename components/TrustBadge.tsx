@@ -1,4 +1,4 @@
-import { ShieldCheck, ShieldAlert, ShieldX, ShieldQuestion, Loader2, UserCheck, UserX } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export interface IntegritySummary {
   status: "PENDING" | "RUNNING" | "DONE" | "ERROR";
@@ -8,12 +8,26 @@ export interface IntegritySummary {
   computedAt?: string | null;
 }
 
-const STYLES = {
-  VERIFIED: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40",
-  REVIEW: "bg-amber-500/15 text-amber-300 border-amber-500/40",
-  FLAGGED: "bg-rose-500/15 text-rose-300 border-rose-500/40",
-  NEUTRAL: "bg-slate-800/80 text-slate-300 border-white/10",
+const DOT = {
+  VERIFIED: "bg-emerald-500",
+  REVIEW: "bg-amber-500",
+  FLAGGED: "bg-red-500",
+  NEUTRAL: "bg-zinc-400",
 };
+
+const TONE = {
+  VERIFIED: "bg-emerald-50 text-emerald-700 ring-emerald-600/15",
+  REVIEW: "bg-amber-50 text-amber-700 ring-amber-600/15",
+  FLAGGED: "bg-red-50 text-red-700 ring-red-600/15",
+  NEUTRAL: "bg-zinc-50 text-zinc-600 ring-zinc-500/15",
+};
+
+export const VERDICT_LABELS = {
+  VERIFIED: "Verified",
+  REVIEW: "Needs review",
+  FLAGGED: "Flagged",
+  UNVERIFIED: "Unverified",
+} as const;
 
 /** Human decision overrides the machine verdict for display (the machine score stays visible). */
 export function effectiveVerdict(i: IntegritySummary | null | undefined): "VERIFIED" | "REVIEW" | "FLAGGED" | null {
@@ -32,60 +46,49 @@ export function TrustBadge({
 }) {
   const base =
     size === "lg"
-      ? "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-bold border"
-      : "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border backdrop-blur-md";
-  const icon = size === "lg" ? "w-4 h-4" : "w-3 h-3";
+      ? "inline-flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium ring-1 ring-inset"
+      : "inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium ring-1 ring-inset";
+  const dot = size === "lg" ? "h-2 w-2 rounded-full" : "h-1.5 w-1.5 rounded-full";
 
   if (!integrity || integrity.status === "PENDING") {
     return (
-      <span className={`${base} ${STYLES.NEUTRAL}`} title="Not verified yet">
-        <ShieldQuestion className={icon} /> Unverified
+      <span className={`${base} ${TONE.NEUTRAL}`} title="Not verified yet">
+        <span className={`${dot} ${DOT.NEUTRAL}`} /> Unverified
       </span>
     );
   }
   if (integrity.status === "RUNNING") {
     return (
-      <span className={`${base} ${STYLES.NEUTRAL}`}>
-        <Loader2 className={`${icon} animate-spin`} /> Verifying
+      <span className={`${base} ${TONE.NEUTRAL}`}>
+        <Loader2 className={size === "lg" ? "h-3.5 w-3.5 animate-spin" : "h-3 w-3 animate-spin"} /> Verifying
       </span>
     );
   }
   if (integrity.status === "ERROR") {
     return (
-      <span className={`${base} ${STYLES.NEUTRAL}`} title="Verification failed; retry">
-        <ShieldQuestion className={icon} /> Retry
+      <span className={`${base} ${TONE.NEUTRAL}`} title="Verification failed; try again">
+        <span className={`${dot} ${DOT.NEUTRAL}`} /> Check failed
       </span>
     );
   }
 
   const verdict = effectiveVerdict(integrity) ?? "REVIEW";
-  const Icon =
-    integrity.reviewDecision === "APPROVED"
-      ? UserCheck
-      : integrity.reviewDecision === "REJECTED"
-        ? UserX
-        : verdict === "VERIFIED"
-          ? ShieldCheck
-          : verdict === "FLAGGED"
-            ? ShieldX
-            : ShieldAlert;
   const label = integrity.reviewDecision
     ? integrity.reviewDecision === "APPROVED"
       ? "Approved"
       : "Rejected"
-    : verdict === "VERIFIED"
-      ? "Verified"
-      : verdict === "FLAGGED"
-        ? "Flagged"
-        : "Review";
+    : VERDICT_LABELS[verdict];
 
   return (
     <span
-      className={`${base} ${STYLES[verdict]}`}
-      title={`Trust Score ${integrity.trustScore}/100${integrity.reviewDecision ? ` · human ${integrity.reviewDecision.toLowerCase()}` : ""}`}
+      className={`${base} ${TONE[verdict]}`}
+      title={`Trust score ${integrity.trustScore}/100${integrity.reviewDecision ? ` · ${integrity.reviewDecision.toLowerCase()} by a reviewer` : ""}`}
     >
-      <Icon className={icon} />
-      {label} · {integrity.trustScore}
+      <span className={`${dot} ${DOT[verdict]}`} />
+      {label}
+      {size === "lg" && integrity.trustScore != null && (
+        <span className="font-normal tabular-nums opacity-70">{integrity.trustScore}/100</span>
+      )}
     </span>
   );
 }

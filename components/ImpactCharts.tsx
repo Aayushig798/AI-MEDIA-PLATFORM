@@ -9,10 +9,12 @@ import {
   Bar,
   XAxis,
   YAxis,
+  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
+import { BarChart3, ChartPie } from "lucide-react";
+import { EmptyState, SectionHeader } from "@/components/ui";
 
 interface ImpactChartsProps {
   categoryBreakdown: Record<string, number>;
@@ -21,148 +23,142 @@ interface ImpactChartsProps {
   verifiedComparisonsCount: number;
 }
 
+// Flat tones from the app palette; "Uncategorized" stays neutral.
 const CATEGORY_COLORS: Record<string, string> = {
   Environmental: "#10b981",
-  Infrastructure: "#06b6d4",
+  Infrastructure: "#0ea5e9",
   Community: "#8b5cf6",
   "Disaster Response": "#f59e0b",
-  Uncategorized: "#64748b",
+  Uncategorized: "#d4d4d8",
 };
 
-const DEFAULT_COLOR = "#3b82f6";
+const FALLBACK_COLORS = ["#10b981", "#0ea5e9", "#f59e0b", "#8b5cf6", "#71717a", "#6ee7b7", "#7dd3fc", "#fcd34d", "#c4b5fd"];
 
-export function ImpactCharts({
-  categoryBreakdown,
-  totalAssets,
-  totalComparisons,
-  verifiedComparisonsCount,
-}: ImpactChartsProps) {
-  const pieData = useMemo(() => {
-    return Object.entries(categoryBreakdown).map(([name, value]) => ({
-      name,
-      value,
-      color: CATEGORY_COLORS[name] || DEFAULT_COLOR,
-    }));
+const colorFor = (name: string, index: number) =>
+  CATEGORY_COLORS[name] || FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+
+const GRID = "#f0f1f0";
+const TICK = { fill: "#71717a", fontSize: 12 };
+const TOOLTIP_STYLE = {
+  backgroundColor: "#ffffff",
+  border: "1px solid #e4e4e7",
+  borderRadius: "10px",
+  fontSize: "12px",
+  color: "#18181b",
+  boxShadow: "0 12px 28px -12px rgba(16,24,40,0.25)",
+  padding: "8px 10px",
+};
+
+export function ImpactCharts({ categoryBreakdown, totalAssets }: ImpactChartsProps) {
+  const data = useMemo(() => {
+    return Object.entries(categoryBreakdown)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({ name, value, color: colorFor(name, i) }));
   }, [categoryBreakdown]);
-
-  const barData = useMemo(() => {
-    return Object.entries(categoryBreakdown).map(([category, count]) => ({
-      category,
-      count,
-      color: CATEGORY_COLORS[category] || DEFAULT_COLOR,
-    }));
-  }, [categoryBreakdown]);
-
-  const verificationData = useMemo(() => {
-    const unverified = Math.max(0, totalComparisons - verifiedComparisonsCount);
-    return [
-      { name: "AI-Verified Pairs", value: verifiedComparisonsCount, color: "#10b981" },
-      { name: "Unverified Pairs", value: unverified, color: "#f59e0b" },
-    ];
-  }, [totalComparisons, verifiedComparisonsCount]);
 
   if (totalAssets === 0) {
     return (
-      <div className="glass-panel rounded-2xl p-8 text-center text-slate-500 text-xs">
-        No catalogued media assets to display analytics for. Upload assets to view distribution charts.
-      </div>
+      <EmptyState
+        icon={BarChart3}
+        title="No charts yet"
+        description="Upload photos or videos to this project to see them broken down by category."
+      />
     );
   }
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Category Donut Distribution */}
-      <div className="lg:col-span-6 glass-panel rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-bold text-slate-100">Domain Category Distribution</h3>
-            <span className="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-              {totalAssets} Total Assets
-            </span>
-          </div>
-          <p className="text-xs text-slate-400 mb-4">
-            AI-classified visual evidence proportions across sustainability pillars
-          </p>
-        </div>
+  const barHeight = Math.max(200, data.length * 44 + 40);
 
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={pieData}
-                cx="50%"
-                cy="50%"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={4}
-                dataKey="value"
-              >
-                {pieData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} stroke="#0f172a" strokeWidth={2} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#0f172a",
-                  borderColor: "rgba(255,255,255,0.1)",
-                  borderRadius: "12px",
-                  fontSize: "12px",
-                  color: "#f8fafc",
-                }}
-                formatter={(val: any, name: any) => [`${val} asset(s)`, name]}
-              />
-              <Legend
-                verticalAlign="bottom"
-                iconType="circle"
-                wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+  return (
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="card space-y-5 p-5">
+        <SectionHeader
+          icon={ChartPie}
+          tone="emerald"
+          title="Media by category"
+          description="Sorted automatically by what each photo shows."
+        />
+
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+          <div className="relative h-48 w-48 shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={64}
+                  outerRadius={92}
+                  paddingAngle={data.length > 1 ? 2 : 0}
+                  cornerRadius={4}
+                  dataKey="value"
+                  nameKey="name"
+                  stroke="none"
+                >
+                  {data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  itemStyle={{ color: "#18181b" }}
+                  formatter={(val: any, name: any) => [`${val} item${Number(val) === 1 ? "" : "s"}`, name]}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-semibold leading-none tracking-tight tabular-nums text-zinc-900">{totalAssets}</span>
+              <span className="mt-1 text-xs text-zinc-500">items</span>
+            </div>
+          </div>
+
+          <ul className="w-full min-w-0 space-y-3">
+            {data.map((d) => {
+              const pct = totalAssets > 0 ? Math.round((d.value / totalAssets) * 100) : 0;
+              return (
+                <li key={d.name} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.color }} />
+                      <span className="truncate text-zinc-700">{d.name}</span>
+                    </span>
+                    <span className="shrink-0 tabular-nums">
+                      <span className="font-medium text-zinc-900">{d.value}</span>
+                      <span className="ml-1.5 text-xs text-zinc-400">{pct}%</span>
+                    </span>
+                  </div>
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-zinc-100">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: d.color }} />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
 
-      {/* Asset Volume per Category Bar Chart */}
-      <div className="lg:col-span-6 glass-panel rounded-2xl p-5 border border-white/10 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-sm font-bold text-slate-100">Evidence Volume by Pillar</h3>
-            <span className="text-[11px] font-mono text-slate-400">Counts</span>
-          </div>
-          <p className="text-xs text-slate-400 mb-4">
-            Absolute asset distribution across active domain categories
-          </p>
-        </div>
+      <div className="card space-y-5 p-5">
+        <SectionHeader
+          icon={BarChart3}
+          tone="sky"
+          title="Items per category"
+          description="Number of photos and videos in each category."
+          actions={<span className="badge badge-neutral tabular-nums">{data.length} categories</span>}
+        />
 
-        <div className="h-64 w-full">
+        <div className="w-full" style={{ height: barHeight }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-              <XAxis
-                dataKey="category"
-                tick={{ fill: "#94a3b8", fontSize: 11 }}
-                axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                tickLine={false}
-                angle={-15}
-                textAnchor="end"
-              />
-              <YAxis
-                allowDecimals={false}
-                tick={{ fill: "#94a3b8", fontSize: 11 }}
-                axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-                tickLine={false}
-              />
+            <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+              <CartesianGrid horizontal={false} stroke={GRID} />
+              <XAxis type="number" allowDecimals={false} tick={TICK} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" width={112} tick={TICK} axisLine={false} tickLine={false} />
               <Tooltip
-                cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                contentStyle={{
-                  backgroundColor: "#0f172a",
-                  borderColor: "rgba(255,255,255,0.1)",
-                  borderRadius: "12px",
-                  fontSize: "12px",
-                  color: "#f8fafc",
-                }}
-                formatter={(val: any) => [`${val} assets`, "Total"]}
+                cursor={{ fill: "#f4f4f5", radius: 6 } as any}
+                contentStyle={TOOLTIP_STYLE}
+                itemStyle={{ color: "#18181b" }}
+                formatter={(val: any) => [`${val} item${Number(val) === 1 ? "" : "s"}`, "Total"]}
               />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {barData.map((entry, index) => (
+              <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={26}>
+                {data.map((entry, index) => (
                   <Cell key={`bar-${index}`} fill={entry.color} />
                 ))}
               </Bar>

@@ -8,6 +8,7 @@ const STATS_URL = "https://sh.dataspace.copernicus.eu/statistics/v1";
 const WINDOW_DAYS = 20; // ± around each date, enough for several 5-day revisits
 const HALF_SIDE_M = 100; // ~200 m box around the site
 const MIN_CHANGE = 0.03; // index change below this is "no detectable change"
+const STRONG_REVERSAL = 0.12; // a drop this large is a real contradiction, not noise
 
 // NDVI (vegetation) and NDWI (open water, McFeeters) with clouds/shadows masked via SCL.
 const EVALSCRIPT = `//VERSION=3
@@ -144,19 +145,23 @@ export async function checkSatellite(ctx: IntegrityContext): Promise<CheckResult
     return skipped("satellite", `No cloud-free Sentinel-2 pass near one of the dates (${result.beforeDate}, ${result.afterDate}).`, details);
   }
   const text = `Sentinel-2 ${name} at this site: ${result.before} → ${result.after}`;
+  // One reading covers the whole site and date, so every photo of a project would get the
+  // same penalty. Keep it a gentle consistency signal: only a strong reversal costs real points.
+  const base = { id: "satellite" as const, label: CHECK_LABELS.satellite, details };
   if (result.delta > MIN_CHANGE) {
-    return { id: "satellite", label: CHECK_LABELS.satellite, status: "pass", penalty: 0, confidence: "medium", summary: `${text}, agrees with the claimed change.`, details };
+    return { ...base, status: "pass", penalty: 0, confidence: "medium", summary: `${text}, agrees with the claimed change.` };
+  }
+  if (result.delta < -STRONG_REVERSAL) {
+    return { ...base, status: "fail", penalty: 10, confidence: "medium", summary: `${text}, a clear reversal of the claimed change.` };
   }
   if (result.delta < -MIN_CHANGE) {
-    return { id: "satellite", label: CHECK_LABELS.satellite, status: "fail", penalty: 15, confidence: "medium", summary: `${text}, the opposite of the claimed change.`, details };
+    return { ...base, status: "warn", penalty: 4, confidence: "low", summary: `${text}: slightly lower, not conclusive at 10 m resolution.` };
   }
   return {
-    id: "satellite",
-    label: CHECK_LABELS.satellite,
+    ...base,
     status: "warn",
-    penalty: 5,
+    penalty: 2,
     confidence: "low",
     summary: `${text}: no change detectable at 10 m (small plots may be below satellite resolution).`,
-    details,
   };
 }

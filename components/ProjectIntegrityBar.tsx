@@ -2,19 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ShieldCheck,
-  ShieldAlert,
-  ShieldX,
-  ShieldQuestion,
-  Loader2,
-  Settings2,
-  ListChecks,
-  Link2,
-  Save,
-} from "lucide-react";
+import { History, Inbox, Loader2, MapPin, RefreshCw, Settings2, ShieldCheck } from "lucide-react";
 import type { MediaAssetItem } from "./GalleryGrid";
 import { effectiveVerdict } from "./TrustBadge";
+import { ErrorNote, Menu, Modal, Ring, cx } from "./ui";
 
 export interface ProjectIntegrityFields {
   id: string;
@@ -42,6 +33,13 @@ const IMPACT_LABELS: Record<ProjectIntegrityFields["impactType"], string> = {
   OTHER: "Other",
 };
 
+const SEGMENTS = [
+  { key: "VERIFIED", label: "Verified", bar: "bg-emerald-500" },
+  { key: "REVIEW", label: "Needs review", bar: "bg-amber-400" },
+  { key: "FLAGGED", label: "Flagged", bar: "bg-red-500" },
+  { key: "UNVERIFIED", label: "Unverified", bar: "bg-zinc-300" },
+] as const;
+
 export function ProjectIntegrityBar({ project, assets, verdictFilter, onVerdictFilter, onAssetsVerified, onProjectUpdated }: Props) {
   const [verifyingAll, setVerifyingAll] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -62,8 +60,9 @@ export function ProjectIntegrityBar({ project, assets, verdictFilter, onVerdictF
     counts[v ?? "UNVERIFIED"]++;
   }
 
-  const verifyAll = async () => {
-    const pending = assets.filter((a) => !a.integrity || a.integrity.status !== "DONE");
+  const verifyAll = async (all = false) => {
+    // all=true re-runs every asset (e.g. after new checks were switched on)
+    const pending = all ? assets : assets.filter((a) => !a.integrity || a.integrity.status !== "DONE");
     if (pending.length === 0) return;
     setVerifyingAll(true);
     setProgress({ done: 0, total: pending.length });
@@ -103,101 +102,230 @@ export function ProjectIntegrityBar({ project, assets, verdictFilter, onVerdictF
     }
   };
 
-  const chip = (key: string, label: string, n: number, Icon: any, cls: string) => (
-    <button
-      key={key}
-      type="button"
-      onClick={() => onVerdictFilter(verdictFilter === key ? "ALL" : key)}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition ${
-        verdictFilter === key ? "ring-2 ring-white/30" : ""
-      } ${cls}`}
-    >
-      <Icon className="w-3.5 h-3.5" />
-      {n} {label}
-    </button>
-  );
-
   const pendingCount = assets.filter((a) => !a.integrity || a.integrity.status !== "DONE").length;
+  const total = assets.length;
+  const needsSetup = !project.claim || project.latitude == null;
+  const verifiedPct = total ? Math.round((counts.VERIFIED / total) * 100) : 0;
+
+  let summary = `${counts.VERIFIED} of ${total} ${total === 1 ? "file is" : "files are"} verified`;
+  if (counts.REVIEW) summary += `, ${counts.REVIEW} ${counts.REVIEW === 1 ? "needs" : "need"} review`;
+  if (counts.FLAGGED) summary += `, ${counts.FLAGGED} flagged`;
 
   return (
-    <div className="glass-panel rounded-2xl p-4 border border-white/5 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">Integrity</span>
-          {chip("VERIFIED", "verified", counts.VERIFIED, ShieldCheck, "bg-emerald-500/10 text-emerald-300 border-emerald-500/30")}
-          {chip("REVIEW", "review", counts.REVIEW, ShieldAlert, "bg-amber-500/10 text-amber-300 border-amber-500/30")}
-          {chip("FLAGGED", "flagged", counts.FLAGGED, ShieldX, "bg-rose-500/10 text-rose-300 border-rose-500/30")}
-          {chip("UNVERIFIED", "unverified", counts.UNVERIFIED, ShieldQuestion, "bg-slate-800 text-slate-300 border-white/10")}
-        </div>
+    <div className="card overflow-hidden">
+      <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+        <Ring value={verifiedPct} size={84} stroke={8}>
+          <div className="text-center leading-none">
+            <p className="text-lg font-semibold tabular-nums text-zinc-900">{verifiedPct}%</p>
+            <p className="mt-0.5 text-[10px] font-medium text-zinc-400">verified</p>
+          </div>
+        </Ring>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <button
-            type="button"
-            id="verify-all-btn"
-            onClick={verifyAll}
-            disabled={verifyingAll || pendingCount === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-40 transition"
-          >
-            {verifyingAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-            {verifyingAll ? `Verifying ${progress.done}/${progress.total}` : `Verify ${pendingCount} unverified`}
-          </button>
-          <Link href={`/review?projectId=${project.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200">
-            <ListChecks className="w-3.5 h-3.5 text-amber-300" /> Review queue
-          </Link>
-          <Link href={`/ledger?projectId=${project.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200">
-            <Link2 className="w-3.5 h-3.5 text-slate-300" /> Ledger
-          </Link>
-          <button
-            type="button"
-            onClick={() => setShowSettings((v) => !v)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200"
-          >
-            <Settings2 className="w-3.5 h-3.5" /> Site & claim
-          </button>
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight text-zinc-900">
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                Verification
+              </h2>
+              <p className="mt-0.5 text-sm tabular-nums text-zinc-500">
+                {total === 0 ? "Upload media and every file is checked automatically." : `${summary}.`}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                id="verify-all-btn"
+                onClick={() => verifyAll(false)}
+                disabled={verifyingAll || pendingCount === 0}
+                className="btn btn-primary btn-sm"
+              >
+                {verifyingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                {verifyingAll
+                  ? `Verifying ${progress.done}/${progress.total}`
+                  : pendingCount === 0
+                    ? "All checked"
+                    : `Verify ${pendingCount} ${pendingCount === 1 ? "file" : "files"}`}
+              </button>
+              <Menu label="Verification options" buttonClassName="btn btn-secondary btn-sm btn-icon">
+                <button
+                  type="button"
+                  id="reverify-all-btn"
+                  onClick={() => verifyAll(true)}
+                  disabled={verifyingAll || assets.length === 0}
+                  className="menu-item disabled:opacity-50"
+                >
+                  <RefreshCw className="h-4 w-4 text-zinc-400" />
+                  Re-check all files
+                </button>
+                <button type="button" onClick={() => setShowSettings(true)} className="menu-item">
+                  <Settings2 className="h-4 w-4 text-zinc-400" />
+                  Site &amp; claim
+                </button>
+                <div className="my-1 border-t border-zinc-100" />
+                <Link href={`/review?projectId=${project.id}`} className="menu-item">
+                  <Inbox className="h-4 w-4 text-zinc-400" />
+                  Open review queue
+                </Link>
+                <Link href={`/ledger?projectId=${project.id}`} className="menu-item">
+                  <History className="h-4 w-4 text-zinc-400" />
+                  View audit trail
+                </Link>
+              </Menu>
+            </div>
+          </div>
+
+          {total > 0 && (
+            <div className="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100">
+              {SEGMENTS.map((s) =>
+                counts[s.key] ? (
+                  <div
+                    key={s.key}
+                    className={cx("transition-all", s.bar)}
+                    style={{ width: `${(counts[s.key] / total) * 100}%` }}
+                  />
+                ) : null,
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {!project.claim || project.latitude == null ? (
-        <p className="text-[11px] text-amber-300/90">
-          Add the project&apos;s site coordinates and impact claim under &ldquo;Site &amp; claim&rdquo; so the geofence, weather,
-          satellite and AI-auditor checks can run.
-        </p>
-      ) : null}
+      {total > 0 && (
+        <div className="grid grid-cols-2 border-t border-zinc-100 bg-zinc-50/60 sm:grid-cols-4">
+          {SEGMENTS.map((s, i) => {
+            const active = verdictFilter === s.key;
+            return (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => onVerdictFilter(active ? "ALL" : s.key)}
+                aria-pressed={active}
+                title={active ? "Show all files" : `Show only ${s.label.toLowerCase()} files`}
+                className={cx(
+                  "flex items-center justify-between gap-2 px-5 py-3 text-left transition",
+                  i > 0 && "sm:border-l sm:border-zinc-100",
+                  i % 2 === 1 && "border-l border-zinc-100",
+                  i > 1 && "border-t border-zinc-100 sm:border-t-0",
+                  active ? "bg-white shadow-[inset_0_-2px_0_0_#10b981]" : "hover:bg-white",
+                )}
+              >
+                <span className="flex items-center gap-2 text-[13px] font-medium text-zinc-600">
+                  <span className={cx("h-2 w-2 rounded-full", s.bar)} />
+                  {s.label}
+                </span>
+                <span className="text-base font-semibold tabular-nums text-zinc-900">{counts[s.key]}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {showSettings && (
-        <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-6 gap-3 pt-3 border-t border-white/10 text-xs">
-          {error && <div className="md:col-span-6 p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300">{error}</div>}
-          <label className="md:col-span-1 space-y-1">
-            <span className="text-slate-400">Site latitude</span>
-            <input value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} placeholder="23.843" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-100" />
-          </label>
-          <label className="md:col-span-1 space-y-1">
-            <span className="text-slate-400">Site longitude</span>
-            <input value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} placeholder="73.715" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-100" />
-          </label>
-          <label className="md:col-span-1 space-y-1">
-            <span className="text-slate-400">Geofence radius (m)</span>
-            <input value={form.geofenceRadiusM} onChange={(e) => setForm({ ...form, geofenceRadiusM: e.target.value })} className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-100" />
-          </label>
-          <label className="md:col-span-3 space-y-1">
-            <span className="text-slate-400">Impact type (decides the satellite index)</span>
-            <select value={form.impactType} onChange={(e) => setForm({ ...form, impactType: e.target.value as any })} className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-100">
+      {needsSetup && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-amber-100 bg-amber-50/70 px-5 py-3 text-[13px] text-amber-900 sm:px-6">
+          <span className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 shrink-0 text-amber-600" />
+            Add the site location and what the project claims, so location, weather and satellite checks can run.
+          </span>
+          <button type="button" onClick={() => setShowSettings(true)} className="btn btn-secondary btn-sm">
+            Set up site
+          </button>
+        </div>
+      )}
+
+      <Modal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        icon={MapPin}
+        tone="sky"
+        title="Site & claim"
+        description="Used to confirm photos were taken at the site and actually show what the project claims."
+        footer={
+          <>
+            <button type="button" onClick={() => setShowSettings(false)} className="btn btn-ghost btn-sm">
+              Cancel
+            </button>
+            <button type="submit" form="site-claim-form" disabled={saving} className="btn btn-primary btn-sm">
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Save
+            </button>
+          </>
+        }
+      >
+        <form id="site-claim-form" onSubmit={saveSettings} className="space-y-4">
+          <ErrorNote>{error}</ErrorNote>
+          <div>
+            <label className="label" htmlFor="site-claim">
+              What does the project claim?
+            </label>
+            <textarea
+              id="site-claim"
+              rows={2}
+              value={form.claim}
+              onChange={(e) => setForm({ ...form, claim: e.target.value })}
+              placeholder="Built a stone check dam across the seasonal stream, with water stored behind it"
+              className="input"
+            />
+            <p className="mt-1 text-xs text-zinc-500">Each photo is checked against this statement.</p>
+          </div>
+          <div>
+            <label className="label" htmlFor="site-type">
+              Project type
+            </label>
+            <select
+              id="site-type"
+              value={form.impactType}
+              onChange={(e) => setForm({ ...form, impactType: e.target.value as any })}
+              className="input"
+            >
               {Object.entries(IMPACT_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
+                <option key={k} value={k}>
+                  {v}
+                </option>
               ))}
             </select>
-          </label>
-          <label className="md:col-span-5 space-y-1">
-            <span className="text-slate-400">Impact claim (the AI auditor checks each photo against this)</span>
-            <input value={form.claim} onChange={(e) => setForm({ ...form, claim: e.target.value })} placeholder="Built a stone check dam across the seasonal stream, with water stored behind it" className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-white/10 text-slate-100" />
-          </label>
-          <div className="md:col-span-1 flex items-end">
-            <button type="submit" disabled={saving} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-50">
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save
-            </button>
+            <p className="mt-1 text-xs text-zinc-500">Decides which satellite measurement is used.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div>
+              <label className="label" htmlFor="site-lat">
+                Latitude
+              </label>
+              <input
+                id="site-lat"
+                value={form.latitude}
+                onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                placeholder="23.843"
+                className="input"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="site-lng">
+                Longitude
+              </label>
+              <input
+                id="site-lng"
+                value={form.longitude}
+                onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                placeholder="73.715"
+                className="input"
+              />
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="label" htmlFor="site-radius">
+                Site radius (m)
+              </label>
+              <input
+                id="site-radius"
+                value={form.geofenceRadiusM}
+                onChange={(e) => setForm({ ...form, geofenceRadiusM: e.target.value })}
+                className="input"
+              />
+            </div>
           </div>
         </form>
-      )}
+      </Modal>
     </div>
   );
 }

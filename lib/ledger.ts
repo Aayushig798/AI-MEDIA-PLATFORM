@@ -71,10 +71,25 @@ export async function tryAppendLedger(input: AppendInput) {
   }
 }
 
-export async function verifyFullChain() {
+async function scanFullChain() {
   const entries = await db.ledgerEntry.findMany({ orderBy: { seq: "asc" } });
   const result = await verifyChain(entries);
   return { ...result, total: entries.length, head: entries.at(-1)?.entryHash ?? GENESIS_HASH };
+}
+
+let chainCache: { fingerprint: string; result: Awaited<ReturnType<typeof scanFullChain>> } | null = null;
+
+export async function verifyFullChain() {
+  // Downloading and re-hashing every entry is the slow part. Postgres fingerprints all rows
+  // in one tiny query, so the full scan only reruns when something changed, including a
+  // direct edit to an old row, which is what tamper detection has to catch.
+  const [{ fp }] = await db.$queryRaw<{ fp: string | null }[]>`
+    SELECT md5(string_agg(row_to_json(e)::text, '|' ORDER BY e.seq)) AS fp FROM "LedgerEntry" e`;
+  const fingerprint = fp ?? "empty";
+  if (chainCache?.fingerprint === fingerprint) return chainCache.result;
+  const result = await scanFullChain();
+  chainCache = { fingerprint, result };
+  return result;
 }
 
 /**

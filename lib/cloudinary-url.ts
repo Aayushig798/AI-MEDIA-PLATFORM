@@ -105,7 +105,8 @@ export function withTransformation(secureUrl: string, transformation: string, ex
 /** A still image to analyse: the photo itself, or a frame 1s into a video. */
 export function getAnalysisImageUrl(secureUrl: string, resourceType: string): string {
   if (resourceType === "video") return withTransformation(secureUrl, "so_1,w_1280,c_limit", "jpg");
-  return withTransformation(secureUrl, "w_1600,c_limit");
+  // f_jpg: some originals are HEIC/GIF/TIFF, which Gemini can't read
+  return withTransformation(secureUrl, "w_1600,c_limit,f_jpg,q_auto:good");
 }
 
 /**

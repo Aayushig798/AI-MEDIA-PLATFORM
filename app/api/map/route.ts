@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getThumbnailUrl } from "@/lib/cloudinary-url";
 import { effectiveVerdict } from "@/lib/reports/factAssembly";
+import { ensureProjectSite } from "@/lib/geocode";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +17,24 @@ export async function GET(req: NextRequest) {
       where: { ...(projectId && { projectId }), integrity: { status: "DONE" } },
       include: {
         integrity: { select: { status: true, verdict: true, reviewDecision: true, trustScore: true, gpsLat: true, gpsLng: true } },
-        project: { select: { id: true, name: true, latitude: true, longitude: true } },
+        project: { select: { id: true, name: true, location: true, latitude: true, longitude: true, geofenceRadiusM: true } },
       },
       orderBy: { capturedAt: "desc" },
     });
 
-    const points = assets
-      .filter((a) => effectiveVerdict(a.integrity) === "VERIFIED")
+    const verified = assets.filter((a) => effectiveVerdict(a.integrity) === "VERIFIED");
+
+    // Look up coordinates (once, then stored) for projects that only have a place name
+    const needSite = new Map<string, (typeof verified)[number]["project"]>();
+    for (const a of verified) if (a.project.latitude == null) needSite.set(a.project.id, a.project);
+    await Promise.all(
+      Array.from(needSite.values()).slice(0, 10).map(async (project) => {
+        const placed = await ensureProjectSite(project).catch(() => null);
+        if (placed) for (const a of verified) if (a.project.id === project.id) Object.assign(a.project, { latitude: placed.lat, longitude: placed.lng });
+      })
+    );
+
+    const points = verified
       .map((a) => {
         const gps =
           a.integrity?.gpsLat != null
@@ -45,7 +57,21 @@ export async function GET(req: NextRequest) {
           projectName: a.project.name,
         };
       })
-      .filter(Boolean);
+      .filter(Boolean) as { id: string; lat: number; lng: number; source: "photo" | "project"; projectId: string }[];
+
+    // Photos pinned at a project's site all share one coordinate; fan them out in a small
+    // spiral (a few hundred metres) so each stays visible and clickable.
+    const seen = new Map<string, number>();
+    for (const p of points) {
+      if (p.source !== "project") continue;
+      const i = seen.get(p.projectId) ?? 0;
+      seen.set(p.projectId, i + 1);
+      if (i === 0) continue;
+      const angle = i * 2.399963; // golden angle
+      const r = 0.0025 * Math.sqrt(i);
+      p.lat += r * Math.sin(angle);
+      p.lng += (r * Math.cos(angle)) / Math.max(0.2, Math.cos((p.lat * Math.PI) / 180));
+    }
 
     return NextResponse.json({ success: true, points });
   } catch (error: any) {

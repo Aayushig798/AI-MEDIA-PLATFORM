@@ -74,11 +74,13 @@ export function effectiveVerdict(
 
 async function integrityFacts(projectId: string): Promise<IntegrityFacts | null> {
   try {
-    const rows = await prisma.assetIntegrity.findMany({
-      where: { asset: { projectId } },
-      select: { status: true, verdict: true, reviewDecision: true, trustScore: true },
-    });
-    const total = await prisma.mediaAsset.count({ where: { projectId } });
+    const [rows, total] = await Promise.all([
+      prisma.assetIntegrity.findMany({
+        where: { asset: { projectId } },
+        select: { status: true, verdict: true, reviewDecision: true, trustScore: true },
+      }),
+      prisma.mediaAsset.count({ where: { projectId } }),
+    ]);
     const counts = { VERIFIED: 0, REVIEW: 0, FLAGGED: 0, UNVERIFIED: total - rows.length };
     for (const r of rows) counts[effectiveVerdict(r)]++;
     const scores = rows.filter((r) => r.status === "DONE" && r.trustScore != null).map((r) => r.trustScore!);
@@ -101,23 +103,23 @@ async function integrityFacts(projectId: string): Promise<IntegrityFacts | null>
  * Strictly guarantees that all metrics, counts, and dates are factual and verifiable.
  */
 export async function assembleProjectFacts(projectId: string): Promise<ProjectFacts> {
-  const project = await db.project.findUnique({
-    where: { id: projectId },
-  });
-
-  const assets = await db.mediaAsset.findMany({
-    where: { projectId },
-    include: {
-      aiTags: { orderBy: { confidence: "desc" } },
-      categories: { include: { category: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const comparisons = await db.comparison.findMany({
-    where: { projectId },
-    orderBy: { createdAt: "desc" },
-  });
+  // Every independent query goes out at once: one round trip of latency instead of seven
+  const [project, assets, comparisons, metrics, ledger, integrity] = await Promise.all([
+    db.project.findUnique({
+      where: { id: projectId },
+      select: { name: true, description: true, location: true },
+    }),
+    db.mediaAsset.findMany({ where: { projectId }, orderBy: { createdAt: "desc" } }),
+    db.comparison.findMany({ where: { projectId }, orderBy: { createdAt: "desc" } }),
+    prisma.changeMetric
+      .findMany({ where: { comparison: { projectId } }, orderBy: { createdAt: "desc" } })
+      .catch(() => null),
+    Promise.all([prisma.ledgerEntry.count({ where: { projectId } }), verifyFullChain()])
+      .then(([projectEntries, chain]): ProjectFacts["ledger"] => ({ projectEntries, chainIntact: chain.ok }))
+      .catch(() => null),
+    integrityFacts(projectId),
+  ]);
+  const assetById = new Map<string, any>(assets.map((a: any) => [a.id, a]));
 
   // Category breakdown calculation
   const categoryBreakdown: Record<string, number> = {};
@@ -147,36 +149,32 @@ export async function assembleProjectFacts(projectId: string): Promise<ProjectFa
     )
   );
 
-  // Enriched comparisons with concrete before/after metadata
-  const enrichedComparisons: EnrichedComparisonFact[] = await Promise.all(
-    comparisons.map(async (c: any) => {
-      const [before, after] = await Promise.all([
-        db.mediaAsset.findUnique({ where: { id: c.beforeAssetId } }),
-        db.mediaAsset.findUnique({ where: { id: c.afterAssetId } }),
-      ]);
+  // Enriched comparisons with concrete before/after metadata (both photos are project assets)
+  const enrichedComparisons: EnrichedComparisonFact[] = comparisons.map((c: any) => {
+    const before = assetById.get(c.beforeAssetId);
+    const after = assetById.get(c.afterAssetId);
 
-      const bDate = before?.capturedAt
-        ? new Date(before.capturedAt).toISOString().split("T")[0]
-        : null;
-      const aDate = after?.capturedAt
-        ? new Date(after.capturedAt).toISOString().split("T")[0]
-        : null;
+    const bDate = before?.capturedAt
+      ? new Date(before.capturedAt).toISOString().split("T")[0]
+      : null;
+    const aDate = after?.capturedAt
+      ? new Date(after.capturedAt).toISOString().split("T")[0]
+      : null;
 
-      return {
-        id: c.id,
-        verified: Boolean(c.verified),
-        matchConfidence: c.matchConfidence ?? null,
-        aiReason: c.aiReason ?? null,
-        changeSummary: c.changeSummary ?? null,
-        notes: c.notes ?? null,
-        beforeDate: bDate,
-        afterDate: aDate,
-        location: before?.manualLocation || after?.manualLocation || null,
-        beforeAssetId: c.beforeAssetId,
-        afterAssetId: c.afterAssetId,
-      };
-    })
-  );
+    return {
+      id: c.id,
+      verified: Boolean(c.verified),
+      matchConfidence: c.matchConfidence ?? null,
+      aiReason: c.aiReason ?? null,
+      changeSummary: c.changeSummary ?? null,
+      notes: c.notes ?? null,
+      beforeDate: bDate,
+      afterDate: aDate,
+      location: before?.manualLocation || after?.manualLocation || null,
+      beforeAssetId: c.beforeAssetId,
+      afterAssetId: c.afterAssetId,
+    };
+  });
 
   const notes = assets
     .map((a: any) => a.manualNotes?.trim())
@@ -184,11 +182,7 @@ export async function assembleProjectFacts(projectId: string): Promise<ProjectFa
 
   // Latest measured change per comparison (change meter)
   let measuredChanges: MeasuredChangeFact[] = [];
-  try {
-    const metrics = await prisma.changeMetric.findMany({
-      where: { comparison: { projectId } },
-      orderBy: { createdAt: "desc" },
-    });
+  if (metrics) {
     const seen = new Set<string>();
     measuredChanges = metrics
       .filter((m) => (seen.has(m.comparisonId) ? false : (seen.add(m.comparisonId), true)))
@@ -211,19 +205,6 @@ export async function assembleProjectFacts(projectId: string): Promise<ProjectFa
               : null,
         };
       });
-  } catch {
-    measuredChanges = [];
-  }
-
-  let ledger: ProjectFacts["ledger"] = null;
-  try {
-    const [projectEntries, chain] = await Promise.all([
-      prisma.ledgerEntry.count({ where: { projectId } }),
-      verifyFullChain(),
-    ]);
-    ledger = { projectEntries, chainIntact: chain.ok };
-  } catch {
-    ledger = null;
   }
 
   return {
@@ -241,7 +222,7 @@ export async function assembleProjectFacts(projectId: string): Promise<ProjectFa
     comparisons: enrichedComparisons,
     locations,
     notes,
-    integrity: await integrityFacts(projectId),
+    integrity,
     measuredChanges,
     ledger,
   };

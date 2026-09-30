@@ -1,29 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { 
-  Layers, 
-  Trash2, 
-  Calendar, 
-  MapPin, 
-  SlidersHorizontal, 
-  Loader2, 
-  Maximize2, 
-  X,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-  Sparkles,
-  ChevronDown,
-  ChevronUp,
-  Plus,
+import { useState, useEffect, type ReactNode } from "react";
+import {
+  ArrowRight,
+  BookmarkCheck,
   Check,
-  Edit2,
-  Brush
+  ChevronDown,
+  Clock,
+  Columns2,
+  Droplets,
+  Eraser,
+  Image as ImageIcon,
+  Leaf,
+  Loader2,
+  MapPin,
+  Maximize2,
+  MoreHorizontal,
+  Pencil,
+  ShieldCheck,
+  Trash2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { Ruler } from "lucide-react";
 import { CompareSlider } from "./CompareSlider";
+import { ConfirmDialog, EmptyState, ErrorNote, IconChip, Menu, Modal, SectionHeader, cx } from "@/components/ui";
+import { withTransformation } from "@/lib/cloudinary-url";
 
 export interface SavedComparisonItem {
   id: string;
@@ -46,6 +47,195 @@ interface SavedComparisonsProps {
   refreshTrigger?: number;
 }
 
+function formatDate(value: string | Date | null | undefined, fallback: string) {
+  if (!value) return fallback;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return fallback;
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** "8 months apart" etc. from the two capture dates; null when either date is missing. */
+function timeApart(a?: string | Date | null, b?: string | Date | null): string | null {
+  if (!a || !b) return null;
+  const ms = Math.abs(new Date(b).getTime() - new Date(a).getTime());
+  if (isNaN(ms)) return null;
+  const days = ms / 86_400_000;
+  if (days < 1) {
+    const h = Math.max(1, Math.round(days * 24));
+    return `${h} hour${h > 1 ? "s" : ""} apart`;
+  }
+  if (days >= 365) {
+    const y = Math.round((days / 365) * 10) / 10;
+    return `${y} year${y === 1 ? "" : "s"} apart`;
+  }
+  if (days >= 30) {
+    const m = Math.round(days / 30);
+    return `${m} month${m > 1 ? "s" : ""} apart`;
+  }
+  const d = Math.round(days);
+  return `${d} day${d === 1 ? "" : "s"} apart`;
+}
+
+/** Latest measured change, only if the comparison data already carries metrics. */
+function measuredChange(comp: SavedComparisonItem): { kind: "GREEN_COVER" | "WATER_AREA"; deltaPp: number } | null {
+  const metrics = (comp as any).metrics;
+  if (!Array.isArray(metrics)) return null;
+  const valid = metrics.filter(
+    (m: any) => m && typeof m.deltaPp === "number" && (m.metric === "GREEN_COVER" || m.metric === "WATER_AREA"),
+  );
+  if (valid.length === 0) return null;
+  const latest = [...valid].sort(
+    (x: any, y: any) => new Date(y.createdAt ?? 0).getTime() - new Date(x.createdAt ?? 0).getTime(),
+  )[0];
+  return { kind: latest.metric, deltaPp: Math.round(latest.deltaPp * 10) / 10 };
+}
+
+const PAIR_CROP = "c_fill,w_600,h_450,g_auto,q_auto,f_auto";
+
+/** A ~600px crop of the photo, sharp enough for the side-by-side cards. */
+function pairImageUrl(asset: any): string {
+  const src = asset?.secureUrl || asset?.normalizedUrl || "";
+  return withTransformation(src, PAIR_CROP, asset?.resourceType === "video" ? "jpg" : undefined);
+}
+
+/** Two tilted photo frames, used as the empty-state illustration. */
+function PhotoPairIcon() {
+  return (
+    <span className="relative block h-8 w-10" aria-hidden>
+      <span className="absolute left-0 top-1.5 flex h-6 w-6 -rotate-[10deg] items-center justify-center rounded-md bg-zinc-100 text-zinc-400 ring-1 ring-zinc-300">
+        <ImageIcon className="h-3.5 w-3.5" />
+      </span>
+      <span className="absolute right-0 top-0 flex h-6 w-6 rotate-[8deg] items-center justify-center rounded-md bg-emerald-50 text-emerald-600 shadow-sm ring-1 ring-emerald-300">
+        <ImageIcon className="h-3.5 w-3.5" />
+      </span>
+    </span>
+  );
+}
+
+/** Two large photos side by side, earlier on the left, joined by a round arrow at the seam. */
+function PairImages({
+  beforeUrl,
+  afterUrl,
+  beforeDate,
+  afterDate,
+}: {
+  beforeUrl: string;
+  afterUrl: string;
+  beforeDate?: string | Date | null;
+  afterDate?: string | Date | null;
+}) {
+  return (
+    <div className="relative grid grid-cols-2 gap-[3px] bg-white">
+      {[
+        { url: beforeUrl, label: "Before", date: beforeDate, dot: "bg-zinc-400" },
+        { url: afterUrl, label: "After", date: afterDate, dot: "bg-emerald-500" },
+      ].map((img) => (
+        <div key={img.label} className="relative aspect-[4/3] overflow-hidden bg-zinc-100">
+          <img
+            src={img.url}
+            alt={`${img.label} photo`}
+            loading="lazy"
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+          <span className="photo-chip absolute left-2.5 top-2.5">
+            <span className={cx("h-1.5 w-1.5 rounded-full", img.dot)} />
+            {img.label}
+          </span>
+          <span className="absolute bottom-2.5 left-2.5 right-2.5 truncate text-xs font-medium tabular-nums text-white drop-shadow-sm">
+            {formatDate(img.date, "No date")}
+          </span>
+        </div>
+      ))}
+      <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-emerald-600 shadow-[0_6px_16px_-6px_rgba(16,24,40,0.45)] ring-4 ring-white/40">
+        <ArrowRight className="h-4 w-4" />
+      </span>
+    </div>
+  );
+}
+
+/** Placeholder card while comparisons load. */
+function PairCardSkeleton() {
+  return (
+    <div className="card overflow-hidden">
+      <div className="grid grid-cols-2 gap-[3px]">
+        <div className="skeleton aspect-[4/3]" />
+        <div className="skeleton aspect-[4/3]" />
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="flex items-center gap-2.5">
+          <div className="skeleton h-7 w-7 rounded-md" />
+          <div className="skeleton h-4 w-1/2 rounded" />
+        </div>
+        <div className="flex gap-1.5">
+          <div className="skeleton h-5 w-28 rounded-md" />
+          <div className="skeleton h-5 w-16 rounded-md" />
+        </div>
+        <div className="flex items-center justify-between border-t border-zinc-100 pt-3">
+          <div className="skeleton h-4 w-14 rounded" />
+          <div className="skeleton h-8 w-24 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VerifiedBadge({ verified }: { verified?: boolean }) {
+  return verified ? (
+    <span className="badge badge-green shrink-0" title="Checked to show the same place">
+      <ShieldCheck className="h-3 w-3" />
+      Verified
+    </span>
+  ) : (
+    <span className="badge badge-neutral shrink-0" title="Not confirmed to show the same place">
+      Unverified
+    </span>
+  );
+}
+
+/** Match score, reason, visible change and save date for a comparison. */
+function ComparisonDetails({ comp, pct }: { comp: SavedComparisonItem; pct: number | null }) {
+  return (
+    <div className="space-y-3 rounded-xl bg-zinc-50 px-3.5 py-3 text-xs ring-1 ring-inset ring-zinc-900/5">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-zinc-500" title="How confident the check is that both photos show the same place">
+            Match score
+          </span>
+          <span className="font-medium tabular-nums text-zinc-900">{pct === null ? "Not checked" : `${pct}%`}</span>
+        </div>
+        {pct !== null && (
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/70">
+            <div
+              className="h-full rounded-full bg-violet-500"
+              style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+            />
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-zinc-500">Saved</span>
+        <span className="tabular-nums text-zinc-900">{formatDate(comp.createdAt, "Unknown")}</span>
+      </div>
+      {comp.changeSummary && (
+        <div className="space-y-0.5">
+          <p className="text-zinc-500">What changed</p>
+          <p className="leading-relaxed text-zinc-700">{comp.changeSummary}</p>
+        </div>
+      )}
+      {comp.aiReason && (
+        <div className="space-y-0.5">
+          <p className="text-zinc-500">Why it&apos;s the same place</p>
+          <p className="leading-relaxed text-zinc-700">{comp.aiReason}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const matchPct = (comp: SavedComparisonItem) =>
+  typeof comp.matchConfidence === "number" ? Math.round(comp.matchConfidence * 100) : null;
+
 export function SavedComparisons({
   projectId,
   refreshTrigger = 0,
@@ -54,6 +244,7 @@ export function SavedComparisons({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Full-screen modal
   const [expandedComp, setExpandedComp] = useState<SavedComparisonItem | null>(null);
@@ -175,20 +366,42 @@ export function SavedComparisons({
     }
   };
 
+  const renderHeader = (count?: number, action?: ReactNode) => (
+    <SectionHeader
+      icon={BookmarkCheck}
+      tone="emerald"
+      title={
+        <span className="flex items-center gap-2">
+          Saved comparisons
+          {count ? <span className="badge badge-green tabular-nums">{count}</span> : null}
+        </span>
+      }
+      description="Open one to measure the change and make a short video."
+      actions={action}
+    />
+  );
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8 text-slate-400 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
-        <span className="text-xs">Loading saved comparisons...</span>
-      </div>
+      <section className="space-y-4" aria-busy="true">
+        {renderHeader()}
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <PairCardSkeleton />
+          <PairCardSkeleton />
+          <div className="hidden xl:block">
+            <PairCardSkeleton />
+          </div>
+        </div>
+      </section>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs">
-        {error}
-      </div>
+      <section className="space-y-4">
+        {renderHeader()}
+        <ErrorNote>{error}</ErrorNote>
+      </section>
     );
   }
 
@@ -197,220 +410,147 @@ export function SavedComparisons({
     (c) => c.verified === false && typeof c.matchConfidence === "number" && c.matchConfidence < 0.3
   ).length;
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-sm font-bold text-white tracking-tight">
-            Saved Evidence Comparisons ({comparisons.length})
-          </h3>
-        </div>
+  const isPlaceholderCaption = (notes?: string | null) => notes === "Verification test comparison";
+  const locationOf = (comp: SavedComparisonItem) =>
+    comp.beforeAsset?.manualLocation || comp.afterAsset?.manualLocation || "Untitled location";
 
-        <div className="flex items-center gap-3">
-          {comparisons.length > 0 && (
-            <button
-              type="button"
-              id="cleanup-unverified-comparisons-btn"
-              onClick={() => setShowCleanupModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium text-slate-400 hover:text-amber-300 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/30 transition"
-              title="Delete unverified comparisons with confidence < 0.3"
-            >
-              <Brush className="w-3.5 h-3.5 text-amber-400" />
-              <span>Clean up unverified comparisons</span>
-              {unverifiedLowConfCount > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">
-                  {unverifiedLowConfCount}
-                </span>
-              )}
-            </button>
-          )}
-          <span className="text-xs text-slate-400 hidden sm:inline">
-            Permanent verified temporal change evidence
-          </span>
-        </div>
-      </div>
+  return (
+    <section className="space-y-4">
+      {renderHeader(
+        comparisons.length,
+        comparisons.length > 0 && (
+          <button
+            type="button"
+            id="cleanup-unverified-comparisons-btn"
+            onClick={() => setShowCleanupModal(true)}
+            className="btn btn-ghost btn-sm shrink-0"
+            title="Remove unverified comparisons with a match score under 30%"
+          >
+            <Eraser className="h-3.5 w-3.5" />
+            Clean up
+            {unverifiedLowConfCount > 0 && (
+              <span className="rounded-md bg-amber-50 px-1.5 text-xs font-medium tabular-nums text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                {unverifiedLowConfCount}
+              </span>
+            )}
+          </button>
+        ),
+      )}
 
       {comparisons.length === 0 ? (
-        <div className="rounded-2xl border border-white/5 bg-slate-900/30 p-8 text-center">
-          <Layers className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h4 className="text-sm font-semibold text-slate-200">No Saved Comparisons Yet</h4>
-          <p className="text-xs text-slate-400 max-w-md mx-auto mt-1 leading-relaxed">
-            Use the Suggested Comparisons section above or the Search page to compare before/after visual evidence and save verified change pairs.
-          </p>
-        </div>
+        <EmptyState
+          icon={PhotoPairIcon}
+          title="No saved comparisons yet"
+          description="A saved comparison keeps an earlier and a later photo of the same place side by side. Save a suggested pair above, or choose two photos to compare."
+          action={
+            <ol className="grid gap-2 text-left sm:grid-cols-3">
+              {[
+                "Pick an earlier and a later photo",
+                "Save them as a pair",
+                "Measure the change and make a video",
+              ].map((step, i) => (
+                <li
+                  key={step}
+                  className="flex items-center gap-2.5 rounded-xl bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] ring-1 ring-zinc-200/80"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-xs font-semibold tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
+                    {i + 1}
+                  </span>
+                  <span className="text-[13px] leading-snug text-zinc-600">{step}</span>
+                </li>
+              ))}
+            </ol>
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           {comparisons.map((comp) => {
             if (!comp.beforeAsset || !comp.afterAsset) return null;
 
-            const pct = Math.round((comp.matchConfidence ?? 0.85) * 100);
+            const pct = matchPct(comp);
             const isDetailsExpanded = Boolean(expandedDetailsMap[comp.id]);
+            const compareHref = `/projects/${comp.projectId}/compare/${comp.id}`;
+            const apart = timeApart(comp.beforeAsset.capturedAt, comp.afterAsset.capturedAt);
+            const change = measuredChange(comp);
 
             // Filter out default placeholder caption
             const hasRealCaption =
               comp.notes &&
               comp.notes.trim() !== "" &&
-              comp.notes !== "Verification test comparison";
+              !isPlaceholderCaption(comp.notes);
 
             return (
-              <div
+              <article
                 key={comp.id}
                 id={`saved-comp-${comp.id}`}
-                className="glass-card rounded-2xl p-4 border border-white/10 hover:border-emerald-500/30 transition-all flex flex-col justify-between group space-y-3"
+                className="group card-interactive relative flex flex-col focus-within:z-10 hover:z-10"
               >
-                {/* 1. TOP HIERARCHY: Photo Dates and Location */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                      <span className="truncate">
-                        {comp.beforeAsset.manualLocation || comp.afterAsset.manualLocation || "Project Location"}
-                      </span>
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400 mt-1">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-emerald-400 shrink-0" />
-                        <span className="text-slate-300">
-                          {comp.beforeAsset.capturedAt
-                            ? new Date(comp.beforeAsset.capturedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-                            : "Earlier"}
-                        </span>
-                        <span className="text-slate-500">&rarr;</span>
-                        <span className="text-slate-300">
-                          {comp.afterAsset.capturedAt
-                            ? new Date(comp.afterAsset.capturedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-                            : "Recent"}
-                        </span>
-                      </span>
-                      <span className="text-slate-600">&bull;</span>
-                      <span className="text-slate-500 text-[10px]">
-                        Saved {new Date(comp.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
+                {/* Before and after photos */}
+                <Link
+                  href={compareHref}
+                  aria-label={`Open comparison: ${locationOf(comp)}`}
+                  className="block overflow-hidden rounded-t-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                >
+                  <PairImages
+                    beforeUrl={pairImageUrl(comp.beforeAsset)}
+                    afterUrl={pairImageUrl(comp.afterAsset)}
+                    beforeDate={comp.beforeAsset.capturedAt}
+                    afterDate={comp.afterAsset.capturedAt}
+                  />
+                </Link>
+
+                <div className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <IconChip icon={MapPin} tone="sky" size="sm" />
+                    <p className="truncate text-[15px] font-semibold tracking-tight text-zinc-900">
+                      {locationOf(comp)}
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Link
-                      href={`/projects/${comp.projectId}/compare/${comp.id}`}
-                      title="Measure the change and make a donor reel"
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-cyan-300 hover:text-white hover:bg-cyan-500/15 border border-cyan-500/30 transition"
-                    >
-                      <Ruler className="w-3.5 h-3.5" /> Measure &amp; reel
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedComp(comp)}
-                      title="Expand full view"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
-                    >
-                      <Maximize2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(comp.id)}
-                      disabled={deletingId === comp.id}
-                      title="Delete comparison"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-50"
-                    >
-                      {deletingId === comp.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {apart && (
+                      <span className="badge badge-blue">
+                        <Clock className="h-3 w-3" />
+                        {apart}
+                      </span>
+                    )}
+                    <VerifiedBadge verified={comp.verified} />
+                    {change && (
+                      <span
+                        className={cx("badge", change.deltaPp >= 0 ? "badge-green" : "badge-red")}
+                        title="Measured change, in percentage points of the photo"
+                      >
+                        {change.kind === "GREEN_COVER" ? (
+                          <Leaf className="h-3 w-3" />
+                        ) : (
+                          <Droplets className="h-3 w-3" />
+                        )}
+                        {change.kind === "GREEN_COVER" ? "Green cover" : "Water"} {change.deltaPp > 0 ? "+" : ""}
+                        {change.deltaPp} points
+                      </span>
+                    )}
                   </div>
-                </div>
 
-                {/* 2. MIDDLE HIERARCHY: Interactive Comparison Slider */}
-                <CompareSlider
-                  beforeUrl={comp.beforeAsset.normalizedUrl || comp.beforeAsset.secureUrl}
-                  afterUrl={comp.afterAsset.normalizedUrl || comp.afterAsset.secureUrl}
-                  beforeDate={comp.beforeAsset.capturedAt}
-                  afterDate={comp.afterAsset.capturedAt}
-                  aspectRatio="aspect-[16/10]"
-                />
-
-                {/* 3. COLLAPSED AI VERIFICATION SECTION (Collapsed by default with toggle) */}
-                <div className="rounded-xl bg-slate-950/70 border border-white/5 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => toggleDetails(comp.id)}
-                    className="w-full px-3 py-2 flex items-center justify-between text-xs hover:bg-white/5 transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      {comp.verified ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                          AI-verified ({pct}%)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                          <AlertTriangle className="w-3 h-3 text-amber-400" />
-                          Unverified ({pct}%)
-                        </span>
-                      )}
-                      <span className="text-[11px] text-slate-400 hidden sm:inline">Scene Analysis</span>
-                    </div>
-
-                    <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-                      <span>{isDetailsExpanded ? "Hide details" : "Show details"}</span>
-                      {isDetailsExpanded ? (
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      ) : (
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      )}
-                    </span>
-                  </button>
-
-                  {isDetailsExpanded && (
-                    <div className="p-3 pt-1 space-y-2 border-t border-white/5 text-xs animate-fade-in">
-                      {comp.aiReason && (
-                        <div className="flex items-start gap-1.5 text-slate-300 mt-1">
-                          <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider block">
-                              Verification Reason
-                            </span>
-                            <span className="leading-relaxed">{comp.aiReason}</span>
-                          </div>
-                        </div>
-                      )}
-                      {comp.changeSummary && (
-                        <div className="flex items-start gap-1.5 text-emerald-300/90 pt-1.5 border-t border-white/5">
-                          <Layers className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold text-teal-400 text-[10px] uppercase tracking-wider block">
-                              Visible Physical Change
-                            </span>
-                            <span className="leading-relaxed">{comp.changeSummary}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* 4. CAPTION / NOTES: Blank by default with "+ Add caption" affordance */}
-                <div className="pt-1">
+                  {/* Caption */}
                   {editingCaptionId === comp.id ? (
-                    <div className="flex items-center gap-1.5 p-2 rounded-xl bg-slate-900 border border-white/10">
+                    <div className="flex items-center gap-1.5">
                       <input
                         type="text"
-                        placeholder="Add a field caption or observation note..."
+                        placeholder="Add a caption"
+                        aria-label="Caption"
                         value={captionInput}
                         onChange={(e) => setCaptionInput(e.target.value)}
-                        className="flex-1 px-2.5 py-1 text-xs rounded-lg bg-slate-950 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                        className="input h-8 min-w-0 flex-1 text-[13px]"
                         autoFocus
                       />
                       <button
                         type="button"
                         disabled={savingCaption}
                         onClick={() => handleSaveCaption(comp.id)}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition"
+                        className="btn btn-primary btn-sm"
                       >
-                        {savingCaption ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                        <span>Save</span>
+                        {savingCaption && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                        Save
                       </button>
                       <button
                         type="button"
@@ -418,193 +558,204 @@ export function SavedComparisons({
                           setEditingCaptionId(null);
                           setCaptionInput("");
                         }}
-                        className="p-1 rounded-lg text-slate-400 hover:text-white transition text-xs"
+                        aria-label="Cancel"
+                        className="btn btn-ghost btn-sm btn-icon"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   ) : hasRealCaption ? (
-                    <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 text-xs text-slate-300 flex items-start justify-between gap-2 group/caption">
-                      <div className="flex items-start gap-2 italic">
-                        <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>&ldquo;{comp.notes}&rdquo;</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCaptionId(comp.id);
-                          setCaptionInput(comp.notes || "");
-                        }}
-                        className="opacity-0 group-hover/caption:opacity-100 p-1 text-slate-400 hover:text-emerald-300 transition"
-                        title="Edit caption"
-                      >
-                        <Edit2 className="w-3 h-3" />
-                      </button>
+                    <p className="border-l-2 border-emerald-200 pl-3 text-sm leading-relaxed text-zinc-700">
+                      {comp.notes}
+                    </p>
+                  ) : null}
+
+                  {isDetailsExpanded && (
+                    <div className="animate-fade-in">
+                      <ComparisonDetails comp={comp} pct={pct} />
                     </div>
-                  ) : (
+                  )}
+
+                  <div className="mt-auto flex items-center justify-between gap-2 border-t border-zinc-100 pt-3">
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingCaptionId(comp.id);
-                        setCaptionInput("");
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-300 transition py-1 px-1.5 rounded-lg hover:bg-white/5"
+                      onClick={() => toggleDetails(comp.id)}
+                      aria-expanded={isDetailsExpanded}
+                      className="inline-flex items-center gap-1 rounded text-[13px] text-zinc-500 transition hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
                     >
-                      <Plus className="w-3 h-3 text-emerald-400" />
-                      <span>Add caption</span>
+                      Details
+                      <ChevronDown className={cx("h-3.5 w-3.5 transition", isDetailsExpanded && "rotate-180")} />
                     </button>
-                  )}
+
+                    <div className="flex items-center gap-1.5">
+                      <Menu
+                        trigger={<MoreHorizontal className="h-4 w-4" />}
+                        buttonClassName="btn btn-ghost btn-sm btn-icon"
+                      >
+                        <button type="button" className="menu-item" onClick={() => setExpandedComp(comp)}>
+                          <Maximize2 className="h-4 w-4 text-zinc-400" />
+                          Quick view
+                        </button>
+                        <button
+                          type="button"
+                          className="menu-item"
+                          onClick={() => {
+                            setEditingCaptionId(comp.id);
+                            setCaptionInput(hasRealCaption ? comp.notes || "" : "");
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 text-zinc-400" />
+                          {hasRealCaption ? "Edit caption" : "Add caption"}
+                        </button>
+                        <button
+                          type="button"
+                          className="menu-item text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => setConfirmDeleteId(comp.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
+                        </button>
+                      </Menu>
+                      <Link
+                        href={compareHref}
+                        title="Measure the change and make a short video"
+                        className="btn btn-primary btn-sm"
+                      >
+                        Open
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
       )}
 
-      {/* Manual Cleanup Confirmation Dialog */}
-      {showCleanupModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div
-            className="glass-dropdown w-full max-w-md rounded-3xl p-6 shadow-2xl relative border border-white/10 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-                <Brush className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Clean Up Unverified Comparisons
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Manual maintenance pass
-                </p>
-              </div>
-            </div>
+      {/* Delete one comparison */}
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={async () => {
+          if (!confirmDeleteId) return;
+          await handleDelete(confirmDeleteId);
+          setConfirmDeleteId(null);
+        }}
+        title="Delete this comparison?"
+        description="The two photos stay in the project. Only the saved pair is removed."
+        busy={deletingId !== null}
+      />
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              This will remove all comparison records where <strong className="text-amber-300">verified = false</strong> and AI match confidence is below <strong className="text-amber-300">30%</strong>. This action cannot be undone.
-            </p>
+      {/* Remove unverified, low-score comparisons */}
+      <Modal
+        open={showCleanupModal}
+        onClose={() => {
+          if (!cleaningUp) setShowCleanupModal(false);
+        }}
+        size="sm"
+        icon={Eraser}
+        tone="amber"
+        title="Clean up unverified comparisons?"
+        description="This removes comparisons that weren't confirmed to show the same place and have a match score under 30%. It can't be undone."
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowCleanupModal(false)}
+              disabled={cleaningUp}
+              className="btn btn-ghost btn-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              id="confirm-cleanup-unverified-btn"
+              onClick={handleConfirmCleanup}
+              disabled={cleaningUp}
+              className="btn btn-danger btn-sm"
+            >
+              {cleaningUp && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Remove
+            </button>
+          </>
+        }
+      >
+        {cleanupFeedback ? (
+          <p className="flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-600/10">
+            <Check className="h-4 w-4 shrink-0" />
+            {cleanupFeedback}
+          </p>
+        ) : null}
+      </Modal>
 
-            {cleanupFeedback && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-1.5">
-                <Check className="w-4 h-4" />
-                <span>{cleanupFeedback}</span>
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setShowCleanupModal(false)}
-                disabled={cleaningUp}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition"
-              >
-                Cancel
+      {/* Quick view with the slider */}
+      <Modal
+        open={Boolean(expandedComp && expandedComp.beforeAsset && expandedComp.afterAsset)}
+        onClose={() => setExpandedComp(null)}
+        size="xl"
+        icon={Columns2}
+        title={
+          expandedComp ? (
+            <span className="flex flex-wrap items-center gap-2">
+              {locationOf(expandedComp)}
+              <VerifiedBadge verified={expandedComp.verified} />
+            </span>
+          ) : undefined
+        }
+        description={
+          expandedComp && expandedComp.beforeAsset && expandedComp.afterAsset
+            ? [
+                `${formatDate(expandedComp.beforeAsset.capturedAt, "Earlier")} → ${formatDate(
+                  expandedComp.afterAsset.capturedAt,
+                  "Later",
+                )}`,
+                timeApart(expandedComp.beforeAsset.capturedAt, expandedComp.afterAsset.capturedAt),
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : undefined
+        }
+        footer={
+          expandedComp && (
+            <>
+              <button type="button" onClick={() => setExpandedComp(null)} className="btn btn-ghost btn-sm">
+                Close
               </button>
-              <button
-                type="button"
-                id="confirm-cleanup-unverified-btn"
-                onClick={handleConfirmCleanup}
-                disabled={cleaningUp}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 transition disabled:opacity-50"
+              <Link
+                href={`/projects/${expandedComp.projectId}/compare/${expandedComp.id}`}
+                className="btn btn-primary btn-sm"
               >
-                {cleaningUp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                <span>Confirm Clean Up</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Expanded Modal */}
-      {expandedComp && expandedComp.beforeAsset && expandedComp.afterAsset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in">
-          <div
-            className="glass-dropdown w-full max-w-5xl max-h-[94vh] rounded-3xl p-6 sm:p-8 shadow-2xl relative border border-white/10 overflow-y-auto flex flex-col gap-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-emerald-400" />
-                    Full-Screen Evidence Comparison
-                  </h3>
-                  {expandedComp.verified ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      AI-verified same scene ({Math.round((expandedComp.matchConfidence ?? 0.85) * 100)}%)
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                      Unverified
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-400">
-                  {expandedComp.beforeAsset.manualLocation || "Project Location"} &bull; Saved {new Date(expandedComp.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setExpandedComp(null)}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
+                Open comparison
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </>
+          )
+        }
+      >
+        {expandedComp && expandedComp.beforeAsset && expandedComp.afterAsset && (
+          <div className="space-y-4">
             <CompareSlider
               beforeUrl={expandedComp.beforeAsset.normalizedUrl || expandedComp.beforeAsset.secureUrl}
               afterUrl={expandedComp.afterAsset.normalizedUrl || expandedComp.afterAsset.secureUrl}
               beforeDate={expandedComp.beforeAsset.capturedAt}
               afterDate={expandedComp.afterAsset.capturedAt}
               aspectRatio="aspect-[16/9]"
-              notes={expandedComp.notes !== "Verification test comparison" ? expandedComp.notes : undefined}
+              notes={!isPlaceholderCaption(expandedComp.notes) ? expandedComp.notes : undefined}
             />
 
-            {(expandedComp.aiReason || expandedComp.changeSummary) && (
-              <div className="space-y-2 p-3.5 rounded-xl bg-slate-950/70 border border-white/5 text-xs">
-                {expandedComp.aiReason && (
-                  <div className="flex items-start gap-2 text-slate-300">
-                    <Sparkles className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider block">
-                        AI Scene Verification Analysis
-                      </span>
-                      <span className="leading-relaxed">{expandedComp.aiReason}</span>
-                    </div>
-                  </div>
-                )}
-                {expandedComp.changeSummary && (
-                  <div className="flex items-start gap-2 text-emerald-300/90 pt-2 border-t border-white/5">
-                    <Layers className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                    <div>
-                      <span className="font-semibold text-teal-400 text-[10px] uppercase tracking-wider block">
-                        Temporal & Physical Changes
-                      </span>
-                      <span className="leading-relaxed">{expandedComp.changeSummary}</span>
-                    </div>
-                  </div>
-                )}
+            <details className="group rounded-xl border border-zinc-200">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 text-sm font-medium text-zinc-700 [&::-webkit-details-marker]:hidden">
+                Details
+                <ChevronDown className="h-4 w-4 text-zinc-400 transition group-open:rotate-180" />
+              </summary>
+              <div className="border-t border-zinc-100 p-3">
+                <ComparisonDetails comp={expandedComp} pct={matchPct(expandedComp)} />
               </div>
-            )}
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setExpandedComp(null)}
-                className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition"
-              >
-                Close
-              </button>
-            </div>
+            </details>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </Modal>
+    </section>
   );
 }

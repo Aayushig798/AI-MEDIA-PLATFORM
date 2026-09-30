@@ -26,20 +26,35 @@ export async function GET(
       );
     }
 
-    const asset = await db.mediaAsset.findUnique({
-      where: { id: assetId },
-      select: {
-        id: true,
-        cloudinaryPublicId: true,
-        secureUrl: true,
-        resourceType: true,
-        format: true,
-        manualCategory: true,
-        manualLocation: true,
-        capturedAt: true,
-        createdAt: true,
-      },
-    });
+    // Asset, audit rows and the ledger side all load in parallel
+    const [asset, auditLogs, ledgerSide] = await Promise.all([
+      db.mediaAsset.findUnique({
+        where: { id: assetId },
+        select: {
+          id: true,
+          cloudinaryPublicId: true,
+          secureUrl: true,
+          resourceType: true,
+          format: true,
+          manualCategory: true,
+          manualLocation: true,
+          capturedAt: true,
+          createdAt: true,
+        },
+      }),
+      db.assetAuditLog.findMany({
+        where: { mediaAssetId: assetId },
+        orderBy: { createdAt: "asc" },
+      }),
+      Promise.all([
+        prisma.ledgerEntry.findMany({
+          where: { assetId, type: { in: LEDGER_ONLY } },
+          orderBy: { seq: "asc" },
+        }),
+        verifyFullChain(),
+        prisma.ledgerEntry.count({ where: { assetId } }),
+      ]).catch(() => null), // file-store mode: audit log only
+    ]);
 
     if (!asset) {
       return NextResponse.json(
@@ -48,19 +63,11 @@ export async function GET(
       );
     }
 
-    const auditLogs = await db.assetAuditLog.findMany({
-      where: { mediaAssetId: assetId },
-      orderBy: { createdAt: "asc" },
-    });
-
     // Integrity Engine events live only in the hash-chained ledger; merge them in.
     let ledger: { chainIntact: boolean; entries: number } | null = null;
     let ledgerLogs: any[] = [];
-    try {
-      const entries = await prisma.ledgerEntry.findMany({
-        where: { assetId, type: { in: LEDGER_ONLY } },
-        orderBy: { seq: "asc" },
-      });
+    if (ledgerSide) {
+      const [entries, chain, count] = ledgerSide;
       ledgerLogs = entries.map((e) => ({
         id: e.id,
         mediaAssetId: assetId,
@@ -69,10 +76,7 @@ export async function GET(
         actor: e.actor,
         createdAt: e.createdAt,
       }));
-      const [chain, count] = await Promise.all([verifyFullChain(), prisma.ledgerEntry.count({ where: { assetId } })]);
       ledger = { chainIntact: chain.ok, entries: count };
-    } catch {
-      // file-store mode: audit log only
     }
 
     const logs = [...auditLogs, ...ledgerLogs].sort(

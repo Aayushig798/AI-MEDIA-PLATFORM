@@ -7,8 +7,14 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    // Status, tags and categories in a single query
     const asset = await db.mediaAsset.findUnique({
       where: { id },
+      select: {
+        aiProcessingStatus: true,
+        aiTags: { orderBy: { confidence: "desc" } },
+        categories: { include: { category: true } },
+      },
     });
 
     if (!asset) {
@@ -18,23 +24,11 @@ export async function GET(
       );
     }
 
-    // Explicitly read directly from the AiTag table
-    const aiTags = await db.aiTag.findMany({
-      where: { mediaAssetId: id },
-      orderBy: { confidence: "desc" },
-    });
-
-    // Read categories from MediaAssetCategory table
-    const mediaCategories = await db.mediaAssetCategory.findMany({
-      where: { mediaAssetId: id },
-      include: { category: true },
-    });
-
     return NextResponse.json({
       success: true,
       aiProcessingStatus: asset.aiProcessingStatus,
-      aiTags: aiTags || [],
-      categories: mediaCategories.map((c: any) => c.category?.name || c.name || "").filter(Boolean),
+      aiTags: asset.aiTags || [],
+      categories: (asset.categories || []).map((c: any) => c.category?.name || c.name || "").filter(Boolean),
     });
   } catch (error: any) {
     console.error(`GET /api/assets/${params.id}/ai-tags error:`, error);

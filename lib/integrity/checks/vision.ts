@@ -1,4 +1,5 @@
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
+import { generate, extractJson, llmConfigured, MODEL } from "@/lib/ai/llm";
 import { c2paEnabled } from "@/lib/derivatives";
 import { CHECK_LABELS, CheckResult, IntegrityContext, skipped } from "../types";
 
@@ -67,8 +68,85 @@ function toYesNo(value: unknown): YesNo {
   return v.startsWith("yes") ? "yes" : v.startsWith("no") ? "no" : "unknown";
 }
 
-/** One moderation call (claims + scene cues) and one descriptive call, via Cloudinary AI Vision. */
+const NL = String.fromCharCode(10);
+
+function toBool(v: unknown): boolean {
+  return v === true || String(v).toLowerCase() === "true" || String(v).toLowerCase() === "yes";
+}
+
+/**
+ * The AI auditor, weather cues and provenance signals from ONE Gemini call that
+ * looks at the photo (Gemini free tier). Preferred over Cloudinary AI Vision,
+ * which needs a separate add-on subscription.
+ */
+async function runGeminiVision(ctx: IntegrityContext): Promise<VisionResult> {
+  const claim = ctx.asset.claimText || ctx.asset.project.claim || ctx.asset.manualNotes;
+  const claimQuestions = buildClaimQuestions(claim, ctx.asset.manualCategory);
+
+  const claimBlock = claimQuestions.length
+    ? claimQuestions.map((q, i) => `${i + 1}. ${q}`).join(NL)
+    : "(none: return an empty array)";
+  const prompt = [
+    "You are auditing one field photo submitted as evidence of a sustainability/development project.",
+    claim ? `The claim it should support: "${claim}".` : "",
+    "Look carefully at the image and answer strictly from what is visible. Reply ONLY with a JSON object of this exact shape:",
+    "{",
+    '  "claimAnswers": [{"question": string, "answer": "yes"|"no"|"unknown"}],',
+    '  "scene": {"raining": boolean, "wetGround": boolean, "flooding": boolean, "dryDusty": boolean},',
+    '  "aiGenerated": "yes"|"no"|"unknown",',
+    '  "screenCapture": "yes"|"no"|"unknown",',
+    '  "description": string,',
+    '  "tags": string[]',
+    "}",
+    "claimAnswers: answer each of these questions, in order, keeping the wording:",
+    claimBlock,
+    "scene: what weather/ground conditions are visible (raining now, wet or muddy ground, floodwater, dry dusty soil).",
+    "aiGenerated: does it look AI-generated, composited or heavily manipulated? screenCapture: is it a photo of a screen, a screenshot, or a photo of a printed photo?",
+    'description: one factual sentence. tags: up to 8 short lowercase tags of visible objects/activities. Use "unknown" rather than guessing.',
+  ]
+    .filter(Boolean)
+    .join(NL);
+
+  const raw = await generate({ text: prompt, images: [ctx.analysisImageUrl], json: true, maxOutputTokens: 1500, temperature: 0.1 });
+  const j = extractJson(raw);
+
+  const yn = (v: unknown): YesNo => (v === "yes" || v === "no" ? v : "unknown");
+  const answered: any[] = Array.isArray(j.claimAnswers) ? j.claimAnswers : [];
+  return {
+    claimAnswers: claimQuestions.map((question, i) => ({ question, answer: yn(String(answered[i]?.answer ?? "").toLowerCase()) })),
+    scene: {
+      raining: toBool(j.scene?.raining),
+      wetGround: toBool(j.scene?.wetGround),
+      flooding: toBool(j.scene?.flooding),
+      dryDusty: toBool(j.scene?.dryDusty),
+    },
+    aiGenerated: yn(String(j.aiGenerated ?? "").toLowerCase()),
+    screenCapture: yn(String(j.screenCapture ?? "").toLowerCase()),
+    description: typeof j.description === "string" && j.description.trim() ? j.description.trim() : null,
+    tags: Array.isArray(j.tags) ? j.tags.map((t: unknown) => String(t).toLowerCase()).slice(0, 8) : [],
+  };
+}
+
+/** Gemini first (free key), then Cloudinary AI Vision if that add-on is available. */
 export async function runVision(ctx: IntegrityContext): Promise<VisionResult> {
+  if (llmConfigured()) {
+    try {
+      return await runGeminiVision(ctx);
+    } catch (err: any) {
+      console.warn(`[vision] Gemini (${MODEL}) failed, trying Cloudinary AI Vision:`, err?.message || err);
+      if (!isCloudinaryConfigured()) throw err;
+      try {
+        return await runCloudinaryVision(ctx);
+      } catch {
+        throw err; // report the Gemini error: it's the primary path
+      }
+    }
+  }
+  return runCloudinaryVision(ctx);
+}
+
+/** One moderation call (claims + scene cues) and one descriptive call, via Cloudinary AI Vision. */
+async function runCloudinaryVision(ctx: IntegrityContext): Promise<VisionResult> {
   if (!isCloudinaryConfigured()) throw new Error("Cloudinary credentials not configured");
 
   const claim = ctx.asset.claimText || ctx.asset.project.claim || ctx.asset.manualNotes;

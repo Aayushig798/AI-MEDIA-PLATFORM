@@ -3,26 +3,19 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Calendar, 
-  UploadCloud, 
-  Layers, 
-  Loader2, 
-  ShieldCheck, 
-  FileSpreadsheet, 
-  Info,
-  ExternalLink,
-  Trash2,
-  AlertTriangle,
-  X,
-  SlidersHorizontal,
-  Image as ImageIcon,
-  Search,
-  FileText,
+import {
+  ArrowLeft,
   BarChart3,
-  MoreHorizontal
+  CalendarDays,
+  Columns2,
+  Copy,
+  FileText,
+  Images,
+  MapPin,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import { GalleryFilterBar } from "@/components/GalleryFilterBar";
 import { GalleryGrid, MediaAssetItem } from "@/components/GalleryGrid";
@@ -31,6 +24,9 @@ import { AssetDetailModal } from "@/components/AssetDetailModal";
 import { SuggestedComparisons } from "@/components/SuggestedComparisons";
 import { SavedComparisons } from "@/components/SavedComparisons";
 import { ProjectIntegrityBar, ProjectIntegrityFields } from "@/components/ProjectIntegrityBar";
+import { effectiveVerdict } from "@/components/TrustBadge";
+import { ConfirmDialog, EmptyState, Loading, Menu, Tabs } from "@/components/ui";
+import { withTransformation } from "@/lib/cloudinary-url";
 
 interface ProjectDetail {
   id: string;
@@ -79,7 +75,6 @@ export default function ProjectGalleryPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  const [showIdMenu, setShowIdMenu] = useState(false);
   const [copiedProjectId, setCopiedProjectId] = useState(false);
 
   const fetchProjectInfo = useCallback(async () => {
@@ -191,220 +186,186 @@ export default function ProjectGalleryPage() {
   };
 
   if (loadingProject && !project) {
-    return (
-      <div className="py-24 flex flex-col items-center justify-center gap-3 text-slate-400">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
-        <p className="text-sm">Loading project repository...</p>
-      </div>
-    );
+    return <Loading label="Loading project" />;
   }
 
   if (!project) {
     return (
-      <div className="glass-panel rounded-2xl p-12 text-center max-w-md mx-auto my-12">
-        <h3 className="text-lg font-bold text-white">Project Not Found</h3>
-        <p className="text-xs text-slate-400 mt-2 mb-6">
-          The requested impact initiative does not exist or may have been archived.
-        </p>
-        <Link
-          href="/projects"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-500 text-slate-950 hover:bg-emerald-400"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Return to Projects</span>
-        </Link>
-      </div>
+      <EmptyState
+        icon={Images}
+        title="Project not found"
+        description="It may have been deleted, or the link is wrong."
+        action={
+          <Link href="/projects" className="btn btn-secondary">
+            Back to projects
+          </Link>
+        }
+      />
     );
   }
 
+  const totalFiles = project._count?.assets ?? allAssets.length;
+  const verifiedCount = allAssets.filter((a) => effectiveVerdict(a.integrity) === "VERIFIED").length;
+  const cover = allAssets.find((a) => a.resourceType !== "video") ?? allAssets[0];
+  const coverSrc = cover
+    ? withTransformation(
+        cover.secureUrl,
+        "c_fill,w_1600,h_560,g_auto,q_auto,f_auto",
+        cover.resourceType === "video" ? "jpg" : undefined,
+      )
+    : null;
+
+  const capturedDates = allAssets
+    .map((a) => (a.capturedAt ? new Date(a.capturedAt).getTime() : NaN))
+    .filter((t) => !Number.isNaN(t));
+  const fmtMonth = (t: number) => new Date(t).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  const span = capturedDates.length
+    ? (() => {
+        const a = fmtMonth(Math.min(...capturedDates));
+        const b = fmtMonth(Math.max(...capturedDates));
+        return a === b ? a : `${a} – ${b}`;
+      })()
+    : null;
+
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <Link
-          href="/projects"
-          className="inline-flex items-center gap-1.5 hover:text-white transition group"
-        >
-          <ArrowLeft className="w-4 h-4 text-emerald-400 group-hover:-translate-x-1 transition-transform" />
-          <span>Back to All Projects</span>
-        </Link>
-
-        {/* Project Options / Debug Menu */}
-        <div className="relative">
-          <button
-            type="button"
-            id="project-options-menu-btn"
-            onClick={() => setShowIdMenu(!showIdMenu)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center gap-1 text-[11px]"
-            title="Project Options"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
-
-          {showIdMenu && (
-            <div
-              onMouseLeave={() => setShowIdMenu(false)}
-              className="absolute right-0 top-full mt-1.5 z-40 p-3 rounded-2xl bg-slate-900/95 border border-white/10 shadow-2xl backdrop-blur-md text-xs space-y-2.5 min-w-[220px] animate-fade-in"
-            >
-              <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                System Identifier
-              </div>
-              <div className="font-mono text-[11px] text-slate-300 break-all bg-black/40 p-1.5 rounded-lg border border-white/5">
-                {project.id}
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(project.id);
-                  setCopiedProjectId(true);
-                  setTimeout(() => setCopiedProjectId(false), 2000);
-                }}
-                className="w-full py-1 text-left text-[11px] font-medium text-emerald-400 hover:underline flex items-center gap-1.5"
-              >
-                {copiedProjectId ? "✓ Copied Project ID" : "Copy Project ID"}
-              </button>
+    <div className="animate-fade-in space-y-8">
+      {/* Hero banner */}
+      <section className="relative isolate rounded-3xl bg-zinc-900 shadow-[0_24px_48px_-24px_rgba(16,24,40,0.45)]">
+        {/* Clipping lives on the background only, so the options menu can overflow the banner. */}
+        <div className="absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+          {coverSrc ? (
+            <img src={coverSrc} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-emerald-600 via-teal-700 to-zinc-900">
+              <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]" />
             </div>
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/90 via-zinc-950/55 to-zinc-950/20" />
         </div>
-      </div>
 
-      {/* Project Banner / Header Card */}
-      <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-white/5 relative overflow-hidden">
-        {/* Ambient background glow */}
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex min-h-[280px] flex-col justify-between gap-8 p-5 sm:p-8">
+          <div className="flex items-center justify-between gap-3">
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1.5 text-sm text-white/90 ring-1 ring-white/15 backdrop-blur-md transition hover:bg-white/20"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Projects
+            </Link>
+            <div className="flex items-center gap-2">
+              <Link href={`/projects/${project.id}/report`} className="btn btn-glass btn-sm hidden sm:inline-flex">
+                <FileText className="h-4 w-4" />
+                Report
+              </Link>
+              <button
+                id="open-upload-modal-btn"
+                onClick={() => setIsUploadOpen(true)}
+                className="btn btn-sm bg-white text-zinc-900 shadow-sm hover:bg-zinc-100"
+              >
+                <Upload className="h-4 w-4" />
+                Upload
+              </button>
+              <Menu label="Project options" buttonClassName="btn btn-glass btn-sm btn-icon">
+                <Link href={`/projects/${project.id}/report`} className="menu-item sm:hidden">
+                  <FileText className="h-4 w-4 text-zinc-400" />
+                  Report
+                </Link>
+                <Link href={`/projects/${project.id}/dashboard`} className="menu-item">
+                  <BarChart3 className="h-4 w-4 text-zinc-400" />
+                  Insights
+                </Link>
+                <Link href={`/search?projectId=${project.id}`} className="menu-item">
+                  <Search className="h-4 w-4 text-zinc-400" />
+                  Search this project
+                </Link>
+                <button
+                  type="button"
+                  id="project-options-menu-btn"
+                  className="menu-item"
+                  onClick={() => {
+                    navigator.clipboard.writeText(project.id);
+                    setCopiedProjectId(true);
+                    setTimeout(() => setCopiedProjectId(false), 2000);
+                  }}
+                >
+                  <Copy className="h-4 w-4 text-zinc-400" />
+                  {copiedProjectId ? "Copied" : "Copy project ID"}
+                </button>
+                <div className="my-1 border-t border-zinc-100" />
+                <button
+                  type="button"
+                  id="open-delete-project-modal-btn"
+                  onClick={() => {
+                    setDeleteError("");
+                    setShowDeleteModal(true);
+                  }}
+                  className="menu-item text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete project
+                </button>
+              </Menu>
+            </div>
+          </div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-3 max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Verified Project
-              </span>
-
-              {project.startDate && (
-                <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                  Initiated: {new Date(project.startDate).toLocaleDateString(undefined, {
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
+          <div className="space-y-4">
+            <div className="max-w-3xl space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">{project.name}</h1>
+              {project.description && (
+                <p className="text-[15px] leading-relaxed text-white/75">{project.description}</p>
               )}
-
+            </div>
+            <div className="flex flex-wrap gap-2 text-[13px] text-white">
               {project.location && (
-                <span className="inline-flex items-center gap-1 text-xs text-teal-400 font-medium">
-                  <MapPin className="w-3.5 h-3.5" />
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/15 backdrop-blur-md">
+                  <MapPin className="h-3.5 w-3.5 text-sky-300" />
                   {project.location}
                 </span>
               )}
-            </div>
-
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              {project.name}
-            </h1>
-
-            <p className="text-sm text-slate-300 leading-relaxed">
-              {project.description || "No detailed scope has been added for this project yet."}
-            </p>
-          </div>
-
-          {/* Action CTAs */}
-          <div className="flex flex-wrap lg:flex-col items-stretch gap-3 shrink-0">
-            <button
-              id="open-upload-modal-btn"
-              onClick={() => setIsUploadOpen(true)}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>Upload Media</span>
-            </button>
-
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex-1 flex items-center justify-center gap-1.5 text-xs text-slate-400 px-3 py-2 rounded-xl bg-white/5 border border-white/5">
-                <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{assets.length} Assets</span>
-              </div>
-
-              {/* Delete Project Button */}
-              <button
-                type="button"
-                id="open-delete-project-modal-btn"
-                onClick={() => setShowDeleteModal(true)}
-                title="Delete this project and all its media"
-                className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 border border-white/5 transition"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {project.startDate && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/15 backdrop-blur-md">
+                  <CalendarDays className="h-3.5 w-3.5 text-sky-300" />
+                  Started{" "}
+                  {new Date(project.startDate).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/15 backdrop-blur-md">
+                <Images className="h-3.5 w-3.5 text-sky-300" />
+                {totalFiles} {totalFiles === 1 ? "file" : "files"}
+                {span ? ` · ${span}` : ""}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-2.5 py-1 ring-1 ring-emerald-300/30 backdrop-blur-md">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+                {verifiedCount} verified
+              </span>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Views and Project Tools Switcher */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
-        {/* In-page View Tabs */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            id="project-tab-gallery"
-            onClick={() => setActiveTab("gallery")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
-              activeTab === "gallery"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
-                : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
-            }`}
-          >
-            <ImageIcon className="w-4 h-4" />
-            <span>Media Evidence ({assets.length})</span>
-          </button>
-
-          <button
-            type="button"
-            id="project-tab-comparisons"
-            onClick={() => setActiveTab("comparisons")}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition ${
-              activeTab === "comparisons"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-md shadow-emerald-500/10"
-                : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
-            }`}
-          >
-            <SlidersHorizontal className="w-4 h-4 text-emerald-400" />
-            <span>Before / After Comparisons</span>
-          </button>
-        </div>
-
-        {/* Project Intelligence & Reporting Tools */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Link
-            href={`/search?projectId=${project.id}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition"
-            title="Search media within this project"
-          >
-            <Search className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Project Search</span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={activeTab}
+          onChange={setActiveTab}
+          items={[
+            { value: "gallery", label: "Media", count: totalFiles, icon: Images },
+            { value: "comparisons", label: "Before & after", icon: Columns2 },
+          ]}
+        />
+        <div className="flex items-center gap-1">
+          <Link href={`/projects/${project.id}/dashboard`} className="btn btn-ghost btn-sm">
+            <BarChart3 className="h-4 w-4" />
+            Insights
           </Link>
-
-          <Link
-            href={`/projects/${project.id}/report`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition"
-          >
-            <FileText className="w-3.5 h-3.5 text-rose-400" />
-            <span>Report Studio</span>
-          </Link>
-
-          <Link
-            href={`/projects/${project.id}/dashboard`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Analytics Dashboard</span>
+          <Link href={`/search?projectId=${project.id}`} className="btn btn-ghost btn-sm">
+            <Search className="h-4 w-4" />
+            Search
           </Link>
         </div>
       </div>
 
       {activeTab === "gallery" ? (
-        <>
-          {/* Proof-of-Impact integrity: verdict counts, verify-all, site & claim */}
+        <div className="space-y-6">
           <ProjectIntegrityBar
             project={project}
             assets={allAssets}
@@ -414,34 +375,30 @@ export default function ProjectGalleryPage() {
             onProjectUpdated={(p) => setProject((prev) => (prev ? { ...prev, ...p } : prev))}
           />
 
-          {/* Filter Bar */}
-          <GalleryFilterBar
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-            fromDate={fromDate}
-            onSelectFromDate={setFromDate}
-            toDate={toDate}
-            onSelectToDate={setToDate}
-            onReset={handleResetFilters}
-            totalCount={project._count?.assets ?? assets.length}
-            filteredCount={assets.length}
-          />
-
-          {/* Media Gallery Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="font-semibold text-slate-200 uppercase tracking-wider text-[11px]">
-                Field Media Stream &bull; Newest First
-              </span>
-              <span className="text-[11px] text-slate-400">
-                {assets.length} visual asset{assets.length === 1 ? "" : "s"}
-              </span>
-            </div>
+            <GalleryFilterBar
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+              fromDate={fromDate}
+              onSelectFromDate={setFromDate}
+              toDate={toDate}
+              onSelectToDate={setToDate}
+              onReset={handleResetFilters}
+              totalCount={project._count?.assets ?? assets.length}
+              filteredCount={assets.length}
+            />
 
             {loadingAssets ? (
-              <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
-                <Loader2 className="w-7 h-7 animate-spin text-emerald-400" />
-                <p className="text-xs">Fetching evidence assets...</p>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="card overflow-hidden">
+                    <div className="skeleton aspect-[4/3]" />
+                    <div className="space-y-2 p-3.5">
+                      <div className="skeleton h-3.5 w-2/3 rounded" />
+                      <div className="skeleton h-3 w-1/2 rounded" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <GalleryGrid
@@ -452,25 +409,18 @@ export default function ProjectGalleryPage() {
               />
             )}
           </div>
-        </>
+        </div>
       ) : (
-        <div className="space-y-10 animate-fade-in">
-          {/* Suggested Comparisons Section */}
+        <div className="animate-fade-in space-y-10">
           <SuggestedComparisons
             projectId={projectId}
             refreshTrigger={comparisonsRefreshKey}
             onComparisonSaved={() => setComparisonsRefreshKey((k) => k + 1)}
           />
-
-          {/* Saved Comparisons Section */}
-          <SavedComparisons
-            projectId={projectId}
-            refreshTrigger={comparisonsRefreshKey}
-          />
+          <SavedComparisons projectId={projectId} refreshTrigger={comparisonsRefreshKey} />
         </div>
       )}
 
-      {/* Upload Modal */}
       <UploadModal
         projectId={projectId}
         defaultLocation={project.location || ""}
@@ -479,7 +429,6 @@ export default function ProjectGalleryPage() {
         onUploadComplete={handleUploadComplete}
       />
 
-      {/* Asset Detail & Edit Modal */}
       <AssetDetailModal
         asset={selectedAsset}
         isOpen={!!selectedAsset}
@@ -488,65 +437,16 @@ export default function ProjectGalleryPage() {
         onAssetDeleted={handleAssetDeleted}
       />
 
-      {/* Delete Project Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div 
-            className="glass-dropdown w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl relative border border-red-500/20"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowDeleteModal(false)}
-              className="absolute right-4 top-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-xl font-bold text-white">Delete Project?</h3>
-            <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-              Are you sure you want to permanently delete <strong className="text-white">&ldquo;{project.name}&rdquo;</strong>?
-            </p>
-            <p className="text-xs text-red-400 mt-2 bg-red-950/40 p-3 rounded-xl border border-red-500/20">
-              Warning: This will permanently erase the project record and destroy all <strong className="text-white">{assets.length}</strong> associated evidence media assets from Cloudinary CDN and the database.
-            </p>
-
-            {deleteError && (
-              <div className="mt-3 p-2.5 rounded-xl bg-red-500/20 text-red-200 text-xs">
-                {deleteError}
-              </div>
-            )}
-
-            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deletingProject}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                id="confirm-delete-project-btn"
-                onClick={handleDeleteProject}
-                disabled={deletingProject}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-600/20 disabled:opacity-50 transition"
-              >
-                {deletingProject ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-                <span>{deletingProject ? "Deleting Project..." : "Permanently Delete"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteProject}
+        busy={deletingProject}
+        error={deleteError}
+        title={`Delete "${project.name}"?`}
+        description={`This permanently deletes the project and its ${totalFiles} ${totalFiles === 1 ? "file" : "files"}. This can't be undone.`}
+        confirmLabel="Delete project"
+      />
     </div>
   );
 }

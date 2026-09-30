@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
 import { getAnalysisImageUrl } from "@/lib/cloudinary-url";
+import { generate, llmConfigured } from "@/lib/ai/llm";
 
 export const maxDuration = 60;
 
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { assetId: st
     if (typeof question !== "string" || question.trim().length < 5 || question.length > MAX_QUESTION) {
       return NextResponse.json({ success: false, error: `Ask a question of 5–${MAX_QUESTION} characters.` }, { status: 400 });
     }
-    if (!isCloudinaryConfigured()) {
+    if (!llmConfigured() && !isCloudinaryConfigured()) {
       return NextResponse.json({ success: false, error: "The AI auditor is not configured." }, { status: 503 });
     }
 
@@ -63,6 +64,24 @@ export async function POST(req: NextRequest, { params }: { params: { assetId: st
       `Answer the viewer's question in at most 3 sentences, based only on what is visible in the image and the context above. ` +
       `If it cannot be determined from the image, say so plainly. Do not speculate about people's identities.\n\n` +
       `Question: ${question.trim()}`;
+
+    // Gemini reads the photo directly (free key); Cloudinary AI Vision is the fallback.
+    if (llmConfigured()) {
+      try {
+        const answer = await generate({
+          text: prompt,
+          images: [getAnalysisImageUrl(asset.secureUrl, asset.resourceType)],
+          maxOutputTokens: 600,
+          temperature: 0.2,
+        });
+        return NextResponse.json({ success: true, answer: answer.trim() || "No answer." });
+      } catch (err: any) {
+        console.warn("[ask] Gemini failed:", err?.message || err);
+        if (!isCloudinaryConfigured()) {
+          return NextResponse.json({ success: false, error: "The AI auditor could not answer right now; try again shortly." }, { status: 502 });
+        }
+      }
+    }
 
     const cloud = process.env.CLOUDINARY_CLOUD_NAME;
     const auth = Buffer.from(`${process.env.CLOUDINARY_API_KEY}:${process.env.CLOUDINARY_API_SECRET}`).toString("base64");

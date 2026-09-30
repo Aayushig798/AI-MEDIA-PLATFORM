@@ -7,7 +7,7 @@ import {
   ReactCompareSliderHandle,
 } from "react-compare-slider";
 import { getNormalizedComparisonUrl } from "@/lib/cloudinary-url";
-import { Calendar, MapPin, Sparkles, Layers, SlidersHorizontal } from "lucide-react";
+import { MapPin } from "lucide-react";
 
 export interface CompareSliderProps {
   beforeUrl: string;
@@ -21,6 +21,13 @@ export interface CompareSliderProps {
   notes?: string | null;
   aspectRatio?: string; // e.g. "aspect-[4/3]" or "aspect-[16/9]"
 }
+
+/** Shows an all-caps label ("BEFORE") in sentence case; other labels are left as given. */
+function displayLabel(label: string) {
+  return label === label.toUpperCase() ? label.charAt(0) + label.slice(1).toLowerCase() : label;
+}
+
+const PRESETS = [25, 50, 75];
 
 export function CompareSlider({
   beforeUrl,
@@ -53,123 +60,93 @@ export function CompareSlider({
   const formattedBeforeDate = formatShortDate(beforeDate);
   const formattedAfterDate = formatShortDate(afterDate);
 
+  const chip =
+    "inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-2 py-1 text-[11px] font-semibold text-zinc-900 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.35)] ring-1 ring-black/5 backdrop-blur";
+
   return (
     <div className="flex flex-col gap-3">
-      {/* Header Info */}
       {(title || location || notes) && (
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            {title && <h4 className="text-sm font-bold text-white tracking-tight">{title}</h4>}
-            {location && (
-              <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                {location}
-              </p>
-            )}
-            {notes && <p className="text-xs text-slate-300 mt-1 italic leading-relaxed">&ldquo;{notes}&rdquo;</p>}
-          </div>
-
-          {/* Quick preset positions */}
-          <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/10 text-[11px]">
-            <button
-              type="button"
-              onClick={() => setSliderPosition(25)}
-              className={`px-2 py-0.5 rounded-lg transition ${sliderPosition === 25 ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-slate-400 hover:text-white"}`}
-            >
-              25%
-            </button>
-            <button
-              type="button"
-              onClick={() => setSliderPosition(50)}
-              className={`px-2 py-0.5 rounded-lg transition ${sliderPosition === 50 ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-slate-400 hover:text-white"}`}
-            >
-              50%
-            </button>
-            <button
-              type="button"
-              onClick={() => setSliderPosition(75)}
-              className={`px-2 py-0.5 rounded-lg transition ${sliderPosition === 75 ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-slate-400 hover:text-white"}`}
-            >
-              75%
-            </button>
-          </div>
+        <div className="min-w-0 space-y-0.5">
+          {title && <h4 className="text-sm font-semibold text-zinc-900">{title}</h4>}
+          {location && (
+            <p className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-sky-500" />
+              <span className="truncate">{location}</span>
+            </p>
+          )}
+          {notes && <p className="pt-0.5 text-sm leading-relaxed text-zinc-600">{notes}</p>}
         </div>
       )}
 
-      {/* Comparison Slider Container */}
-      <div className={`relative w-full ${aspectRatio} rounded-2xl overflow-hidden bg-slate-950 border border-white/10 shadow-2xl group select-none`}>
+      <div
+        className={`relative w-full ${aspectRatio} select-none overflow-hidden rounded-xl bg-zinc-900 shadow-[0_12px_32px_-16px_rgba(0,0,0,0.5)] ring-1 ring-black/10`}
+      >
         <ReactCompareSlider
           key={sliderPosition}
           defaultPosition={sliderPosition}
-          className="w-full h-full"
+          className="h-full w-full"
           handle={
             <ReactCompareSliderHandle
               buttonStyle={{
-                backdropFilter: "blur(8px)",
-                background: "rgba(16, 185, 129, 0.9)",
-                border: "2px solid #ffffff",
-                boxShadow: "0 0 15px rgba(16, 185, 129, 0.5)",
-                color: "#ffffff",
-                width: "36px",
-                height: "36px",
+                backdropFilter: "none",
+                background: "#ffffff",
+                border: "none",
+                boxShadow: "0 6px 20px -4px rgba(0, 0, 0, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.28)",
+                color: "#059669",
+                width: "40px",
+                height: "40px",
               }}
               linesStyle={{
-                background: "rgba(255, 255, 255, 0.8)",
-                boxShadow: "0 0 6px rgba(0, 0, 0, 0.6)",
+                background: "#ffffff",
+                boxShadow: "0 0 10px rgba(0, 0, 0, 0.35)",
                 width: 2,
               }}
             />
           }
           itemOne={
-            <ReactCompareSliderImage
-              src={normalizedBefore}
-              alt={beforeLabel}
-              className="object-cover w-full h-full"
-            />
+            <ReactCompareSliderImage src={normalizedBefore} alt={beforeLabel} className="h-full w-full object-cover" />
           }
           itemTwo={
-            <ReactCompareSliderImage
-              src={normalizedAfter}
-              alt={afterLabel}
-              className="object-cover w-full h-full"
-            />
+            <ReactCompareSliderImage src={normalizedAfter} alt={afterLabel} className="h-full w-full object-cover" />
           }
         />
 
-        {/* Floating Before Badge (Top-Left) */}
-        <div className="absolute top-3 left-3 pointer-events-none z-10 flex flex-col items-start gap-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-950/80 text-amber-400 border border-amber-500/30 backdrop-blur-md shadow-lg">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-            {beforeLabel}
-          </div>
-          {formattedBeforeDate && (
-            <span className="text-[10px] text-slate-300 bg-slate-900/90 px-2 py-0.5 rounded-md backdrop-blur-sm flex items-center gap-1 shadow">
-              <Calendar className="w-3 h-3 text-slate-400" />
-              {formattedBeforeDate}
-            </span>
-          )}
-        </div>
+        {/* Soft shade so the chips stay readable on bright skies */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-gradient-to-b from-black/30 to-transparent" />
 
-        {/* Floating After Badge (Top-Right) */}
-        <div className="absolute top-3 right-3 pointer-events-none z-10 flex flex-col items-end gap-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-slate-950/80 text-emerald-400 border border-emerald-500/30 backdrop-blur-md shadow-lg">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            {afterLabel}
-          </div>
-          {formattedAfterDate && (
-            <span className="text-[10px] text-slate-300 bg-slate-900/90 px-2 py-0.5 rounded-md backdrop-blur-sm flex items-center gap-1 shadow">
-              <Calendar className="w-3 h-3 text-slate-400" />
-              {formattedAfterDate}
-            </span>
-          )}
-        </div>
-
-        {/* Bottom Helper Hint */}
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none z-10 opacity-70 group-hover:opacity-100 transition">
-          <span className="text-[10px] text-white/90 bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm border border-white/10 flex items-center gap-1.5">
-            <SlidersHorizontal className="w-3 h-3 text-emerald-400" />
-            Drag handle left or right to compare
+        <div className="pointer-events-none absolute left-2.5 top-2.5 z-10 sm:left-3 sm:top-3">
+          <span className={chip}>
+            <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+            {displayLabel(beforeLabel)}
+            {formattedBeforeDate && <span className="font-medium tabular-nums text-zinc-500">{formattedBeforeDate}</span>}
           </span>
+        </div>
+
+        <div className="pointer-events-none absolute right-2.5 top-2.5 z-10 sm:right-3 sm:top-3">
+          <span className={chip}>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            {displayLabel(afterLabel)}
+            {formattedAfterDate && <span className="font-medium tabular-nums text-zinc-500">{formattedAfterDate}</span>}
+          </span>
+        </div>
+
+        {/* Quick preset positions */}
+        <div
+          className="absolute bottom-2.5 left-1/2 z-10 inline-flex -translate-x-1/2 rounded-lg bg-black/45 p-0.5 ring-1 ring-white/15 backdrop-blur-md sm:bottom-3"
+          aria-label="Slider position"
+        >
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setSliderPosition(p)}
+              className={`rounded-md px-2.5 py-1 text-[12px] font-medium tabular-nums transition-colors ${
+                sliderPosition === p ? "bg-white text-zinc-900 shadow-sm" : "text-white/80 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {p}%
+            </button>
+          ))}
         </div>
       </div>
     </div>
