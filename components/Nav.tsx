@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderKanban, History, Inbox, Leaf, Map as MapIcon, Plus, Search } from "lucide-react";
+import { FolderKanban, History, Inbox, Leaf, Map as MapIcon, Search } from "lucide-react";
 import { cx } from "./ui";
 
 const LINKS = [
@@ -76,16 +76,6 @@ export function Nav() {
             <Search className="h-4 w-4" />
             Search photos…
           </Link>
-          <Link href="/projects?new=true" className="btn btn-primary btn-sm hidden sm:inline-flex">
-            <Plus className="h-4 w-4" />
-            New project
-          </Link>
-          <span
-            title="Field team"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-xs font-semibold text-white ring-2 ring-white"
-          >
-            ER
-          </span>
         </div>
       </div>
     </header>
