@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 
-const envPath = path.join(process.cwd(), ".env.local");
+const envPath = [".env.local", ".env"].map((f) => path.join(process.cwd(), f)).find((f) => fs.existsSync(f)) ?? path.join(process.cwd(), ".env.local");
 if (fs.existsSync(envPath)) {
   const content = fs.readFileSync(envPath, "utf-8");
   for (const line of content.split("\n")) {

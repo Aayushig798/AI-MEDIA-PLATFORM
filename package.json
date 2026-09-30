@@ -9,7 +9,9 @@
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:seed": "prisma db seed",
-    "db:setup": "prisma db execute --file prisma/extensions.sql --schema prisma/schema.prisma && prisma db push && prisma db execute --file prisma/indexes.sql --schema prisma/schema.prisma"
+    "db:setup": "prisma db execute --file prisma/extensions.sql --schema prisma/schema.prisma && prisma db push && prisma db execute --file prisma/indexes.sql --schema prisma/schema.prisma",
+    "ai:check": "tsx scripts/check_ai.ts",
+    "ai:reembed": "tsx scripts/backfill_embeddings.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -21,7 +23,6 @@
     "lucide-react": "^0.475.0",
     "next": "^14.2.35",
     "next-auth": "^4.24.11",
-    "openai": "^7.23.0",
     "puppeteer": "^25.12.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",

@@ -1,4 +1,4 @@
-import { chat, llmConfigured, TEXT_MODEL } from "@/lib/ai/llm";
+import { generate, llmConfigured } from "@/lib/ai/llm";
 import { ProjectFacts } from "./factAssembly";
 import { ungroundedNumbers } from "./grounding";
 
@@ -64,27 +64,22 @@ function measuredText(facts: ProjectFacts): string[] {
 
 /**
  * Generates an executive narrative strictly grounded in assembled project facts.
- * Uses the Groq text model when GROQ_API_KEY is available; falls back to an exact,
+ * Uses Gemini when GEMINI_API_KEY is available; falls back to an exact,
  * fact-grounded template if unavailable.
  */
 export async function generateNarrative(facts: ProjectFacts): Promise<string> {
   if (llmConfigured()) {
     try {
       const content = (
-        await chat({
-          model: TEXT_MODEL,
-          messages: [
-          {
-            role: "system",
-            content:
-              "You write concise sustainability impact-report narratives. " +
-              "Use ONLY the facts provided in the user message. " +
-              "Never invent statistics, dates, or details not present in the facts. " +
-              "Write 2-3 paragraphs suitable for a stakeholder report.",
-          },
-          { role: "user", content: JSON.stringify(facts) },
-          ],
+        await generate({
+          system:
+            "You write concise sustainability impact-report narratives. " +
+            "Use ONLY the facts provided in the user message. " +
+            "Never invent statistics, dates, or details not present in the facts. " +
+            "Write 2-3 paragraphs suitable for a stakeholder report. Plain prose, no headings or bullet points.",
+          text: JSON.stringify(facts),
           temperature: 0.2,
+          maxOutputTokens: 1500,
         })
       ).trim();
       // Grounding guard: reject any draft that states a number not in the facts.
