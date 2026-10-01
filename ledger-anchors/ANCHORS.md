@@ -8,3 +8,4 @@ when the commit was made.
 | Anchored at (UTC) | Entries | Merkle root |
 |---|---|---|
 | 2026-09-30T22:30Z | #149–#206 (58) |  |
+| 2026-10-01T22:50Z | #207–#207 (1) |  |
